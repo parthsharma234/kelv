@@ -71,9 +71,9 @@ export default function WaitlistForm() {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="text-center p-8 bg-gray-800/50 rounded-lg border border-gray-700"
+        className="text-center p-8 bg-dark-700/50 rounded-lg border border-dark-600"
       >
-        <CheckCircleIcon className="w-16 h-16 text-green-400 mx-auto mb-4" />
+        <CheckCircleIcon className="w-16 h-16 text-orange-500 mx-auto mb-4" />
         <h3 className="text-2xl font-semibold mb-2 text-white">You're on the list!</h3>
         <p className="text-gray-300">
           Thanks for joining our waitlist. We'll notify you when we launch.
@@ -86,9 +86,10 @@ export default function WaitlistForm() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 bg-gray-800/50 rounded-lg border border-gray-700 backdrop-blur-sm"
+      className="p-8 bg-dark-700/50 rounded-lg border border-dark-600 backdrop-blur-sm"
     >
       <h2 className="text-2xl font-bold mb-6 text-center text-white">Join the Waitlist</h2>
+      
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
@@ -100,11 +101,12 @@ export default function WaitlistForm() {
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className="w-full px-4 py-2 rounded-lg bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 text-white placeholder-gray-500"
             placeholder="Your name"
             required
           />
         </div>
+        
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
             Email
@@ -115,31 +117,33 @@ export default function WaitlistForm() {
             name="email"
             value={formData.email}
             onChange={handleChange}
-            className="w-full px-4 py-2 rounded-lg bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 text-white placeholder-gray-500"
             placeholder="your@email.com"
             required
           />
         </div>
+        
         {error && (
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-red-400 text-sm"
-          >
+          <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
             {error}
-          </motion.p>
+          </div>
         )}
+        
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           type="submit"
           disabled={status === 'loading'}
-          className={`w-full py-3 px-4 rounded-lg font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 
-            ${status === 'loading' ? 'opacity-70 cursor-not-allowed' : 'hover:from-blue-600 hover:to-purple-700'}
-            transition-all duration-200`}
+          className={`w-full py-3 px-4 rounded-lg font-medium text-white bg-gradient-to-r from-orange-500 to-orange-400 
+            ${status === 'loading' ? 'opacity-70 cursor-not-allowed' : 'hover:from-orange-400 hover:to-orange-300'}
+            transition-all duration-200 shadow-lg shadow-orange-500/20`}
         >
           {status === 'loading' ? 'Joining...' : 'Join Waitlist'}
         </motion.button>
+        
+        <p className="text-sm text-gray-400 text-center mt-4">
+          We respect your privacy. Unsubscribe at any time.
+        </p>
       </form>
     </motion.div>
   );

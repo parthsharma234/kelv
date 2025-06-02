@@ -1,9 +1,30 @@
-import React, { useEffect, useRef } from 'react';
-import { ArrowRight, CheckCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowRight, CheckCircle, Bot, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Hero: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [currentMessage, setCurrentMessage] = useState(0);
   
+  const messages = [
+    {
+      role: 'ai',
+      text: "Hi! I'm your AI interview coach. I'll help you prepare for your upcoming interviews. What role are you interviewing for?",
+      delay: 1000
+    },
+    {
+      role: 'user',
+      text: "I'm interviewing for a Senior Software Engineer position at a tech company.",
+      delay: 2000
+    },
+    {
+      role: 'ai',
+      text: "Great choice! Let's start with some technical questions. Can you walk me through your experience with system design?",
+      delay: 2000
+    }
+  ];
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -11,6 +32,10 @@ const Hero: React.FC = () => {
           if (entry.isIntersecting) {
             entry.target.classList.add('opacity-100');
             entry.target.classList.remove('opacity-0', 'translate-y-10');
+            // Start the conversation when the section is visible
+            setTimeout(() => {
+              setIsTyping(true);
+            }, 1000);
           }
         });
       },
@@ -27,6 +52,15 @@ const Hero: React.FC = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isTyping && currentMessage < messages.length) {
+      const timer = setTimeout(() => {
+        setCurrentMessage(prev => prev + 1);
+      }, messages[currentMessage].delay);
+      return () => clearTimeout(timer);
+    }
+  }, [isTyping, currentMessage, messages]);
   
   return (
     <section className="pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden">
@@ -71,33 +105,49 @@ const Hero: React.FC = () => {
         </div>
         
         <div className="mt-16 md:mt-24 relative max-w-5xl mx-auto">
-          <div className="relative z-10 rounded-xl overflow-hidden shadow-2xl shadow-orange-500/10 border border-dark-700 animate-float">
+          <div className="relative z-10 rounded-xl overflow-hidden shadow-2xl shadow-orange-500/10 border border-dark-700 mt-12">
             <div className="aspect-video bg-dark-800 flex items-center justify-center">
               <div className="w-full max-w-3xl px-8 py-12 bg-dark-700 rounded-lg relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-transparent"></div>
-                <div className="relative z-10">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-xl font-bold">
-                      AI
-                    </div>
-                    <div className="flex-1">
-                      <div className="animate-pulse h-6 w-3/4 bg-dark-600 rounded mb-3"></div>
-                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2"></div>
-                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2 w-5/6"></div>
-                      <div className="animate-pulse h-4 bg-dark-600 rounded w-2/3"></div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-lg font-bold">
-                      You
-                    </div>
-                    <div className="flex-1">
-                      <div className="animate-pulse h-6 w-1/2 bg-dark-600 rounded mb-3"></div>
-                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2"></div>
-                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2 w-4/6"></div>
-                    </div>
-                  </div>
+                <div className="relative z-10 space-y-6">
+                  <AnimatePresence>
+                    {messages.slice(0, currentMessage + 1).map((message, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className={`flex items-start gap-4 ${
+                          message.role === 'ai' ? 'group hover:bg-dark-600/50 p-2 rounded-lg transition-colors' : ''
+                        }`}
+                      >
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          message.role === 'ai' 
+                            ? 'bg-orange-500 text-white group-hover:scale-110 transition-transform' 
+                            : 'bg-gray-600'
+                        }`}>
+                          {message.role === 'ai' ? <Bot className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium mb-1">
+                            {message.role === 'ai' ? 'AI Coach' : 'You'}
+                          </div>
+                          <div className="text-gray-300">
+                            {message.text}
+                            {index === currentMessage && isTyping && (
+                              <motion.span
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ repeat: Infinity, duration: 0.5 }}
+                                className="inline-block w-2 h-4 bg-orange-500 ml-1"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>

@@ -35,7 +35,6 @@ const Navbar: React.FC = () => {
           <div className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-gray-300 hover:text-orange-400 transition-colors">Features</a>
             <a href="#how-it-works" className="text-gray-300 hover:text-orange-400 transition-colors">How It Works</a>
-            <a href="#testimonials" className="text-gray-300 hover:text-orange-400 transition-colors">Success Stories</a>
             <a href="#waitlist" className="btn btn-primary">Join Waitlist</a>
           </div>
           
@@ -65,13 +64,6 @@ const Navbar: React.FC = () => {
                 onClick={() => setIsOpen(false)}
               >
                 How It Works
-              </a>
-              <a 
-                href="#testimonials" 
-                className="text-gray-300 hover:text-orange-400 transition-colors py-2"
-                onClick={() => setIsOpen(false)}
-              >
-                Success Stories
               </a>
               <a 
                 href="#waitlist" 
