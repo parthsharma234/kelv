@@ -86,7 +86,7 @@ const HowItWorks: React.FC = () => {
                 ref={el => stepsRefs.current[index] = el}
                 className={`flex flex-col ${
                   index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
-                } gap-8 items-center opacity-0 translate-y-10 transition-all duration-700`}
+                } gap-8 items-center opacity-0 translate-y-10 transition-all duration-700 group hover:scale-[1.02] hover:shadow-orange-500/10 hover:shadow-2xl rounded-xl p-4`}
               >
                 <div className="flex-1 relative group">
                   <div className="relative overflow-hidden rounded-xl aspect-video bg-dark-800 p-8 border border-dark-700">

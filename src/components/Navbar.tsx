@@ -33,8 +33,8 @@ const Navbar: React.FC = () => {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-300 hover:text-orange-400 transition-colors">Features</a>
-            <a href="#how-it-works" className="text-gray-300 hover:text-orange-400 transition-colors">How It Works</a>
+            <a href="#features" className="text-gray-300 hover:text-orange-400 transition-colors duration-300">Features</a>
+            <a href="#how-it-works" className="text-gray-300 hover:text-orange-400 transition-colors duration-300">How It Works</a>
             <a href="#waitlist" className="btn btn-primary">Join Waitlist</a>
           </div>
           
@@ -53,14 +53,14 @@ const Navbar: React.FC = () => {
             <div className="container py-4 flex flex-col space-y-4">
               <a 
                 href="#features" 
-                className="text-gray-300 hover:text-orange-400 transition-colors py-2"
+                className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
                 onClick={() => setIsOpen(false)}
               >
                 Features
               </a>
               <a 
                 href="#how-it-works" 
-                className="text-gray-300 hover:text-orange-400 transition-colors py-2"
+                className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
                 onClick={() => setIsOpen(false)}
               >
                 How It Works
