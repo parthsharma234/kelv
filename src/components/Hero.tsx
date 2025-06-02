@@ -16,22 +16,17 @@ const Hero: React.FC = () => {
     {
       role: 'user',
       text: "I'm interviewing for a Senior Software Engineer position at a tech company.",
-      delay: 3000
+      delay: 2000
     },
     {
       role: 'sol',
       text: "Excellent choice! As Sol AI, I specialize in technical interviews. Let's start with system design - can you walk me through your experience?",
-      delay: 3000
+      delay: 2000
     },
     {
       role: 'user',
       text: "I've designed several distributed systems, including a real-time analytics platform that processes millions of events daily.",
-      delay: 3000
-    },
-    {
-      role: 'sol',
-      text: "That's impressive! Using my advanced analysis capabilities, I can help you refine your system design answers. How did you handle scalability challenges in that platform?",
-      delay: 3000
+      delay: 2000
     }
   ];
 
