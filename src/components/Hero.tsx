@@ -1,0 +1,116 @@
+import React, { useEffect, useRef } from 'react';
+import { ArrowRight, CheckCircle } from 'lucide-react';
+
+const Hero: React.FC = () => {
+  const heroRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('opacity-100');
+            entry.target.classList.remove('opacity-0', 'translate-y-10');
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (heroRef.current) {
+      observer.observe(heroRef.current);
+    }
+    
+    return () => {
+      if (heroRef.current) {
+        observer.unobserve(heroRef.current);
+      }
+    };
+  }, []);
+  
+  return (
+    <section className="pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden">
+      <div className="container">
+        <div 
+          ref={heroRef}
+          className="max-w-4xl mx-auto text-center space-y-8 opacity-0 translate-y-10 transition-all duration-1000"
+        >
+          <h1 className="gradient-text font-bold">
+            Master Your Interviews with <br />
+            <span className="text-white">AI-Powered Preparation</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto">
+            Sol Interview uses advanced AI to analyze your performance, provide personalized feedback, and help you land your dream job with confidence.
+          </p>
+          
+          <div className="flex flex-wrap justify-center gap-4 pt-4">
+            <a href="#waitlist" className="btn btn-primary">
+              Join Waitlist
+              <ArrowRight className="ml-2 w-5 h-5" />
+            </a>
+            <a href="#how-it-works" className="btn btn-secondary">
+              How It Works
+            </a>
+          </div>
+          
+          <div className="pt-6 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-gray-400">
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
+              <span>Personalized Feedback</span>
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
+              <span>AI-Powered Analysis</span>
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
+              <span>Practice Like Real Interviews</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-16 md:mt-24 relative max-w-5xl mx-auto">
+          <div className="relative z-10 rounded-xl overflow-hidden shadow-2xl shadow-orange-500/10 border border-dark-700 animate-float">
+            <div className="aspect-video bg-dark-800 flex items-center justify-center">
+              <div className="w-full max-w-3xl px-8 py-12 bg-dark-700 rounded-lg relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-transparent"></div>
+                <div className="relative z-10">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-xl font-bold">
+                      AI
+                    </div>
+                    <div className="flex-1">
+                      <div className="animate-pulse h-6 w-3/4 bg-dark-600 rounded mb-3"></div>
+                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2"></div>
+                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2 w-5/6"></div>
+                      <div className="animate-pulse h-4 bg-dark-600 rounded w-2/3"></div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-lg font-bold">
+                      You
+                    </div>
+                    <div className="flex-1">
+                      <div className="animate-pulse h-6 w-1/2 bg-dark-600 rounded mb-3"></div>
+                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2"></div>
+                      <div className="animate-pulse h-4 bg-dark-600 rounded mb-2 w-4/6"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Decorative elements */}
+          <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] blur-3xl bg-gradient-to-br from-orange-500/10 via-orange-400/5 to-transparent rounded-full"></div>
+          <div className="absolute -z-10 -top-10 -right-10 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute -z-10 -bottom-10 -left-10 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl"></div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Hero;
