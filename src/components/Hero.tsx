@@ -9,19 +9,19 @@ const Hero: React.FC = () => {
   
   const messages = [
     {
-      role: 'ai',
+      role: 'Sol AI',
       text: "Hi! I'm your AI interview coach. I'll help you prepare for your upcoming interviews. What role are you interviewing for?",
       delay: 1000
     },
     {
-      role: 'user',
+      role: 'Sol AI',
       text: "I'm interviewing for a Senior Software Engineer position at a tech company.",
-      delay: 2000
+      delay: 3000
     },
     {
-      role: 'ai',
+      role: 'Sol AI',
       text: "Great choice! Let's start with some technical questions. Can you walk me through your experience with system design?",
-      delay: 2000
+      delay: 3000
     }
   ];
 
