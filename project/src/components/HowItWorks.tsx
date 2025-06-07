@@ -69,7 +69,7 @@ const HowItWorks: React.FC = () => {
           className="text-center max-w-2xl mx-auto mb-16 opacity-0 translate-y-10 transition-all duration-700"
         >
           <h2 className="mb-4">
-            <span className="gradient-text">How Sol Interview</span> Works
+            <span className="gradient-text">How Kelv AI</span> Works
           </h2>
           <p className="text-gray-400 text-lg">
             Our streamlined process helps you prepare effectively and track your improvement

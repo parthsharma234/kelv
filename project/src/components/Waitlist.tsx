@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import WaitlistForm from '../../app/components/WaitlistForm';
+import WaitlistForm from './WaitlistForm';
 
 const Waitlist: React.FC = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -38,7 +38,7 @@ const Waitlist: React.FC = () => {
           <div className="relative z-10">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Be the First to <span className="gradient-text">Experience Sol AI</span>
+                Be the First to <span className="gradient-text">Experience Kelv AI</span>
               </h2>
               <p className="mt-6 text-gray-300 text-lg max-w-xl mx-auto">
                 Join our exclusive waitlist to get early access and special offers when we launch.

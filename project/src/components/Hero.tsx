@@ -12,7 +12,7 @@ const Hero: React.FC = () => {
   
   const messages = [
     {
-      role: 'sol',
+      role: 'kelv',
       text: "Alright, just one final question. How do you typically handle conflict within a team setting?",
       delay: 1000
     },
@@ -22,8 +22,8 @@ const Hero: React.FC = () => {
       delay: 1000
     },
     {
-      role: 'sol',
-      text: "Great. Your detailed performance analysis is now ready to view.",
+      role: 'kelv',
+      text: "Excellent response! Your detailed performance analysis is now ready to view.",
       delay: 1000
     }
   ];
@@ -85,7 +85,7 @@ const Hero: React.FC = () => {
           </h1>
           
           <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto">
-            Sol Interview uses advanced AI to analyze your performance, provide personalized feedback, and help you land your dream job with confidence.
+            Kelv AI uses advanced artificial intelligence to analyze your performance, provide personalized feedback, and help you land your dream job with confidence.
           </p>
           
           <div className="flex flex-wrap justify-center gap-4 pt-4">
@@ -129,20 +129,20 @@ const Hero: React.FC = () => {
                           exit={{ opacity: 0, y: -8 }}
                           transition={{ duration: 0.2 }}
                           className={`flex items-start gap-4 ${
-                            message.role === 'sol' ? 'group hover:bg-dark-700/50 p-2 rounded-lg transition-colors' : ''
+                            message.role === 'kelv' ? 'group hover:bg-dark-700/50 p-2 rounded-lg transition-colors' : ''
                           }`}
                         >
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            message.role === 'sol' 
-                              ? 'bg-orange-500 text-white group-hover:scale-105 transition-transform'
+                            message.role === 'kelv' 
+                              ? 'bg-gradient-to-br from-orange-500 to-orange-400 text-white group-hover:scale-105 transition-transform shadow-lg'
                               : 'bg-gray-600'
                           }`}>
-                            {message.role === 'sol' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                            {message.role === 'kelv' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                           </div>
                           
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium mb-1 text-gray-300">
-                              {message.role === 'sol' ? 'Sol AI' : 'You'}
+                              {message.role === 'kelv' ? 'Kelv AI' : 'You'}
                             </div>
                             <div className="text-gray-300">
                               {message.text}
@@ -170,7 +170,7 @@ const Hero: React.FC = () => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     onClick={() => setShowAnalytics(true)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-colors shadow-lg shadow-orange-500/20"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/30"
                   >
                     <ChevronLeft className="w-6 h-6 rotate-180" />
                   </motion.button>
