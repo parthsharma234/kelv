@@ -1,0 +1,58 @@
+{
+  "name": "Kelv AI - AI-Powered Interview Preparation",
+  "short_name": "Kelv AI",
+  "description": "Master your interview skills with AI-powered coaching and preparation tools",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#FF5722",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Practice",
+      "short_name": "Practice",
+      "description": "Start a new interview practice session",
+      "url": "/#practice",
+      "icons": [{ "src": "/practice-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "View Progress",
+      "short_name": "Progress",
+      "description": "Check your interview preparation progress",
+      "url": "/#progress",
+      "icons": [{ "src": "/progress-icon.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["business", "education", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Kelv AI Interview Practice Interface"
+    },
+    {
+      "src": "/screenshot2.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Mobile View of Kelv AI"
+    }
+  ],
+  "prefer_related_applications": false
+} 
