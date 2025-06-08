@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star } from 'lucide-react';
+import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star, Calendar, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,6 +30,27 @@ const WaitlistSuccess: React.FC = () => {
     }
   ];
 
+  const waitlistStats = [
+    {
+      icon: Users,
+      label: "Waitlist Members",
+      value: "2,847",
+      change: "+156 this week"
+    },
+    {
+      icon: Calendar,
+      label: "Expected Launch",
+      value: "Q2 2025",
+      change: "On track"
+    },
+    {
+      icon: Brain,
+      label: "AI Models Training",
+      value: "94%",
+      change: "Complete"
+    }
+  ];
+
   // Floating particles for background animation
   const particles = Array.from({ length: 20 }, (_, i) => (
     <motion.div
@@ -50,6 +71,14 @@ const WaitlistSuccess: React.FC = () => {
       }}
     />
   ));
+
+  const joinedDate = user?.user_metadata?.waitlist_joined_at 
+    ? new Date(user.user_metadata.waitlist_joined_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : 'Recently';
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -96,7 +125,7 @@ const WaitlistSuccess: React.FC = () => {
       </Link>
 
       {/* Main content */}
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative z-10">
         <motion.div
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -137,18 +166,54 @@ const WaitlistSuccess: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="flex items-center justify-center gap-2 text-gray-400 mb-12"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 text-gray-400 mb-8"
           >
-            <Mail className="w-5 h-5 text-orange-500" />
-            <span>We'll notify you at <strong className="text-white">{user?.email}</strong> when we launch</span>
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-orange-500" />
+              <span>Notifications sent to <strong className="text-white">{user?.email}</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-orange-500" />
+              <span>Joined on <strong className="text-white">{joinedDate}</strong></span>
+            </div>
           </motion.div>
+        </motion.div>
+
+        {/* Waitlist Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+        >
+          {waitlistStats.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 + index * 0.1 }}
+                className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 text-center hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300"
+              >
+                <div className="flex items-center justify-center mb-4">
+                  <div className="p-3 bg-gradient-to-br from-orange-500/20 to-orange-400/10 rounded-xl">
+                    <Icon className="w-6 h-6 text-orange-400" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">{stat.value}</h3>
+                <p className="text-gray-400 text-sm mb-1">{stat.label}</p>
+                <p className="text-orange-400 text-xs">{stat.change}</p>
+              </motion.div>
+            );
+          })}
         </motion.div>
 
         {/* Benefits grid */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 1 }}
           className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"
         >
           {benefits.map((benefit, index) => {
@@ -158,7 +223,7 @@ const WaitlistSuccess: React.FC = () => {
                 key={benefit.title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 + index * 0.1 }}
+                transition={{ delay: 1.1 + index * 0.1 }}
                 className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 group"
               >
                 <div className="flex items-start gap-4">
@@ -179,7 +244,7 @@ const WaitlistSuccess: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2 }}
+          transition={{ delay: 1.5 }}
           className="bg-gradient-to-r from-orange-500/10 to-orange-400/5 rounded-2xl p-8 border border-orange-500/20 text-center"
         >
           <div className="flex items-center justify-center gap-3 mb-6">
@@ -224,7 +289,7 @@ const WaitlistSuccess: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.4 }}
+          transition={{ delay: 1.7 }}
           className="text-center mt-12"
         >
           <Link

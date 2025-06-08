@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { useAuth } from '../contexts/AuthContext';
 
 interface FormData {
   email: string;
@@ -13,6 +14,8 @@ export default function WaitlistForm() {
   const [formData, setFormData] = useState<FormData>({ email: '', name: '' });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
+
+  const { signUp, isConfigured } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,23 +28,48 @@ export default function WaitlistForm() {
       return;
     }
 
-    try {
-      const response = await fetch('https://formspree.io/f/mwpbkloq', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+    if (!formData.name.trim()) {
+      setError('Please enter your name');
+      setStatus('error');
+      return;
+    }
 
-      if (response.ok) {
-        setStatus('success');
-        setFormData({ email: '', name: '' });
+    try {
+      if (isConfigured) {
+        // Use Supabase authentication for waitlist signup
+        const { error: authError } = await signUp(
+          formData.email, 
+          'waitlist-temp-password-' + Math.random().toString(36).substring(7), // Temporary password
+          formData.name
+        );
+
+        if (authError) {
+          // If user already exists, that's okay for waitlist
+          if (authError.message.includes('already registered')) {
+            setStatus('success');
+            setFormData({ email: '', name: '' });
+            return;
+          }
+          throw authError;
+        }
       } else {
-        const data = await response.json();
-        setError(data.error || 'Something went wrong. Please try again.');
-        setStatus('error');
+        // Fallback to Formspree if Supabase is not configured
+        const response = await fetch('https://formspree.io/f/mwpbkloq', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Something went wrong. Please try again.');
+        }
       }
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
+
+      setStatus('success');
+      setFormData({ email: '', name: '' });
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
       setStatus('error');
     }
   };
@@ -60,9 +88,14 @@ export default function WaitlistForm() {
       >
         <CheckCircleIcon className="w-16 h-16 text-orange-500 mx-auto mb-4" />
         <h3 className="text-2xl font-semibold mb-2 text-white">You're on the list!</h3>
-        <p className="text-gray-300">
+        <p className="text-gray-300 mb-4">
           Thanks for joining our waitlist. We'll notify you when we launch.
         </p>
+        {isConfigured && (
+          <p className="text-sm text-orange-400">
+            You can now sign in to check your waitlist status anytime!
+          </p>
+        )}
       </motion.div>
     );
   }
@@ -74,6 +107,12 @@ export default function WaitlistForm() {
       className="mt-10 p-8 md:p-10 bg-dark-800/80 rounded-lg border border-dark-700 backdrop-blur-sm transition-shadow duration-300 hover:shadow-2xl hover:shadow-orange-500/30 max-w-md mx-auto"
     >
       <h2 className="text-2xl font-bold mb-8 text-center text-white">Join the Waitlist</h2>
+      
+      {!isConfigured && (
+        <div className="mb-6 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-400 text-sm text-center">
+          Demo mode - Using backup form submission
+        </div>
+      )}
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>

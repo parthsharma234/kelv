@@ -71,6 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           data: {
             full_name: fullName,
+            waitlist_joined_at: new Date().toISOString(),
+            user_type: 'waitlist'
           },
         },
       });
