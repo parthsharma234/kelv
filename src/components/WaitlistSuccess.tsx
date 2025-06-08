@@ -1,0 +1,248 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+
+const WaitlistSuccess: React.FC = () => {
+  const { user } = useAuth();
+
+  const benefits = [
+    {
+      icon: Star,
+      title: "Early Access",
+      description: "Be among the first to experience Kelv AI when we launch"
+    },
+    {
+      icon: Target,
+      title: "Exclusive Features",
+      description: "Get access to premium features not available to regular users"
+    },
+    {
+      icon: Bell,
+      title: "Priority Support",
+      description: "Receive dedicated support and direct feedback channels"
+    },
+    {
+      icon: Mail,
+      title: "Special Pricing",
+      description: "Enjoy exclusive discounts and early-bird pricing"
+    }
+  ];
+
+  // Floating particles for background animation
+  const particles = Array.from({ length: 20 }, (_, i) => (
+    <motion.div
+      key={i}
+      className="absolute w-1 h-1 bg-orange-400/30 rounded-full"
+      initial={{
+        x: Math.random() * 800,
+        y: Math.random() * 600,
+      }}
+      animate={{
+        x: Math.random() * 800,
+        y: Math.random() * 600,
+      }}
+      transition={{
+        duration: Math.random() * 20 + 10,
+        repeat: Infinity,
+        ease: "linear"
+      }}
+    />
+  ));
+
+  return (
+    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-400/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        {particles}
+      </div>
+
+      {/* Back to home link */}
+      <Link
+        to="/"
+        className="absolute top-8 left-8 flex items-center gap-3 text-gray-400 hover:text-orange-400 transition-all duration-300 z-10 group"
+      >
+        <motion.div 
+          whileHover={{ scale: 1.05, rotate: 5 }}
+          className="relative"
+        >
+          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30 relative overflow-hidden group-hover:shadow-orange-500/50 transition-all">
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute top-1 left-1 w-1 h-1 bg-white rounded-full"></div>
+              <div className="absolute top-3 right-2 w-0.5 h-0.5 bg-white rounded-full"></div>
+              <div className="absolute bottom-2 left-2 w-0.5 h-0.5 bg-white rounded-full"></div>
+              <div className="absolute bottom-1 right-1 w-1 h-1 bg-white rounded-full"></div>
+              <div className="absolute top-1.5 left-1.5 w-6 h-0.5 bg-white/30 rotate-45 origin-left"></div>
+              <div className="absolute top-3.5 left-3 w-4 h-0.5 bg-white/30 -rotate-45 origin-left"></div>
+            </div>
+            <div className="relative z-10 w-5 h-5 border-2 border-white rounded-lg flex items-center justify-center">
+              <motion.div
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-1.5 h-1.5 bg-white rounded-full"
+              />
+            </div>
+          </div>
+          <motion.div
+            animate={{ scale: [1, 1.3, 1] }}
+            transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+            className="absolute -top-1 -right-1 w-3 h-3 bg-orange-300 rounded-full"
+          />
+        </motion.div>
+        <span className="text-xl font-bold group-hover:text-orange-400 transition-colors">Kelv AI</span>
+      </Link>
+
+      {/* Main content */}
+      <div className="max-w-4xl mx-auto relative z-10">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="text-center mb-12"
+        >
+          {/* Success icon */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+            className="w-24 h-24 bg-gradient-to-br from-green-500 to-green-400 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-green-500/30"
+          >
+            <CheckCircle className="w-12 h-12 text-white" />
+          </motion.div>
+
+          {/* Welcome message */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-5xl font-bold gradient-text mb-6"
+          >
+            Welcome to the Future!
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="text-xl text-gray-300 mb-4 max-w-2xl mx-auto"
+          >
+            {user?.user_metadata?.full_name ? `Hi ${user.user_metadata.full_name}! ` : ''}
+            You're now on the exclusive Kelv AI waitlist. Get ready to revolutionize your interview preparation with cutting-edge AI technology.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="flex items-center justify-center gap-2 text-gray-400 mb-12"
+          >
+            <Mail className="w-5 h-5 text-orange-500" />
+            <span>We'll notify you at <strong className="text-white">{user?.email}</strong> when we launch</span>
+          </motion.div>
+        </motion.div>
+
+        {/* Benefits grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"
+        >
+          {benefits.map((benefit, index) => {
+            const Icon = benefit.icon;
+            return (
+              <motion.div
+                key={benefit.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 + index * 0.1 }}
+                className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 group"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-gradient-to-br from-orange-500/20 to-orange-400/10 rounded-xl group-hover:from-orange-500/30 group-hover:to-orange-400/20 transition-all">
+                    <Icon className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
+                    <p className="text-gray-400">{benefit.description}</p>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        {/* What's next section */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.2 }}
+          className="bg-gradient-to-r from-orange-500/10 to-orange-400/5 rounded-2xl p-8 border border-orange-500/20 text-center"
+        >
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <Brain className="w-8 h-8 text-orange-400" />
+            <h2 className="text-2xl font-bold text-white">What's Next?</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <span className="text-white text-sm font-bold">1</span>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-2">Development Updates</h4>
+                <p className="text-gray-300 text-sm">Get behind-the-scenes insights as we build the future of interview preparation</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <span className="text-white text-sm font-bold">2</span>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-2">Beta Access</h4>
+                <p className="text-gray-300 text-sm">Be among the first to test our AI-powered interview coaching platform</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <span className="text-white text-sm font-bold">3</span>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-2">Launch Day</h4>
+                <p className="text-gray-300 text-sm">Get instant access when we officially launch with exclusive member benefits</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Call to action */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.4 }}
+          className="text-center mt-12"
+        >
+          <Link
+            to="/"
+            className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 group"
+          >
+            <Sparkles className="w-5 h-5" />
+            <span>Explore More About Kelv AI</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
+          
+          <p className="text-gray-400 text-sm mt-4">
+            Share Kelv AI with friends and colleagues to help them prepare for success too!
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default WaitlistSuccess;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, User, LogOut, Brain } from 'lucide-react';
+import { Menu, X, User, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -66,16 +66,6 @@ const Navbar: React.FC = () => {
             <a href="#features" className="text-gray-300 hover:text-orange-400 transition-colors duration-300">Features</a>
             <a href="#how-it-works" className="text-gray-300 hover:text-orange-400 transition-colors duration-300">How It Works</a>
             
-            {user && (
-              <Link
-                to="/practice"
-                className="text-gray-300 hover:text-orange-400 transition-colors duration-300 flex items-center gap-2"
-              >
-                <Brain className="w-4 h-4" />
-                Practice
-              </Link>
-            )}
-            
             {user ? (
               <div className="relative">
                 <button
@@ -95,14 +85,14 @@ const Navbar: React.FC = () => {
                       <p className="font-medium truncate">{user.email}</p>
                     </div>
                     <Link
-                      to="/practice"
+                      to="/waitlist-success"
                       className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3"
                       onClick={() => setShowUserMenu(false)}
                     >
                       <div className="w-4 h-4 bg-gradient-to-br from-orange-500 to-orange-400 rounded flex items-center justify-center">
                         <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       </div>
-                      Practice Dashboard
+                      Waitlist Status
                     </Link>
                     <button
                       onClick={handleSignOut}
@@ -158,12 +148,11 @@ const Navbar: React.FC = () => {
               {user ? (
                 <>
                   <Link
-                    to="/practice"
-                    className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300 flex items-center gap-2"
+                    to="/waitlist-success"
+                    className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
                     onClick={() => setIsOpen(false)}
                   >
-                    <Brain className="w-4 h-4" />
-                    Practice
+                    Waitlist Status
                   </Link>
                   <button
                     onClick={() => {

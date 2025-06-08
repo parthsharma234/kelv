@@ -13,16 +13,15 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
 
   const { signUp, signIn, user, isConfigured } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && !showSuccess) {
-      navigate('/practice');
+    if (user) {
+      navigate('/waitlist-success');
     }
-  }, [user, navigate, showSuccess]);
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,15 +38,11 @@ const LoginPage: React.FC = () => {
       if (isSignUp) {
         const { error } = await signUp(email, password, fullName);
         if (error) throw error;
-        // Show success message for sign up
-        setShowSuccess(true);
-        setTimeout(() => {
-          setShowSuccess(false);
-          navigate('/practice');
-        }, 3000);
+        // User will be redirected by useEffect when user state updates
       } else {
         const { error } = await signIn(email, password);
         if (error) throw error;
+        // User will be redirected by useEffect when user state updates
       }
     } catch (err: any) {
       setError(err.message);
@@ -63,7 +58,6 @@ const LoginPage: React.FC = () => {
     setError('');
     setShowPassword(false);
     setFocusedField('');
-    setShowSuccess(false);
   };
 
   const toggleMode = () => {
@@ -91,62 +85,6 @@ const LoginPage: React.FC = () => {
       }}
     />
   ));
-
-  // Success message overlay
-  if (showSuccess) {
-    return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-400/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        </div>
-        
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="bg-dark-800/90 backdrop-blur-xl rounded-3xl p-12 border border-dark-700/50 text-center max-w-md relative z-10"
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-400 rounded-full flex items-center justify-center mx-auto mb-6"
-          >
-            <CheckCircle className="w-10 h-10 text-white" />
-          </motion.div>
-          
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="text-3xl font-bold gradient-text mb-4"
-          >
-            Welcome to Kelv AI!
-          </motion.h2>
-          
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="text-gray-300 mb-6"
-          >
-            Your account has been created successfully. Get ready to master your interview skills with AI-powered feedback!
-          </motion.p>
-          
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="flex items-center justify-center gap-2 text-sm text-gray-400"
-          >
-            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-            Redirecting to your practice dashboard...
-          </motion.div>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -224,7 +162,7 @@ const LoginPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                {isSignUp ? 'Join Kelv AI' : 'Welcome Back'}
+                {isSignUp ? 'Join the Waitlist' : 'Welcome Back'}
               </motion.h1>
               <motion.p 
                 className="text-gray-400"
@@ -232,7 +170,7 @@ const LoginPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                {isSignUp ? 'Start your AI-powered interview journey' : 'Continue mastering your skills'}
+                {isSignUp ? 'Get early access to AI-powered interview preparation' : 'Continue to your waitlist status'}
               </motion.p>
             </div>
 
@@ -353,11 +291,11 @@ const LoginPage: React.FC = () => {
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       />
-                      {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                      {isSignUp ? 'Joining Waitlist...' : 'Signing In...'}
                     </>
                   ) : (
                     <>
-                      {isSignUp ? 'Create Account' : 'Sign In'}
+                      {isSignUp ? 'Join Waitlist' : 'Sign In'}
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </>
                   )}
@@ -420,7 +358,7 @@ const LoginPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
             >
-              {isSignUp ? 'Welcome Back!' : 'Hello, Future Success!'}
+              {isSignUp ? 'Welcome Back!' : 'Join the Revolution!'}
             </motion.h2>
             
             <motion.p 
@@ -430,8 +368,8 @@ const LoginPage: React.FC = () => {
               transition={{ delay: 0.6 }}
             >
               {isSignUp 
-                ? 'Ready to continue your AI-powered interview preparation journey?'
-                : 'Join thousands mastering interviews with AI-powered feedback and personalized coaching'
+                ? 'Ready to check your waitlist status and get the latest updates?'
+                : 'Be among the first to experience the future of AI-powered interview preparation'
               }
             </motion.p>
 
@@ -444,15 +382,15 @@ const LoginPage: React.FC = () => {
             >
               <div className="flex items-center gap-3 text-sm opacity-80">
                 <Target className="w-4 h-4" />
-                <span>Personalized AI Feedback</span>
+                <span>Early Access Benefits</span>
               </div>
               <div className="flex items-center gap-3 text-sm opacity-80">
                 <Zap className="w-4 h-4" />
-                <span>Real-time Performance Analysis</span>
+                <span>Exclusive Member Pricing</span>
               </div>
               <div className="flex items-center gap-3 text-sm opacity-80">
                 <Brain className="w-4 h-4" />
-                <span>Industry-specific Practice</span>
+                <span>Priority Support & Updates</span>
               </div>
             </motion.div>
             
@@ -465,7 +403,7 @@ const LoginPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              {isSignUp ? 'SIGN IN' : 'SIGN UP'}
+              {isSignUp ? 'SIGN IN' : 'JOIN WAITLIST'}
             </motion.button>
           </motion.div>
         </motion.div>

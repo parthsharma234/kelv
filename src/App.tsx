@@ -8,8 +8,7 @@ import HowItWorks from './components/HowItWorks';
 import Waitlist from './components/Waitlist';
 import Footer from './components/Footer';
 import LoginPage from './components/Auth/LoginPage';
-import PracticeDashboard from './components/Practice/PracticeDashboard';
-import PracticeSession from './components/Practice/PracticeSession';
+import WaitlistSuccess from './components/WaitlistSuccess';
 
 const HomePage: React.FC = () => {
   useEffect(() => {
@@ -58,18 +57,10 @@ function AppContent() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route 
-          path="/practice" 
+          path="/waitlist-success" 
           element={
             <ProtectedRoute>
-              <PracticeDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/practice/session" 
-          element={
-            <ProtectedRoute>
-              <PracticeSession />
+              <WaitlistSuccess />
             </ProtectedRoute>
           } 
         />

@@ -1,33 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle, Bot, User, ChevronLeft } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import PerformanceAnalytics from './PerformanceAnalytics';
+import React, { useEffect, useRef } from 'react';
+import { ArrowRight, CheckCircle, Sparkles, Users, Clock, Star } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Hero: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const [currentMessage, setCurrentMessage] = useState(-1);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showAnalyticsButton, setShowAnalyticsButton] = useState(false);
   
-  const messages = [
-    {
-      role: 'kelv',
-      text: "Alright, just one final question. How do you typically handle conflict within a team setting?",
-      delay: 1000
-    },
-    {
-      role: 'user',
-      text: "I usually approach conflict by first seeking to understand the other person's perspective. Then I try to find a collaborative solution that addresses everyone's concerns.",
-      delay: 1000
-    },
-    {
-      role: 'kelv',
-      text: "Excellent response! Your detailed performance analysis is now ready to view.",
-      delay: 1000
-    }
-  ];
-
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -35,11 +12,6 @@ const Hero: React.FC = () => {
           if (entry.isIntersecting) {
             entry.target.classList.add('opacity-100');
             entry.target.classList.remove('opacity-0', 'translate-y-10');
-            // Start the conversation when the section is visible
-            setTimeout(() => {
-              setIsTyping(true);
-              setCurrentMessage(0);
-            }, 400);
           }
         });
       },
@@ -57,21 +29,6 @@ const Hero: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (isTyping && currentMessage >= 0 && currentMessage < messages.length - 1) {
-      const timer = setTimeout(() => {
-        setCurrentMessage(prev => prev + 1);
-      }, messages[currentMessage].delay);
-      return () => clearTimeout(timer);
-    } else if (currentMessage === messages.length - 1) {
-      // Show analytics button after the last message
-      const timer = setTimeout(() => {
-        setShowAnalyticsButton(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isTyping, currentMessage, messages]);
-
   return (
     <section className="pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden">
       <div className="container">
@@ -79,6 +36,16 @@ const Hero: React.FC = () => {
           ref={heroRef}
           className="max-w-4xl mx-auto text-center space-y-8 opacity-0 translate-y-10 transition-all duration-1000"
         >
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-2 text-orange-400 text-sm font-medium mb-6"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Coming Soon - Join the Waitlist</span>
+          </motion.div>
+          
           <h1 className="gradient-text font-bold">
             Master Your Interviews with <br />
             <span className="text-white">AI-Powered Preparation</span>
@@ -114,76 +81,60 @@ const Hero: React.FC = () => {
           </div>
         </div>
         
-        <div className="relative z-10 mt-12">
-          <div className="rounded-xl overflow-hidden border border-gray-700 group relative transition-shadow duration-300 hover:shadow-2xl hover:shadow-orange-500/30">
-            <div className="bg-dark-800 relative z-10 p-6">
-              <div className="flex items-center justify-center">
-                <div className="w-full max-w-xl bg-dark-800 relative p-5 rounded-lg">
-                  <div className="relative z-10 space-y-4">
-                    <AnimatePresence mode="popLayout">
-                      {messages.slice(0, currentMessage + 1).map((message, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8 }}
-                          transition={{ duration: 0.2 }}
-                          className={`flex items-start gap-4 ${
-                            message.role === 'kelv' ? 'group hover:bg-dark-700/50 p-2 rounded-lg transition-colors' : ''
-                          }`}
-                        >
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            message.role === 'kelv' 
-                              ? 'bg-gradient-to-br from-orange-500 to-orange-400 text-white group-hover:scale-105 transition-transform shadow-lg'
-                              : 'bg-gray-600'
-                          }`}>
-                            {message.role === 'kelv' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium mb-1 text-gray-300">
-                              {message.role === 'kelv' ? 'Kelv AI' : 'You'}
-                            </div>
-                            <div className="text-gray-300">
-                              {message.text}
-                              {index === currentMessage && isTyping && (
-                                <motion.span
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  transition={{ repeat: Infinity, duration: 0.5 }}
-                                  className="inline-block w-2 h-4 bg-orange-500 ml-1"
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
+        {/* Waitlist stats preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="relative z-10 mt-16"
+        >
+          <div className="max-w-3xl mx-auto bg-dark-800/80 backdrop-blur-sm rounded-2xl p-8 border border-dark-700 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-orange-400/5"></div>
+            
+            <div className="relative z-10">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-white mb-2">Join Thousands Preparing for Success</h3>
+                <p className="text-gray-400">Be part of the AI interview revolution</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Users className="w-6 h-6 text-orange-500" />
+                    <span className="text-3xl font-bold gradient-text">2,847</span>
                   </div>
+                  <p className="text-gray-400 text-sm">People on Waitlist</p>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Clock className="w-6 h-6 text-orange-500" />
+                    <span className="text-3xl font-bold gradient-text">Q2 2025</span>
+                  </div>
+                  <p className="text-gray-400 text-sm">Expected Launch</p>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Star className="w-6 h-6 text-orange-500" />
+                    <span className="text-3xl font-bold gradient-text">50%</span>
+                  </div>
+                  <p className="text-gray-400 text-sm">Early Access Discount</p>
                 </div>
               </div>
-
-              <AnimatePresence>
-                {showAnalyticsButton && !showAnalytics && (
-                  <motion.button
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    onClick={() => setShowAnalytics(true)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/30"
-                  >
-                    <ChevronLeft className="w-6 h-6 rotate-180" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
-
-              <PerformanceAnalytics 
-                isOpen={showAnalytics} 
-                onClose={() => setShowAnalytics(false)} 
-              />
+              
+              <div className="mt-8 text-center">
+                <a 
+                  href="#waitlist" 
+                  className="inline-flex items-center gap-2 text-orange-400 hover:text-orange-300 transition-colors font-medium"
+                >
+                  <span>Secure your spot now</span>
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );
