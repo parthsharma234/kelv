@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles } from 'lucide-react';
+import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send } from 'lucide-react';
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech } from '../../utils/openai';
 
@@ -29,8 +29,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [isVideoElementReady, setIsVideoElementReady] = useState(false);
   const [userResponse, setUserResponse] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<any>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
   const [aiState, setAiState] = useState<AIInterviewerState>({
     currentPersonality: 'friendly',
@@ -39,6 +37,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     focusAreas: []
   });
   const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
+
+  // Check if OpenAI API key is configured
+  const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
+                      import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
 
   useEffect(() => {
     initializeSession();
@@ -50,23 +53,23 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (session?.isActive && hasStartedInterview) {
+    if (session?.isActive && hasStartedInterview && !isInterviewComplete) {
       interval = setInterval(() => {
         setTimeElapsed(prev => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [session?.isActive, hasStartedInterview]);
+  }, [session?.isActive, hasStartedInterview, isInterviewComplete]);
 
   useEffect(() => {
-    if (hasStartedInterview) {
+    if (hasStartedInterview && !isInterviewComplete) {
       // Animate panda periodically during interview
       const interval = setInterval(() => {
         setPandaAnimation(prev => prev === 'idle' ? 'talking' : 'idle');
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [hasStartedInterview]);
+  }, [hasStartedInterview, isInterviewComplete]);
 
   useEffect(() => {
     const currentVideoRef = hasStartedInterview ? videoRef : previewVideoRef;
@@ -287,57 +290,52 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     setIsAnalyzing(true);
     try {
       const currentQuestion = session.questions[session.currentQuestionIndex];
-      const analysisResult = await analyzeResponse(currentQuestion, userResponse, setup, responses);
-      setAnalysis(analysisResult);
-      setShowFeedback(true);
-
+      
+      // Store response immediately (without showing individual feedback)
       const newResponse: InterviewResponse = {
         questionId: currentQuestion.id,
         response: userResponse,
-        analysis: analysisResult,
         timestamp: new Date()
       };
       
       const updatedResponses = [...responses, newResponse];
       setResponses(updatedResponses);
 
-      // Update AI state based on analysis
-      const updatedAiState = {
-        ...aiState,
-        adaptationLevel: analysisResult.adaptiveInsights?.confidenceLevel || aiState.adaptationLevel,
-        focusAreas: analysisResult.adaptiveInsights?.suggestedFocus || aiState.focusAreas
-      };
-      setAiState(updatedAiState);
+      // Clear the response input
+      setUserResponse('');
 
-      // Update session adaptive state
-      if (session) {
-        setSession({
-          ...session,
-          responses: updatedResponses,
-          adaptiveState: {
-            ...session.adaptiveState,
-            confidenceLevel: analysisResult.adaptiveInsights?.confidenceLevel || session.adaptiveState.confidenceLevel,
-            performanceLevel: analysisResult.adaptiveInsights?.performanceLevel || session.adaptiveState.performanceLevel,
-            strugglingAreas: analysisResult.adaptiveInsights?.suggestedFocus || session.adaptiveState.strugglingAreas
-          }
-        });
-      }
+      // Generate next question or complete interview
+      await moveToNextQuestion(updatedResponses);
 
     } catch (error) {
-      console.error('Error analyzing response:', error);
+      console.error('Error processing response:', error);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const moveToNextQuestion = async () => {
+  const moveToNextQuestion = async (currentResponses: InterviewResponse[]) => {
     if (!session) return;
+
+    // Check if we should complete the interview
+    if (currentResponses.length >= 5) {
+      // Complete the interview and show comprehensive feedback
+      await completeInterview(currentResponses);
+      return;
+    }
 
     setIsGeneratingQuestion(true);
     
     try {
+      // For real-time analysis, we'll analyze the last response to determine next question type
+      const lastResponse = currentResponses[currentResponses.length - 1];
+      const currentQuestion = session.questions[session.currentQuestionIndex];
+      
+      // Quick analysis for next question generation (not shown to user)
+      const analysisResult = await analyzeResponse(currentQuestion, lastResponse.response, setup, currentResponses.slice(0, -1));
+      
       // Generate next question dynamically based on performance
-      const nextQuestion = await generateNextQuestion(setup, responses, aiState, analysis?.nextQuestionType);
+      const nextQuestion = await generateNextQuestion(setup, currentResponses, aiState, analysisResult?.nextQuestionType);
       
       const updatedQuestions = [...session.questions, nextQuestion];
       const nextIndex = session.currentQuestionIndex + 1;
@@ -348,63 +346,98 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         currentQuestionIndex: nextIndex
       });
       
-      setUserResponse('');
-      setAnalysis(null);
-      setShowFeedback(false);
-      
       // Play the new question
       await playQuestion(nextQuestion.text);
       
     } catch (error) {
       console.error('Error generating next question:', error);
-      // Check if this is the interview completion signal
+      // If question generation fails or signals completion, complete the interview
       if (error instanceof Error && error.message === 'INTERVIEW_COMPLETE') {
-        completeInterview();
+        await completeInterview(currentResponses);
       } else {
-        // Fallback to completing interview if question generation fails
-        completeInterview();
+        await completeInterview(currentResponses);
       }
     } finally {
       setIsGeneratingQuestion(false);
     }
   };
 
-  const completeInterview = () => {
+  const completeInterview = async (finalResponses: InterviewResponse[]) => {
     if (!session) return;
 
-    const endTime = new Date();
-    const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000);
-    const overallScore = responses.length > 0 
-      ? Math.round(responses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / responses.length)
-      : 0;
+    setIsInterviewComplete(true);
+    setIsAnalyzing(true);
 
-    const sessionData = {
-      ...session,
-      endTime,
-      duration,
-      overallScore,
-      responses,
-      isActive: false
-    };
+    try {
+      // Analyze all responses for comprehensive feedback
+      const analyzedResponses = await Promise.all(
+        finalResponses.map(async (response, index) => {
+          const question = session.questions.find(q => q.id === response.questionId);
+          if (!question) return response;
 
-    // Save to localStorage as backup
-    const existingHistory = JSON.parse(localStorage.getItem('kelv-interview-history') || '[]');
-    const historyEntry = {
-      id: session.id,
-      date: session.startTime,
-      setup: session.setup,
-      overallScore,
-      duration,
-      questionsAnswered: responses.length,
-      status: 'completed'
-    };
-    
-    existingHistory.push(historyEntry);
-    localStorage.setItem('kelv-interview-history', JSON.stringify(existingHistory));
+          const analysis = await analyzeResponse(question, response.response, setup, finalResponses.slice(0, index));
+          return {
+            ...response,
+            analysis
+          };
+        })
+      );
 
-    stopCamera();
-    stopPreviewCamera();
-    onComplete(sessionData);
+      const endTime = new Date();
+      const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000);
+      const overallScore = analyzedResponses.length > 0 
+        ? Math.round(analyzedResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / analyzedResponses.length)
+        : 0;
+
+      const sessionData = {
+        ...session,
+        endTime,
+        duration,
+        overallScore,
+        responses: analyzedResponses,
+        isActive: false
+      };
+
+      // Save to localStorage as backup
+      const existingHistory = JSON.parse(localStorage.getItem('kelv-interview-history') || '[]');
+      const historyEntry = {
+        id: session.id,
+        date: session.startTime,
+        setup: session.setup,
+        overallScore,
+        duration,
+        questionsAnswered: analyzedResponses.length,
+        status: 'completed'
+      };
+      
+      existingHistory.push(historyEntry);
+      localStorage.setItem('kelv-interview-history', JSON.stringify(existingHistory));
+
+      stopCamera();
+      stopPreviewCamera();
+      onComplete(sessionData);
+
+    } catch (error) {
+      console.error('Error completing interview:', error);
+      // Fallback completion without analysis
+      const endTime = new Date();
+      const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000);
+      
+      const sessionData = {
+        ...session,
+        endTime,
+        duration,
+        overallScore: 70, // Default score
+        responses: finalResponses,
+        isActive: false
+      };
+
+      stopCamera();
+      stopPreviewCamera();
+      onComplete(sessionData);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -432,7 +465,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl flex items-center justify-center">
             <Video className="w-12 h-12 text-[#FF5722]" />
           </div>
-          <h2 className="text-3xl font-bold text-white mb-4">Camera & Microphone Access</h2>
+          <h2 className="text-3xl font-bold text-white mb-4">AI Interview Setup</h2>
           <p className="text-gray-400 mb-8 leading-relaxed">
             To conduct your AI-powered mock interview, we need access to your camera and microphone. 
             This allows us to simulate a real interview experience with dynamic question adaptation.
@@ -441,22 +474,26 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           <div className="bg-gray-900/50 rounded-xl p-6 mb-8 border border-[#FF5722]/20">
             <h3 className="text-white font-semibold mb-3 flex items-center justify-center">
               <Settings className="w-5 h-5 mr-2 text-[#FF5722]" />
-              AI Features:
+              AI Analysis Status:
             </h3>
-            <ul className="text-sm text-gray-300 space-y-2">
-              <li className="flex items-center">
-                <Brain className="w-4 h-4 mr-3 text-[#FF5722]" />
-                Dynamic question generation with GPT-4o
-              </li>
-              <li className="flex items-center">
-                <Sparkles className="w-4 h-4 mr-3 text-[#FF5722]" />
-                Adaptive difficulty based on your responses
-              </li>
-              <li className="flex items-center">
-                <Video className="w-4 h-4 mr-3 text-[#FF5722]" />
-                Real-time performance analysis
-              </li>
-            </ul>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
+                <span className="text-sm text-gray-300">OpenAI GPT-4o Integration:</span>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  hasOpenAIKey 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {hasOpenAIKey ? 'REAL AI' : 'DEMO MODE'}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400">
+                {hasOpenAIKey 
+                  ? '✅ Real-time AI analysis with GPT-4o' 
+                  : '⚠️ Using demo responses - add VITE_OPENAI_API_KEY for real AI'
+                }
+              </div>
+            </div>
           </div>
 
           <button
@@ -489,7 +526,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-3 border-gray-800 border-t-[#FF5722] mx-auto mb-4"></div>
           <p className="text-gray-300 text-lg">Initializing AI interviewer...</p>
-          <p className="text-gray-500 text-sm mt-2">Preparing dynamic questions with GPT-4o</p>
+          <p className="text-gray-500 text-sm mt-2">
+            {hasOpenAIKey ? 'Connecting to GPT-4o for real AI analysis' : 'Loading demo interview experience'}
+          </p>
         </div>
       </div>
     );
@@ -499,6 +538,49 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
         <p className="text-red-400 text-lg">Error loading interview session</p>
+      </div>
+    );
+  }
+
+  // Show completion screen while analyzing
+  if (isInterviewComplete) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-orange-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Brain className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-4">Interview Complete!</h2>
+          <p className="text-gray-400 mb-8">
+            {isAnalyzing 
+              ? hasOpenAIKey 
+                ? 'GPT-4o is analyzing your responses and generating comprehensive feedback...'
+                : 'Generating your comprehensive interview feedback...'
+              : 'Preparing your results...'
+            }
+          </p>
+          
+          {isAnalyzing && (
+            <div className="flex items-center justify-center space-x-2 mb-6">
+              <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-bounce"></div>
+              <div className="w-3 h-3 bg-[#FF7043] rounded-full animate-bounce delay-100"></div>
+              <div className="w-3 h-3 bg-[#D84315] rounded-full animate-bounce delay-200"></div>
+            </div>
+          )}
+          
+          <div className="bg-gray-900/50 rounded-xl p-6 border border-[#FF5722]/20">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="text-center">
+                <span className="text-gray-400 block mb-1">Duration:</span>
+                <p className="font-bold text-xl text-[#FF5722]">{formatTime(timeElapsed)}</p>
+              </div>
+              <div className="text-center">
+                <span className="text-gray-400 block mb-1">Questions:</span>
+                <p className="font-bold text-xl text-[#FF5722]">{responses.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -520,7 +602,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           <span className="text-white font-medium">AI Dynamic Interview</span>
           {hasStartedInterview && (
             <div className="px-2 py-1 bg-[#FF5722]/20 rounded text-[#FF5722] text-xs font-medium border border-[#FF5722]/30">
-              ADAPTIVE
+              {hasOpenAIKey ? 'GPT-4o' : 'DEMO'}
             </div>
           )}
         </div>
@@ -532,9 +614,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <span className="text-white font-medium">{formatTime(timeElapsed)}</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Brain className="w-4 h-4 text-orange-400" />
+                <MessageSquare className="w-4 h-4 text-orange-400" />
                 <span className="text-sm text-gray-400">
-                  {responses.length} responses • {aiState.currentPersonality}
+                  {responses.length + 1} of ~5-8 questions
                 </span>
               </div>
             </>
@@ -559,7 +641,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <p className="text-gray-300 text-base leading-relaxed">
                   {hasStartedInterview 
                     ? currentQuestion?.text || "Generating next question..."
-                    : "Click 'Start AI Interview' to begin your personalized mock interview with dynamic question adaptation"}
+                    : "Click 'Start AI Interview' to begin your personalized mock interview. Feedback will be provided at the end of the complete interview."}
                 </p>
                 {hasStartedInterview && currentQuestion && (
                   <div className="mt-3 flex items-center gap-2">
@@ -593,7 +675,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             </div>
 
             {/* Response input section */}
-            {hasStartedInterview && !showFeedback && currentQuestion && (
+            {hasStartedInterview && currentQuestion && (
               <div className="flex-1 flex flex-col space-y-4">
                 <div className="flex-1">
                   <textarea
@@ -606,121 +688,36 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 
                 <button
                   onClick={handleSubmitResponse}
-                  disabled={!userResponse.trim() || isAnalyzing}
+                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
                 >
-                  {isAnalyzing ? (
+                  {isAnalyzing || isGeneratingQuestion ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>AI Analyzing...</span>
+                      <span>
+                        {isGeneratingQuestion ? 'Generating Next Question...' : 'Processing...'}
+                      </span>
                     </>
                   ) : (
                     <>
-                      <Brain className="w-5 h-5" />
-                      <span>Submit for AI Analysis</span>
+                      <Send className="w-5 h-5" />
+                      <span>Submit Response</span>
                     </>
                   )}
                 </button>
-              </div>
-            )}
 
-            {/* Feedback section */}
-            {hasStartedInterview && showFeedback && analysis && (
-              <div className="flex-1 flex flex-col space-y-6">
-                <div className="bg-gray-800/50 rounded-xl p-6 border border-[#FF5722]/20">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-white font-semibold flex items-center gap-2">
-                      <Brain className="w-4 h-4 text-orange-400" />
-                      AI Analysis
-                    </h4>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-400">Score:</span>
-                      <span className={`px-2 py-1 rounded text-sm font-medium ${
-                        analysis.score >= 8
-                          ? 'bg-green-500/20 text-green-400'
-                          : analysis.score >= 6
-                          ? 'bg-yellow-500/20 text-yellow-400'
-                          : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {analysis.score}/10
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-400 mb-2">AI Feedback</h5>
-                      <p className="text-white text-sm leading-relaxed">{analysis.feedback}</p>
-                    </div>
-                    
-                    {analysis.confidenceIndicators && (
-                      <div className="grid grid-cols-2 gap-4 text-xs">
-                        <div>
-                          <span className="text-gray-400">Confidence:</span>
-                          <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
-                            <div 
-                              className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${(analysis.confidenceIndicators.enthusiasm || 5) * 10}%` }}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Structure:</span>
-                          <span className={`ml-2 ${analysis.confidenceIndicators.structuredAnswer ? 'text-green-400' : 'text-orange-400'}`}>
-                            {analysis.confidenceIndicators.structuredAnswer ? 'Good' : 'Improve'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-400 mb-2">Strengths</h5>
-                      <ul className="space-y-1">
-                        {analysis.strengths?.map((strength: string, index: number) => (
-                          <li key={index} className="flex items-center text-sm text-green-400">
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            {strength}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-400 mb-2">Areas for Improvement</h5>
-                      <ul className="space-y-1">
-                        {analysis.areasForImprovement?.map((area: string, index: number) => (
-                          <li key={index} className="flex items-center text-sm text-orange-400">
-                            <AlertCircle className="w-4 h-4 mr-2" />
-                            {area}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                {/* Progress indicator */}
+                <div className="text-center">
+                  <p className="text-sm text-gray-400">
+                    Question {responses.length + 1} • Feedback at interview completion
+                  </p>
+                  <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(((responses.length + 1) / 6) * 100, 100)}%` }}
+                    />
                   </div>
                 </div>
-
-                <button
-                  onClick={moveToNextQuestion}
-                  disabled={isGeneratingQuestion}
-                  className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
-                >
-                  {isGeneratingQuestion ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Generating Next Question...</span>
-                    </>
-                  ) : responses.length >= 5 ? (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Continue or Complete</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5" />
-                      <span>Next AI Question</span>
-                    </>
-                  )}
-                </button>
               </div>
             )}
 
@@ -735,11 +732,21 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   <Brain className="w-6 h-6" />
                   <span>Start AI Interview</span>
                 </button>
+                
+                <div className="mt-4 p-4 bg-dark-700/30 rounded-lg">
+                  <h4 className="text-sm font-medium text-white mb-2">Interview Flow:</h4>
+                  <ul className="text-xs text-gray-400 space-y-1">
+                    <li>• 5-8 adaptive questions based on your responses</li>
+                    <li>• {hasOpenAIKey ? 'Real GPT-4o analysis' : 'Demo mode responses'}</li>
+                    <li>• Comprehensive feedback table at the end</li>
+                    <li>• Natural interview conclusion when appropriate</li>
+                  </ul>
+                </div>
               </div>
             )}
 
             {/* Repeat question button */}
-            {hasStartedInterview && !showFeedback && currentQuestion && (
+            {hasStartedInterview && currentQuestion && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
@@ -790,7 +797,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                       </div>
                     </div>
                     {/* AI indicator */}
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <div className={`absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center ${
+                      hasOpenAIKey 
+                        ? 'bg-gradient-to-br from-green-500 to-green-400' 
+                        : 'bg-gradient-to-br from-yellow-500 to-yellow-400'
+                    }`}>
                       <Sparkles className="w-4 h-4 text-white" />
                     </div>
                   </div>
@@ -808,8 +819,17 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     </div>
                     <span className="text-[#FF5722] text-lg font-medium">
                       {isGeneratingQuestion ? 'Generating Question...' : 
-                       isAnalyzing ? 'Analyzing Response...' :
+                       isAnalyzing ? 'Processing...' :
                        isPlaying ? 'Speaking...' : 'Listening...'}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      hasOpenAIKey 
+                        ? 'bg-green-500/20 text-green-400' 
+                        : 'bg-yellow-500/20 text-yellow-400'
+                    }`}>
+                      {hasOpenAIKey ? 'Real GPT-4o AI' : 'Demo Mode'}
                     </span>
                   </div>
                 </div>
