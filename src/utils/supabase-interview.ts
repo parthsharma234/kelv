@@ -18,9 +18,15 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
   }
 
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { error } = await supabase
       .from('interview_sessions')
       .insert({
+        user_id: user.id,
         setup: sessionData.setup,
         responses: sessionData.responses,
         overall_score: sessionData.overallScore,
@@ -50,9 +56,15 @@ export const saveInterviewSetup = async (
   }
 
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('interview_setups')
       .insert({
+        user_id: user.id,
         name,
         setup,
         is_favorite: isFavorite,
