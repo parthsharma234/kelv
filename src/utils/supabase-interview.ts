@@ -117,10 +117,23 @@ export const updateSetupUsage = async (setupId: string): Promise<void> => {
   }
 
   try {
+    // First get the current usage count
+    const { data: currentData, error: fetchError } = await supabase
+      .from('interview_setups')
+      .select('usage_count')
+      .eq('id', setupId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching current usage count:', fetchError);
+      return;
+    }
+
+    // Then update with incremented value
     const { error } = await supabase
       .from('interview_setups')
       .update({ 
-        usage_count: supabase.raw('usage_count + 1'),
+        usage_count: (currentData.usage_count || 0) + 1,
         updated_at: new Date().toISOString()
       })
       .eq('id', setupId);
