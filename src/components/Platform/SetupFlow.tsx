@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus, Trash2, Heart, Wand2 } from 'lucide-react';
+import { ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus, Trash2, Heart, Wand2, Mic, Type, AlertTriangle } from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
 import { 
   getUserInterviewSetups, 
@@ -30,6 +30,25 @@ const jobTypes = [
 const experienceLevels = [
   'Entry Level (0-2 years)', 'Mid Level (3-5 years)', 
   'Senior Level (6-10 years)', 'Executive Level (10+ years)'
+];
+
+const interviewModes = [
+  {
+    id: 'voice',
+    title: 'Voice Interview',
+    description: 'Full AI voice interaction with speech analysis',
+    icon: Mic,
+    features: ['Real-time speech analysis', 'Natural conversation flow', 'Voice confidence metrics', 'Pronunciation assessment'],
+    recommended: true
+  },
+  {
+    id: 'text',
+    title: 'Text Interview', 
+    description: 'Text-based interview experience',
+    icon: Type,
+    features: ['Written responses only', 'Focus on content analysis', 'No voice metrics', 'Silent mode'],
+    warning: 'You\'ll miss out on voice confidence, speech pace, and communication delivery metrics that employers often evaluate.'
+  }
 ];
 
 // Function to generate setup name based on choices
@@ -82,12 +101,16 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
 
   const industry = industryMap[setup.industry] || setup.industry;
 
-  return `${experiencePrefix} ${jobTitle} - ${industry}`;
+  const modePrefix = setup.interviewMode === 'voice' ? 'Voice' : 'Text';
+
+  return `${modePrefix} ${experiencePrefix} ${jobTitle} - ${industry}`;
 };
 
 export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [setup, setSetup] = useState<Partial<InterviewSetup>>({});
+  const [setup, setSetup] = useState<Partial<InterviewSetup>>({
+    interviewMode: 'voice' // Default to voice mode
+  });
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showOtherInput, setShowOtherInput] = useState(false);
@@ -100,13 +123,17 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [saveAsFavorite, setSaveAsFavorite] = useState(false);
   const [useAutoName, setUseAutoName] = useState(true);
 
+  // Check if OpenAI API key is configured
+  const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
+                      import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
+
   useEffect(() => {
     loadSavedSetups();
   }, []);
 
   // Auto-generate name when setup changes
   useEffect(() => {
-    if (useAutoName && setup.industry && setup.jobType && setup.experienceLevel) {
+    if (useAutoName && setup.industry && setup.jobType && setup.experienceLevel && setup.interviewMode) {
       const autoName = generateSetupName(setup);
       setSetupName(autoName);
     }
@@ -172,10 +199,17 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   };
 
   const isSetupComplete = () => {
-    return setup.industry && setup.jobType && setup.experienceLevel;
+    return setup.industry && setup.jobType && setup.experienceLevel && setup.interviewMode;
   };
 
   const steps = [
+    {
+      title: 'Interview Mode',
+      icon: Mic,
+      options: interviewModes.map(mode => mode.id),
+      key: 'interviewMode' as keyof InterviewSetup,
+      isSpecial: true
+    },
     {
       title: 'Select Industry',
       icon: Building,
@@ -302,12 +336,17 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
                             {savedSetup.is_favorite && (
                               <Heart className="w-4 h-4 text-red-400 fill-current" />
                             )}
+                            {savedSetup.setup.interviewMode === 'voice' ? (
+                              <Mic className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <Type className="w-4 h-4 text-blue-400" />
+                            )}
                           </div>
                           <p className="text-sm text-gray-400">
                             {savedSetup.setup.jobType} • {savedSetup.setup.industry}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {savedSetup.setup.experienceLevel}
+                            {savedSetup.setup.experienceLevel} • {savedSetup.setup.interviewMode === 'voice' ? 'Voice Mode' : 'Text Mode'}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -371,7 +410,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
                       Start Custom Setup
                     </h4>
                     <p className="text-sm text-gray-500 mt-1">
-                      Configure industry, role, and experience level
+                      Configure mode, industry, role, and experience level
                     </p>
                   </div>
                 </button>
@@ -453,7 +492,12 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
             <h2 className="text-5xl font-bold text-white mb-4 tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               {currentStepData?.title}
             </h2>
-            <p className="text-gray-400 text-lg">Choose the option that best describes your target role</p>
+            <p className="text-gray-400 text-lg">
+              {currentStep === 0 
+                ? 'Choose your preferred interview experience'
+                : 'Choose the option that best describes your target role'
+              }
+            </p>
           </div>
 
           {/* Other input form */}
@@ -492,8 +536,119 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
             </div>
           )}
 
-          {/* Grid layout for options */}
-          {!showOtherInput && currentStepData && (
+          {/* Special handling for interview mode selection */}
+          {!showOtherInput && currentStepData && currentStep === 0 && (
+            <div className="relative z-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {interviewModes.map((mode, index) => {
+                  const Icon = mode.icon;
+                  const isSelected = setup.interviewMode === mode.id;
+                  const isDisabled = mode.id === 'voice' && !hasOpenAIKey;
+                  
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => !isDisabled && handleSelection(mode.id)}
+                      disabled={isDisabled}
+                      onMouseEnter={() => setHoveredOption(mode.id)}
+                      onMouseLeave={() => setHoveredOption(null)}
+                      className={`group relative p-6 border-2 rounded-2xl transition-all duration-500 text-left overflow-hidden transform hover:scale-[1.02] hover:shadow-2xl ${
+                        isSelected 
+                          ? 'border-[#FF5722] bg-gradient-to-r from-[#FF5722]/10 to-[#FF7043]/10' 
+                          : isDisabled
+                          ? 'border-gray-700 bg-gray-800/30 opacity-50 cursor-not-allowed'
+                          : 'border-gray-800/50 hover:border-[#FF5722]/50 hover:bg-gradient-to-r hover:from-[#FF5722]/5 hover:to-[#FF7043]/5'
+                      }`}
+                      style={{
+                        animationDelay: `${index * 100}ms`,
+                        animation: 'fadeInUp 0.6s ease-out forwards'
+                      }}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FF5722]/10 to-[#FF7043]/10 rounded-2xl opacity-0 transition-all duration-500 ${
+                        hoveredOption === mode.id || isSelected ? 'opacity-100' : ''
+                      }`}></div>
+                      
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`p-3 rounded-xl transition-all duration-300 ${
+                            isSelected 
+                              ? 'bg-[#FF5722] text-white' 
+                              : isDisabled
+                              ? 'bg-gray-700 text-gray-500'
+                              : 'bg-gray-700 text-gray-400 group-hover:bg-[#FF5722] group-hover:text-white'
+                          }`}>
+                            <Icon className="w-6 h-6" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className={`text-xl font-semibold transition-colors ${
+                                isSelected 
+                                  ? 'text-[#FF5722]' 
+                                  : isDisabled
+                                  ? 'text-gray-500'
+                                  : 'text-white group-hover:text-[#FF5722]'
+                              }`}>
+                                {mode.title}
+                              </h3>
+                              {mode.recommended && (
+                                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full border border-green-500/30">
+                                  Recommended
+                                </span>
+                              )}
+                              {isDisabled && (
+                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full border border-yellow-500/30">
+                                  Requires API Key
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-sm transition-colors ${
+                              isDisabled ? 'text-gray-500' : 'text-gray-400'
+                            }`}>
+                              {mode.description}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2 mb-4">
+                          {mode.features.map((feature, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-sm">
+                              <div className={`w-1.5 h-1.5 rounded-full ${
+                                isDisabled ? 'bg-gray-600' : 'bg-[#FF5722]'
+                              }`}></div>
+                              <span className={isDisabled ? 'text-gray-500' : 'text-gray-300'}>
+                                {feature}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {mode.warning && (
+                          <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-yellow-400">{mode.warning}</p>
+                          </div>
+                        )}
+                        
+                        {isDisabled && (
+                          <div className="flex items-start gap-2 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                            <AlertTriangle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-gray-400">
+                              Voice mode requires OpenAI API key. Add VITE_OPENAI_API_KEY to enable voice features.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="absolute inset-0 rounded-2xl bg-[#FF5722]/20 scale-0 group-active:scale-100 transition-transform duration-300 opacity-50"></div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Regular options grid for other steps */}
+          {!showOtherInput && currentStepData && currentStep > 0 && (
             <div className="relative z-10">
               {currentStepData.options.length <= 4 ? (
                 // 2x2 grid for 4 or fewer items
@@ -621,7 +776,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
                       setSetupName(e.target.value);
                       setUseAutoName(false);
                     }}
-                    placeholder="e.g., Senior Software Engineer - Tech"
+                    placeholder="e.g., Voice Senior Software Engineer - Tech"
                     className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none transition-colors"
                     autoFocus={!useAutoName}
                   />
@@ -649,6 +804,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
                 <div className="bg-dark-700/50 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-white mb-2">Setup Summary:</h4>
                   <div className="text-sm text-gray-400 space-y-1">
+                    <p>• Mode: {setup.interviewMode === 'voice' ? 'Voice Interview' : 'Text Interview'}</p>
                     <p>• Industry: {setup.industry}</p>
                     <p>• Role: {setup.jobType}</p>
                     <p>• Experience: {setup.experienceLevel}</p>

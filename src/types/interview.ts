@@ -2,6 +2,7 @@ export interface InterviewSetup {
   industry: string;
   jobType: string;
   experienceLevel: string;
+  interviewMode: 'voice' | 'text';
 }
 
 export interface Question {
