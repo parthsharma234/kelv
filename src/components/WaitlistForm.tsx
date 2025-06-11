@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface FormData {
   email: string;
@@ -16,6 +17,7 @@ export default function WaitlistForm() {
   const [error, setError] = useState<string>('');
 
   const { signUp, isConfigured } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,10 +50,21 @@ export default function WaitlistForm() {
           if (authError.message.includes('already registered')) {
             setStatus('success');
             setFormData({ email: '', name: '' });
+            // Navigate to waitlist success page
+            setTimeout(() => {
+              navigate('/waitlist-success');
+            }, 1500);
             return;
           }
           throw authError;
         }
+
+        // Successfully signed up, navigate to waitlist success
+        setStatus('success');
+        setFormData({ email: '', name: '' });
+        setTimeout(() => {
+          navigate('/waitlist-success');
+        }, 1500);
       } else {
         // Fallback to Formspree if Supabase is not configured
         const response = await fetch('https://formspree.io/f/mwpbkloq', {
@@ -64,10 +77,11 @@ export default function WaitlistForm() {
           const data = await response.json();
           throw new Error(data.error || 'Something went wrong. Please try again.');
         }
-      }
 
-      setStatus('success');
-      setFormData({ email: '', name: '' });
+        setStatus('success');
+        setFormData({ email: '', name: '' });
+        // For non-Supabase users, show success message but don't navigate
+      }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
       setStatus('error');
@@ -79,7 +93,7 @@ export default function WaitlistForm() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  if (status === 'success') {
+  if (status === 'success' && !isConfigured) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
@@ -91,11 +105,23 @@ export default function WaitlistForm() {
         <p className="text-gray-300 mb-4">
           Thanks for joining our waitlist. We'll notify you when we launch.
         </p>
-        {isConfigured && (
-          <p className="text-sm text-orange-400">
-            You can now sign in to check your waitlist status anytime!
-          </p>
-        )}
+      </motion.div>
+    );
+  }
+
+  if (status === 'success' && isConfigured) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center p-8 bg-dark-700/50 rounded-lg border border-dark-600 max-w-md mx-auto"
+      >
+        <CheckCircleIcon className="w-16 h-16 text-orange-500 mx-auto mb-4" />
+        <h3 className="text-2xl font-semibold mb-2 text-white">Welcome aboard!</h3>
+        <p className="text-gray-300 mb-4">
+          Redirecting you to your waitlist dashboard...
+        </p>
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
       </motion.div>
     );
   }

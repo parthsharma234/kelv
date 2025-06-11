@@ -1,11 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star, Calendar, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const WaitlistSuccess: React.FC = () => {
   const { user } = useAuth();
+  const [waitlistCount, setWaitlistCount] = useState<number>(2847); // Fallback number
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWaitlistCount = async () => {
+      if (isSupabaseConfigured()) {
+        try {
+          // Get count of all authenticated users
+          const { count, error } = await supabase
+            .from('auth.users')
+            .select('*', { count: 'exact', head: true });
+
+          if (error) {
+            console.error('Error fetching user count:', error);
+            // Try alternative method using RPC if direct auth.users access fails
+            const { data: rpcData, error: rpcError } = await supabase
+              .rpc('get_user_count');
+            
+            if (!rpcError && rpcData) {
+              setWaitlistCount(rpcData);
+            }
+          } else if (count !== null) {
+            setWaitlistCount(count);
+          }
+        } catch (error) {
+          console.error('Error fetching waitlist count:', error);
+          // Keep fallback number
+        }
+      }
+      setIsLoading(false);
+    };
+
+    fetchWaitlistCount();
+  }, []);
 
   const benefits = [
     {
@@ -34,13 +69,13 @@ const WaitlistSuccess: React.FC = () => {
     {
       icon: Users,
       label: "Waitlist Members",
-      value: "2,847",
+      value: isLoading ? "..." : waitlistCount.toLocaleString(),
       change: "+156 this week"
     },
     {
       icon: Calendar,
       label: "Expected Launch",
-      value: "Q2 2025",
+      value: "June 2025",
       change: "On track"
     },
     {
@@ -74,6 +109,12 @@ const WaitlistSuccess: React.FC = () => {
 
   const joinedDate = user?.user_metadata?.waitlist_joined_at 
     ? new Date(user.user_metadata.waitlist_joined_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : user?.created_at
+    ? new Date(user.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
@@ -279,7 +320,7 @@ const WaitlistSuccess: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-2">Launch Day</h4>
-                <p className="text-gray-300 text-sm">Get instant access when we officially launch with exclusive member benefits</p>
+                <p className="text-gray-300 text-sm">Get instant access when we officially launch in June 2025 with exclusive member benefits</p>
               </div>
             </div>
           </div>
@@ -292,16 +333,29 @@ const WaitlistSuccess: React.FC = () => {
           transition={{ delay: 1.7 }}
           className="text-center mt-12"
         >
-          <Link
-            to="/"
-            className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 group"
-          >
-            <Sparkles className="w-5 h-5" />
-            <span>Explore More About Kelv AI</span>
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 group"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span>Explore More About Kelv AI</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            
+            {user && (
+              <Link
+                to="/platform"
+                className="inline-flex items-center gap-3 px-8 py-4 bg-dark-800 border border-dark-700 text-white rounded-xl font-semibold hover:bg-dark-700 hover:border-orange-500/50 transition-all group"
+              >
+                <Brain className="w-5 h-5 text-orange-400" />
+                <span>Try Interview Platform</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            )}
+          </div>
           
-          <p className="text-gray-400 text-sm mt-4">
+          <p className="text-gray-400 text-sm mt-6">
             Share Kelv AI with friends and colleagues to help them prepare for success too!
           </p>
         </motion.div>
