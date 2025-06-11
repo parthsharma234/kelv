@@ -14,22 +14,15 @@ const WaitlistSuccess: React.FC = () => {
     const fetchWaitlistCount = async () => {
       if (isSupabaseConfigured()) {
         try {
-          // Get count of all authenticated users
-          const { count, error } = await supabase
-            .from('auth.users')
-            .select('*', { count: 'exact', head: true });
-
-          if (error) {
-            console.error('Error fetching user count:', error);
-            // Try alternative method using RPC if direct auth.users access fails
-            const { data: rpcData, error: rpcError } = await supabase
-              .rpc('get_user_count');
-            
-            if (!rpcError && rpcData) {
-              setWaitlistCount(rpcData);
-            }
-          } else if (count !== null) {
-            setWaitlistCount(count);
+          // Use RPC call to get user count (secure method)
+          const { data: rpcData, error: rpcError } = await supabase
+            .rpc('get_user_count');
+          
+          if (!rpcError && rpcData) {
+            setWaitlistCount(rpcData);
+          } else {
+            console.log('RPC call failed or returned no data, using fallback count');
+            // Keep fallback number if RPC fails
           }
         } catch (error) {
           console.error('Error fetching waitlist count:', error);
