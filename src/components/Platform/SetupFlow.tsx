@@ -1,6 +1,15 @@
-import React, { useState } from 'react';
-import { ChevronRight, Briefcase, Building, GraduationCap, Edit3 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus, Trash2, Heart } from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
+import { 
+  getUserInterviewSetups, 
+  saveInterviewSetup, 
+  updateSetupUsage, 
+  toggleSetupFavorite, 
+  deleteInterviewSetup,
+  SavedInterviewSetup 
+} from '../../utils/supabase-interview';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface SetupFlowProps {
   onComplete: (setup: InterviewSetup) => void;
@@ -30,6 +39,78 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherValue, setOtherValue] = useState('');
+  const [savedSetups, setSavedSetups] = useState<SavedInterviewSetup[]>([]);
+  const [showSavedSetups, setShowSavedSetups] = useState(true);
+  const [isLoadingSetups, setIsLoadingSetups] = useState(true);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [setupName, setSetupName] = useState('');
+  const [saveAsFavorite, setSaveAsFavorite] = useState(false);
+
+  useEffect(() => {
+    loadSavedSetups();
+  }, []);
+
+  const loadSavedSetups = async () => {
+    setIsLoadingSetups(true);
+    try {
+      const setups = await getUserInterviewSetups();
+      setSavedSetups(setups);
+    } catch (error) {
+      console.error('Error loading saved setups:', error);
+    } finally {
+      setIsLoadingSetups(false);
+    }
+  };
+
+  const handleUseSavedSetup = async (savedSetup: SavedInterviewSetup) => {
+    try {
+      await updateSetupUsage(savedSetup.id);
+      onComplete(savedSetup.setup);
+    } catch (error) {
+      console.error('Error using saved setup:', error);
+      // Still proceed with the setup even if usage update fails
+      onComplete(savedSetup.setup);
+    }
+  };
+
+  const handleToggleFavorite = async (setupId: string, currentFavorite: boolean) => {
+    try {
+      await toggleSetupFavorite(setupId, !currentFavorite);
+      await loadSavedSetups(); // Refresh the list
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleDeleteSetup = async (setupId: string) => {
+    try {
+      await deleteInterviewSetup(setupId);
+      await loadSavedSetups(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting setup:', error);
+    }
+  };
+
+  const handleSaveSetup = async () => {
+    if (!setupName.trim() || !isSetupComplete()) return;
+
+    try {
+      await saveInterviewSetup(setupName.trim(), setup as InterviewSetup, saveAsFavorite);
+      setShowSaveDialog(false);
+      setSetupName('');
+      setSaveAsFavorite(false);
+      await loadSavedSetups(); // Refresh the list
+      onComplete(setup as InterviewSetup);
+    } catch (error) {
+      console.error('Error saving setup:', error);
+      // Still proceed with the interview even if save fails
+      onComplete(setup as InterviewSetup);
+    }
+  };
+
+  const isSetupComplete = () => {
+    return setup.industry && setup.jobType && setup.experienceLevel;
+  };
 
   const steps = [
     {
@@ -66,7 +147,8 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
       if (currentStep < steps.length - 1) {
         setCurrentStep(currentStep + 1);
       } else {
-        onComplete(updatedSetup as InterviewSetup);
+        // Setup is complete, show save dialog
+        setShowSaveDialog(true);
       }
       setIsAnimating(false);
     }, 300);
@@ -82,7 +164,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
         if (currentStep < steps.length - 1) {
           setCurrentStep(currentStep + 1);
         } else {
-          onComplete(updatedSetup as InterviewSetup);
+          setShowSaveDialog(true);
         }
         setIsAnimating(false);
         setShowOtherInput(false);
@@ -97,7 +179,156 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   };
 
   const currentStepData = steps[currentStep];
-  const StepIcon = currentStepData.icon;
+  const StepIcon = currentStepData?.icon;
+
+  // Show saved setups first
+  if (showSavedSetups && savedSetups.length > 0) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden pt-24">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#FF5722]/3 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#FF7043]/3 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        </div>
+        
+        <div className="w-full max-w-5xl relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-8"
+          >
+            <h2 className="text-4xl font-bold text-white mb-4 tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              Choose Interview Setup
+            </h2>
+            <p className="text-gray-400 text-lg">Use a saved setup or create a new one</p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Saved Setups */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-800/50"
+            >
+              <h3 className="text-2xl font-semibold text-white mb-6 flex items-center gap-3">
+                <Star className="w-6 h-6 text-orange-400" />
+                Saved Setups
+              </h3>
+              
+              {isLoadingSetups ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-400">Loading your setups...</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {savedSetups.map((savedSetup) => (
+                    <motion.div
+                      key={savedSetup.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="group p-4 bg-dark-700/30 rounded-xl border border-dark-600/50 hover:border-orange-500/50 transition-all cursor-pointer"
+                      onClick={() => handleUseSavedSetup(savedSetup)}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium text-white group-hover:text-orange-400 transition-colors">
+                              {savedSetup.name}
+                            </h4>
+                            {savedSetup.is_favorite && (
+                              <Heart className="w-4 h-4 text-red-400 fill-current" />
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-400">
+                            {savedSetup.setup.jobType} • {savedSetup.setup.industry}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {savedSetup.setup.experienceLevel}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFavorite(savedSetup.id, savedSetup.is_favorite);
+                            }}
+                            className="p-1 hover:bg-dark-600 rounded transition-colors"
+                          >
+                            <Heart className={`w-4 h-4 ${savedSetup.is_favorite ? 'text-red-400 fill-current' : 'text-gray-500'}`} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSetup(savedSetup.id);
+                            }}
+                            className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>Used {savedSetup.usage_count} times</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 group-hover:text-orange-400 transition-colors" />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+
+            {/* Create New Setup */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-800/50"
+            >
+              <h3 className="text-2xl font-semibold text-white mb-6 flex items-center gap-3">
+                <Plus className="w-6 h-6 text-orange-400" />
+                Create New Setup
+              </h3>
+              
+              <div className="space-y-4">
+                <p className="text-gray-400 mb-6">
+                  Create a custom interview setup tailored to your specific needs and save it for future use.
+                </p>
+                
+                <button
+                  onClick={() => setShowSavedSetups(false)}
+                  className="w-full p-6 border-2 border-dashed border-gray-600 rounded-xl hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group"
+                >
+                  <div className="text-center">
+                    <Plus className="w-8 h-8 text-gray-500 group-hover:text-orange-400 mx-auto mb-3 transition-colors" />
+                    <h4 className="font-medium text-white group-hover:text-orange-400 transition-colors">
+                      Start Custom Setup
+                    </h4>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Configure industry, role, and experience level
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="text-center mt-8">
+            <button
+              onClick={onBack}
+              className="px-6 py-3 text-gray-400 hover:text-[#FF5722] transition-all duration-500 group flex items-center space-x-3 hover:bg-[#FF5722]/5 rounded-xl mx-auto"
+            >
+              <span className="transform group-hover:-translate-x-2 transition-transform duration-500 text-xl">←</span>
+              <span className="font-medium">Back to Dashboard</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden pt-24">
@@ -154,10 +385,10 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
             <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl mb-6 relative group">
               <div className="absolute inset-0 bg-gradient-to-br from-[#FF5722]/30 to-[#FF7043]/30 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-500"></div>
               <div className="absolute inset-0 bg-gradient-to-br from-[#FF5722]/10 to-[#FF7043]/10 rounded-3xl animate-pulse"></div>
-              <StepIcon className="w-12 h-12 text-[#FF5722] relative z-10 group-hover:scale-110 group-hover:rotate-12 transition-all duration-500" />
+              {StepIcon && <StepIcon className="w-12 h-12 text-[#FF5722] relative z-10 group-hover:scale-110 group-hover:rotate-12 transition-all duration-500" />}
             </div>
             <h2 className="text-5xl font-bold text-white mb-4 tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              {currentStepData.title}
+              {currentStepData?.title}
             </h2>
             <p className="text-gray-400 text-lg">Choose the option that best describes your target role</p>
           </div>
@@ -168,14 +399,14 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
               <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                 <div className="flex items-center space-x-3 mb-4">
                   <Edit3 className="w-5 h-5 text-[#FF5722]" />
-                  <h3 className="text-white font-medium">Please specify your {currentStepData.title.toLowerCase()}</h3>
+                  <h3 className="text-white font-medium">Please specify your {currentStepData?.title.toLowerCase()}</h3>
                 </div>
                 <div className="flex space-x-4">
                   <input
                     type="text"
                     value={otherValue}
                     onChange={(e) => setOtherValue(e.target.value)}
-                    placeholder={`Enter your ${currentStepData.title.toLowerCase()}...`}
+                    placeholder={`Enter your ${currentStepData?.title.toLowerCase()}...`}
                     className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors"
                     autoFocus
                     onKeyPress={(e) => e.key === 'Enter' && handleOtherSubmit()}
@@ -199,7 +430,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
           )}
 
           {/* Grid layout for options */}
-          {!showOtherInput && (
+          {!showOtherInput && currentStepData && (
             <div className="relative z-10">
               {currentStepData.options.length <= 4 ? (
                 // 2x2 grid for 4 or fewer items
@@ -271,16 +502,98 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
               </button>
             ) : (
               <button
-                onClick={onBack}
+                onClick={() => setShowSavedSetups(true)}
                 className="px-6 py-3 text-gray-400 hover:text-[#FF5722] transition-all duration-500 relative z-10 group flex items-center space-x-3 hover:bg-[#FF5722]/5 rounded-xl"
               >
                 <span className="transform group-hover:-translate-x-2 transition-transform duration-500 text-xl">←</span>
-                <span className="font-medium">Back to Dashboard</span>
+                <span className="font-medium">Back to Setups</span>
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Save Setup Dialog */}
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-dark-800 rounded-2xl p-8 border border-dark-700 max-w-md w-full"
+            >
+              <h3 className="text-2xl font-bold text-white mb-4">Save Interview Setup</h3>
+              <p className="text-gray-400 mb-6">
+                Save this setup to quickly reuse it for future interviews.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Setup Name
+                  </label>
+                  <input
+                    type="text"
+                    value={setupName}
+                    onChange={(e) => setSetupName(e.target.value)}
+                    placeholder="e.g., Senior Software Engineer - Tech"
+                    className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none transition-colors"
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="favorite"
+                    checked={saveAsFavorite}
+                    onChange={(e) => setSaveAsFavorite(e.target.checked)}
+                    className="w-4 h-4 text-orange-500 bg-dark-700 border-dark-600 rounded focus:ring-orange-500"
+                  />
+                  <label htmlFor="favorite" className="text-sm text-gray-300 flex items-center gap-2">
+                    <Heart className="w-4 h-4" />
+                    Mark as favorite
+                  </label>
+                </div>
+                
+                <div className="bg-dark-700/50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-white mb-2">Setup Summary:</h4>
+                  <div className="text-sm text-gray-400 space-y-1">
+                    <p>• Industry: {setup.industry}</p>
+                    <p>• Role: {setup.jobType}</p>
+                    <p>• Experience: {setup.experienceLevel}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-8">
+                <button
+                  onClick={() => {
+                    setShowSaveDialog(false);
+                    onComplete(setup as InterviewSetup);
+                  }}
+                  className="flex-1 px-6 py-3 bg-dark-700 text-white rounded-xl hover:bg-dark-600 transition-colors"
+                >
+                  Skip & Continue
+                </button>
+                <button
+                  onClick={handleSaveSetup}
+                  disabled={!setupName.trim()}
+                  className="flex-1 px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Save & Continue
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style jsx>{`
         @keyframes fadeInUp {

@@ -1,5 +1,15 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { InterviewSession, InterviewHistory } from '../types/interview';
+import { InterviewSession, InterviewHistory, InterviewSetup } from '../types/interview';
+
+export interface SavedInterviewSetup {
+  id: string;
+  name: string;
+  setup: InterviewSetup;
+  is_favorite: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export const saveInterviewSession = async (sessionData: any): Promise<void> => {
   if (!isSupabaseConfigured()) {
@@ -26,6 +36,131 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
   } catch (error) {
     console.error('Failed to save interview session:', error);
     // Don't throw error to prevent blocking user flow
+  }
+};
+
+export const saveInterviewSetup = async (
+  name: string, 
+  setup: InterviewSetup, 
+  isFavorite: boolean = false
+): Promise<SavedInterviewSetup | null> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping setup save');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('interview_setups')
+      .insert({
+        name,
+        setup,
+        is_favorite: isFavorite,
+        usage_count: 1
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving interview setup:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to save interview setup:', error);
+    return null;
+  }
+};
+
+export const getUserInterviewSetups = async (): Promise<SavedInterviewSetup[]> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning empty setups');
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('interview_setups')
+      .select('*')
+      .order('is_favorite', { ascending: false })
+      .order('usage_count', { ascending: false })
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching interview setups:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch interview setups:', error);
+    return [];
+  }
+};
+
+export const updateSetupUsage = async (setupId: string): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('interview_setups')
+      .update({ 
+        usage_count: supabase.raw('usage_count + 1'),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', setupId);
+
+    if (error) {
+      console.error('Error updating setup usage:', error);
+    }
+  } catch (error) {
+    console.error('Failed to update setup usage:', error);
+  }
+};
+
+export const toggleSetupFavorite = async (setupId: string, isFavorite: boolean): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('interview_setups')
+      .update({ 
+        is_favorite: isFavorite,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', setupId);
+
+    if (error) {
+      console.error('Error toggling setup favorite:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to toggle setup favorite:', error);
+  }
+};
+
+export const deleteInterviewSetup = async (setupId: string): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('interview_setups')
+      .delete()
+      .eq('id', setupId);
+
+    if (error) {
+      console.error('Error deleting interview setup:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to delete interview setup:', error);
   }
 };
 
