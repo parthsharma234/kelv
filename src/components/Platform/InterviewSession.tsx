@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, MoreVertical, AlertCircle, Settings, ArrowLeft } from 'lucide-react';
-import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse } from '../../types/interview';
-import { generateInterviewQuestions, synthesizeSpeech, analyzeResponse } from '../../utils/openai';
+import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles } from 'lucide-react';
+import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
+import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech } from '../../utils/openai';
 
 interface InterviewSessionProps {
   setup: InterviewSetup;
@@ -29,15 +29,16 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [isVideoElementReady, setIsVideoElementReady] = useState(false);
   const [userResponse, setUserResponse] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<{
-    score: number;
-    feedback: string;
-    followUpQuestion: string;
-    strengths: string[];
-    areasForImprovement: string[];
-  } | null>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
+  const [aiState, setAiState] = useState<AIInterviewerState>({
+    currentPersonality: 'friendly',
+    adaptationLevel: 5,
+    questionFlow: 'adaptive',
+    focusAreas: []
+  });
+  const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
 
   useEffect(() => {
     initializeSession();
@@ -139,7 +140,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const startInterview = async () => {
     try {
       setCameraError(null);
-      // Use existing preview stream or get new one
       let mediaStream = previewStream;
       if (!mediaStream) {
         mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -151,7 +151,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        // IMPORTANT: Call play() after setting srcObject
         try {
           await videoRef.current.play();
         } catch (playError) {
@@ -162,13 +161,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       setHasStartedInterview(true);
       if (session) {
         setSession({ ...session, isActive: true });
-        // Simulate playing first question (no actual audio in UI mode)
         if (session.questions.length > 0) {
           await playQuestion(session.questions[0].text);
         }
       }
       
-      // Stop preview stream since we're now using main stream
       stopPreviewCamera();
     } catch (error) {
       console.error('Error starting interview:', error);
@@ -199,28 +196,20 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     if (!currentStream) return;
 
     if (isVideoOn) {
-      // Turn OFF video by disabling video tracks
       currentStream.getVideoTracks().forEach(track => {
-        console.log('Disabling video track:', track.label);
         track.enabled = false;
       });
       setIsVideoOn(false);
     } else {
-      // Turn ON video by re-enabling video tracks
       try {
         const videoTracks = currentStream.getVideoTracks();
         if (videoTracks.length > 0) {
-          // If we have existing tracks, just re-enable them
           videoTracks.forEach(track => {
-            console.log('Re-enabling video track:', track.label);
             track.enabled = true;
           });
           setIsVideoOn(true);
         } else {
-          // If no tracks exist, get a new video stream
           const newVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          console.log('New video stream obtained:', newVideoStream.getVideoTracks()[0].label);
-          
           if (hasStartedInterview) {
             setStream(newVideoStream);
           } else {
@@ -246,12 +235,20 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         currentQuestionIndex: 0,
         isActive: false,
         startTime: new Date(),
-        responses: []
+        responses: [],
+        aiPersonality: 'friendly',
+        adaptiveState: {
+          confidenceLevel: 5,
+          performanceLevel: 5,
+          communicationStyle: 'detailed',
+          strugglingAreas: [],
+          strongAreas: []
+        }
       };
       setSession(newSession);
     } catch (error) {
       console.error('Error initializing session:', error);
-      throw error; // Let the error propagate to show error UI
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -260,7 +257,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const playQuestion = async (questionText: string) => {
     try {
       setIsPlaying(true);
-      // Stop any existing audio
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
@@ -275,7 +271,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           setCurrentAudio(null);
         };
       } else {
-        // Fallback to simulated delay if speech synthesis fails
         setTimeout(() => {
           setIsPlaying(false);
         }, 2000);
@@ -292,11 +287,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     setIsAnalyzing(true);
     try {
       const currentQuestion = session.questions[session.currentQuestionIndex];
-      const analysisResult = await analyzeResponse(currentQuestion, userResponse, setup);
+      const analysisResult = await analyzeResponse(currentQuestion, userResponse, setup, responses);
       setAnalysis(analysisResult);
       setShowFeedback(true);
 
-      // Save response
       const newResponse: InterviewResponse = {
         questionId: currentQuestion.id,
         response: userResponse,
@@ -307,22 +301,28 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       const updatedResponses = [...responses, newResponse];
       setResponses(updatedResponses);
 
-      // If there's a follow-up question, add it to the session
-      if (analysisResult.followUpQuestion) {
-        const followUpQuestion: Question = {
-          id: `${currentQuestion.id}-followup`,
-          text: analysisResult.followUpQuestion,
-          type: currentQuestion.type
-        };
+      // Update AI state based on analysis
+      const updatedAiState = {
+        ...aiState,
+        adaptationLevel: analysisResult.adaptiveInsights?.confidenceLevel || aiState.adaptationLevel,
+        focusAreas: analysisResult.adaptiveInsights?.suggestedFocus || aiState.focusAreas
+      };
+      setAiState(updatedAiState);
 
-        const updatedQuestions = [...session.questions];
-        updatedQuestions.splice(session.currentQuestionIndex + 1, 0, followUpQuestion);
+      // Update session adaptive state
+      if (session) {
         setSession({
           ...session,
-          questions: updatedQuestions,
-          responses: updatedResponses
+          responses: updatedResponses,
+          adaptiveState: {
+            ...session.adaptiveState,
+            confidenceLevel: analysisResult.adaptiveInsights?.confidenceLevel || session.adaptiveState.confidenceLevel,
+            performanceLevel: analysisResult.adaptiveInsights?.performanceLevel || session.adaptiveState.performanceLevel,
+            strugglingAreas: analysisResult.adaptiveInsights?.suggestedFocus || session.adaptiveState.strugglingAreas
+          }
         });
       }
+
     } catch (error) {
       console.error('Error analyzing response:', error);
     } finally {
@@ -330,22 +330,37 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     }
   };
 
-  const moveToNextQuestion = () => {
+  const moveToNextQuestion = async () => {
     if (!session) return;
 
-    const nextIndex = session.currentQuestionIndex + 1;
-    if (nextIndex < session.questions.length) {
+    setIsGeneratingQuestion(true);
+    
+    try {
+      // Generate next question dynamically based on performance
+      const nextQuestion = await generateNextQuestion(setup, responses, aiState, analysis?.nextQuestionType);
+      
+      const updatedQuestions = [...session.questions, nextQuestion];
+      const nextIndex = session.currentQuestionIndex + 1;
+      
       setSession({
         ...session,
+        questions: updatedQuestions,
         currentQuestionIndex: nextIndex
       });
+      
       setUserResponse('');
       setAnalysis(null);
       setShowFeedback(false);
-      playQuestion(session.questions[nextIndex].text);
-    } else {
-      // End of interview
+      
+      // Play the new question
+      await playQuestion(nextQuestion.text);
+      
+    } catch (error) {
+      console.error('Error generating next question:', error);
+      // Fallback to completing interview if question generation fails
       completeInterview();
+    } finally {
+      setIsGeneratingQuestion(false);
     }
   };
 
@@ -414,23 +429,27 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">Camera & Microphone Access</h2>
           <p className="text-gray-400 mb-8 leading-relaxed">
-            To conduct your mock interview, we need access to your camera and microphone. 
-            This allows us to simulate a real interview experience.
+            To conduct your AI-powered mock interview, we need access to your camera and microphone. 
+            This allows us to simulate a real interview experience with dynamic question adaptation.
           </p>
           
           <div className="bg-gray-900/50 rounded-xl p-6 mb-8 border border-[#FF5722]/20">
             <h3 className="text-white font-semibold mb-3 flex items-center justify-center">
               <Settings className="w-5 h-5 mr-2 text-[#FF5722]" />
-              What we'll use:
+              AI Features:
             </h3>
             <ul className="text-sm text-gray-300 space-y-2">
               <li className="flex items-center">
-                <Video className="w-4 h-4 mr-3 text-[#FF5722]" />
-                Camera for video interview simulation
+                <Brain className="w-4 h-4 mr-3 text-[#FF5722]" />
+                Dynamic question generation with GPT-4o
               </li>
               <li className="flex items-center">
-                <Mic className="w-4 h-4 mr-3 text-[#FF5722]" />
-                Microphone for voice interaction
+                <Sparkles className="w-4 h-4 mr-3 text-[#FF5722]" />
+                Adaptive difficulty based on your responses
+              </li>
+              <li className="flex items-center">
+                <Video className="w-4 h-4 mr-3 text-[#FF5722]" />
+                Real-time performance analysis
               </li>
             </ul>
           </div>
@@ -440,7 +459,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             disabled={isRequestingPermission}
             className="px-8 py-4 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold text-lg"
           >
-            {isRequestingPermission ? 'Requesting Access...' : 'Grant Camera & Microphone Access'}
+            {isRequestingPermission ? 'Requesting Access...' : 'Start AI Interview'}
           </button>
           
           <p className="text-xs text-gray-500 mt-4">
@@ -464,7 +483,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-3 border-gray-800 border-t-[#FF5722] mx-auto mb-4"></div>
-          <p className="text-gray-300 text-lg">Preparing interview questions...</p>
+          <p className="text-gray-300 text-lg">Initializing AI interviewer...</p>
+          <p className="text-gray-500 text-sm mt-2">Generating personalized questions with GPT-4o</p>
         </div>
       </div>
     );
@@ -478,40 +498,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     );
   }
 
-  if (session.isActive === false && hasStartedInterview) {
-    return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
-        <div className="text-center max-w-md">
-          <CheckCircle className="w-16 h-16 text-[#FF5722] mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-white mb-4">Interview Complete!</h2>
-          <p className="text-gray-400 mb-6">Great job completing your mock interview.</p>
-          
-          <div className="bg-gray-900/50 rounded-xl p-4 mb-6 border border-[#FF5722]/20">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="text-center">
-                <span className="text-gray-400 block mb-1">Duration:</span>
-                <p className="font-bold text-xl text-[#FF5722]">{formatTime(timeElapsed)}</p>
-              </div>
-              <div className="text-center">
-                <span className="text-gray-400 block mb-1">Questions:</span>
-                <p className="font-bold text-xl text-[#FF5722]">{responses.length}</p>
-              </div>
-            </div>
-          </div>
-          
-          <button
-            onClick={completeInterview}
-            className="px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] transition-colors font-medium"
-          >
-            View Results
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const currentQuestion = session.questions[session.currentQuestionIndex];
-  const progress = ((session.currentQuestionIndex + 1) / session.questions.length) * 100;
+  const progress = responses.length > 0 ? (responses.length / (responses.length + 1)) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col pt-20">
@@ -525,10 +513,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             <ArrowLeft className="w-5 h-5 text-gray-400" />
           </button>
           <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-pulse"></div>
-          <span className="text-white font-medium">AI Mock Interview</span>
+          <span className="text-white font-medium">AI Dynamic Interview</span>
           {hasStartedInterview && (
             <div className="px-2 py-1 bg-[#FF5722]/20 rounded text-[#FF5722] text-xs font-medium border border-[#FF5722]/30">
-              LIVE
+              ADAPTIVE
             </div>
           )}
         </div>
@@ -539,11 +527,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <Clock className="w-4 h-4 text-[#FF5722]" />
                 <span className="text-white font-medium">{formatTime(timeElapsed)}</span>
               </div>
-              <div className="w-32 bg-gray-800 rounded-full h-2">
-                <div 
-                  className="bg-[#FF5722] h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
+              <div className="flex items-center space-x-2">
+                <Brain className="w-4 h-4 text-orange-400" />
+                <span className="text-sm text-gray-400">
+                  {aiState.currentPersonality} • {responses.length} responses
+                </span>
               </div>
             </>
           )}
@@ -562,31 +550,46 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-3 text-lg">
-                  {hasStartedInterview ? "Interview Question" : "Ready to Start"}
+                  {hasStartedInterview ? "AI Interview Question" : "Ready to Start"}
                 </h3>
                 <p className="text-gray-300 text-base leading-relaxed">
                   {hasStartedInterview 
-                    ? currentQuestion.text 
-                    : "Click 'Start Interview' to begin your mock interview session"}
+                    ? currentQuestion?.text || "Generating next question..."
+                    : "Click 'Start AI Interview' to begin your personalized mock interview with dynamic question adaptation"}
                 </p>
-                {hasStartedInterview && (
-                  <div className="mt-3">
+                {hasStartedInterview && currentQuestion && (
+                  <div className="mt-3 flex items-center gap-2">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      currentQuestion.type === 'behavioral'
+                      currentQuestion.type === 'small_talk'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        : currentQuestion.type === 'behavioral'
                         ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                         : currentQuestion.type === 'technical'
                         ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : currentQuestion.type === 'follow_up'
+                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                         : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
                     }`}>
-                      {currentQuestion.type.charAt(0).toUpperCase() + currentQuestion.type.slice(1)}
+                      {currentQuestion.type.replace('_', ' ').charAt(0).toUpperCase() + currentQuestion.type.replace('_', ' ').slice(1)}
                     </span>
+                    {currentQuestion.difficulty && (
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        currentQuestion.difficulty === 'easy'
+                          ? 'bg-green-500/20 text-green-400'
+                          : currentQuestion.difficulty === 'medium'
+                          ? 'bg-yellow-500/20 text-yellow-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {currentQuestion.difficulty}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Response input section */}
-            {hasStartedInterview && !showFeedback && (
+            {hasStartedInterview && !showFeedback && currentQuestion && (
               <div className="flex-1 flex flex-col space-y-4">
                 <div className="flex-1">
                   <textarea
@@ -605,11 +608,12 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   {isAnalyzing ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Analyzing...</span>
+                      <span>AI Analyzing...</span>
                     </>
                   ) : (
                     <>
-                      <span>Submit Response</span>
+                      <Brain className="w-5 h-5" />
+                      <span>Submit for AI Analysis</span>
                     </>
                   )}
                 </button>
@@ -621,7 +625,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="flex-1 flex flex-col space-y-6">
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-[#FF5722]/20">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-white font-semibold">Response Analysis</h4>
+                    <h4 className="text-white font-semibold flex items-center gap-2">
+                      <Brain className="w-4 h-4 text-orange-400" />
+                      AI Analysis
+                    </h4>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-400">Score:</span>
                       <span className={`px-2 py-1 rounded text-sm font-medium ${
@@ -638,14 +645,34 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   
                   <div className="space-y-4">
                     <div>
-                      <h5 className="text-sm font-medium text-gray-400 mb-2">Feedback</h5>
+                      <h5 className="text-sm font-medium text-gray-400 mb-2">AI Feedback</h5>
                       <p className="text-white text-sm leading-relaxed">{analysis.feedback}</p>
                     </div>
+                    
+                    {analysis.confidenceIndicators && (
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="text-gray-400">Confidence:</span>
+                          <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
+                            <div 
+                              className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${(analysis.confidenceIndicators.enthusiasm || 5) * 10}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Structure:</span>
+                          <span className={`ml-2 ${analysis.confidenceIndicators.structuredAnswer ? 'text-green-400' : 'text-orange-400'}`}>
+                            {analysis.confidenceIndicators.structuredAnswer ? 'Good' : 'Improve'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     
                     <div>
                       <h5 className="text-sm font-medium text-gray-400 mb-2">Strengths</h5>
                       <ul className="space-y-1">
-                        {analysis.strengths.map((strength, index) => (
+                        {analysis.strengths?.map((strength: string, index: number) => (
                           <li key={index} className="flex items-center text-sm text-green-400">
                             <CheckCircle className="w-4 h-4 mr-2" />
                             {strength}
@@ -657,7 +684,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     <div>
                       <h5 className="text-sm font-medium text-gray-400 mb-2">Areas for Improvement</h5>
                       <ul className="space-y-1">
-                        {analysis.areasForImprovement.map((area, index) => (
+                        {analysis.areasForImprovement?.map((area: string, index: number) => (
                           <li key={index} className="flex items-center text-sm text-orange-400">
                             <AlertCircle className="w-4 h-4 mr-2" />
                             {area}
@@ -670,11 +697,25 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
                 <button
                   onClick={moveToNextQuestion}
-                  className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] transition-colors text-base font-medium"
+                  disabled={isGeneratingQuestion}
+                  className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
                 >
-                  {session.currentQuestionIndex < session.questions.length - 1
-                    ? "Next Question"
-                    : "Complete Interview"}
+                  {isGeneratingQuestion ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Generating Next Question...</span>
+                    </>
+                  ) : responses.length >= 5 ? (
+                    <>
+                      <CheckCircle className="w-5 h-5" />
+                      <span>Complete Interview</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      <span>Next AI Question</span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -685,15 +726,16 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <button
                   onClick={startInterview}
                   disabled={!!cameraError}
-                  className="w-full px-6 py-4 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-semibold"
+                  className="w-full px-6 py-4 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-semibold flex items-center justify-center space-x-3"
                 >
-                  Start Interview
+                  <Brain className="w-6 h-6" />
+                  <span>Start AI Interview</span>
                 </button>
               </div>
             )}
 
             {/* Repeat question button */}
-            {hasStartedInterview && !showFeedback && (
+            {hasStartedInterview && !showFeedback && currentQuestion && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
@@ -729,25 +771,29 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
           {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
-            {/* AI Interviewer (Red Panda) */}
+            {/* AI Interviewer */}
             <div className="relative w-96 h-96">
               <div className={`absolute inset-0 bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl transform transition-transform duration-500 ${
                 pandaAnimation === 'talking' ? 'scale-105' : 'scale-100'
               }`}>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 bg-[#FF5722] rounded-full flex items-center justify-center">
+                  <div className="w-48 h-48 bg-[#FF5722] rounded-full flex items-center justify-center relative">
                     <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
                       <div className="w-24 h-24 bg-[#FF5722] rounded-full flex items-center justify-center">
                         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                          <div className="w-8 h-8 bg-[#FF5722] rounded-full"></div>
+                          <Brain className="w-8 h-8 text-[#FF5722]" />
                         </div>
                       </div>
+                    </div>
+                    {/* AI indicator */}
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-white" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Speaking indicator */}
+              {/* AI Status indicator */}
               {hasStartedInterview && (
                 <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 w-full text-center">
                   <div className="flex items-center justify-center space-x-4">
@@ -757,7 +803,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                       <div className="w-3 h-3 bg-[#D84315] rounded-full animate-bounce delay-200"></div>
                     </div>
                     <span className="text-[#FF5722] text-lg font-medium">
-                      {isPlaying ? 'Speaking...' : 'Listening...'}
+                      {isGeneratingQuestion ? 'Generating Question...' : 
+                       isAnalyzing ? 'Analyzing Response...' :
+                       isPlaying ? 'Speaking...' : 'Listening...'}
                     </span>
                   </div>
                 </div>
@@ -786,8 +834,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   console.error('Main video error:', e);
                   setCameraError('Error playing video stream. Please check your browser settings.');
                 }}
-                onLoadedMetadata={() => console.log('Main video metadata loaded')}
-                onPlaying={() => console.log('Main video started playing')}
               />
             ) : (
               <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">

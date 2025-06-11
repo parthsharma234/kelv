@@ -7,7 +7,9 @@ export interface InterviewSetup {
 export interface Question {
   id: string;
   text: string;
-  type: 'behavioral' | 'technical' | 'situational';
+  type: 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up';
+  category?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
   followUp?: string;
 }
 
@@ -20,6 +22,14 @@ export interface InterviewSession {
   startTime: Date;
   endTime?: Date;
   responses: InterviewResponse[];
+  aiPersonality: 'friendly' | 'formal' | 'challenging';
+  adaptiveState: {
+    confidenceLevel: number; // 1-10
+    performanceLevel: number; // 1-10
+    communicationStyle: 'concise' | 'detailed' | 'storytelling';
+    strugglingAreas: string[];
+    strongAreas: string[];
+  };
 }
 
 export interface InterviewResponse {
@@ -31,6 +41,12 @@ export interface InterviewResponse {
     followUpQuestion?: string;
     strengths: string[];
     areasForImprovement: string[];
+    confidenceIndicators: {
+      responseLength: number;
+      specificExamples: boolean;
+      structuredAnswer: boolean;
+      enthusiasm: number; // 1-10
+    };
   };
   timestamp: Date;
 }
@@ -43,4 +59,11 @@ export interface InterviewHistory {
   duration: number;
   questionsAnswered: number;
   status: 'completed' | 'incomplete';
+}
+
+export interface AIInterviewerState {
+  currentPersonality: 'friendly' | 'formal' | 'challenging';
+  adaptationLevel: number; // How much to adapt based on responses
+  questionFlow: 'linear' | 'adaptive' | 'branching';
+  focusAreas: string[]; // Areas to focus on based on performance
 }
