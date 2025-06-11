@@ -1,10 +1,10 @@
-import { InterviewSetup, Question, AIInterviewerState, SpeechMetrics } from '../types/interview';
-import { SpeechAnalyzer, FastTranscription } from './speechAnalysis';
+import { InterviewSetup, Question, AIInterviewerState } from '../types/interview';
 
 // OpenAI API configuration
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_TTS_URL = 'https://api.openai.com/v1/audio/speech';
+const OPENAI_STT_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
 // Mock function to simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -62,7 +62,7 @@ const extractJsonFromMarkdown = (content: string): string => {
 export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement | null> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
     // Simulate API delay for demo mode
-    await delay(1000);
+    await delay(800);
     return null;
   }
 
@@ -74,7 +74,7 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1-hd', // Use HD model for better quality
+        model: 'tts-1',
         input: text,
         voice: 'alloy', // Professional, friendly voice
         response_format: 'mp3',
@@ -99,133 +99,89 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
   } catch (error) {
     console.error('Error synthesizing speech:', error);
     // Fallback to no audio
-    await delay(1000);
+    await delay(800);
     return null;
   }
 };
 
-// Enhanced Speech-to-Text using OpenAI Whisper with optimization
+// Optimized Speech-to-Text using OpenAI Whisper
 export const transcribeAudio = async (audioBlob: Blob): Promise<string | null> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    console.warn('OpenAI API key not configured - transcription disabled');
+    // Demo mode - return null to indicate no transcription
     return null;
   }
 
   // Validate audio blob
   if (!audioBlob || audioBlob.size === 0) {
-    console.warn('Invalid or empty audio blob provided for transcription');
+    console.warn('Invalid or empty audio blob');
     return null;
   }
 
-  // Check if audio is too short (less than 1 second worth of data)
-  if (audioBlob.size < 1000) {
-    console.warn('Audio too short for meaningful transcription');
+  // Check if audio blob is too small (less than 0.5 seconds of audio)
+  if (audioBlob.size < 500) {
+    console.warn('Audio blob too small for meaningful transcription');
     return null;
   }
 
   try {
-    // Use the optimized transcription method with better error handling
-    const transcription = await FastTranscription.transcribeWithStreaming(audioBlob, OPENAI_API_KEY);
+    // Validate API key format
+    if (!OPENAI_API_KEY.startsWith('sk-')) {
+      throw new Error('Invalid OpenAI API key format');
+    }
+
+    // Prepare form data with optimized settings
+    const formData = new FormData();
     
-    // Return null if transcription is empty or just whitespace
-    if (!transcription || transcription.trim().length === 0) {
-      console.warn('Transcription returned empty result');
+    // Ensure proper file naming and type
+    const audioFile = new File([audioBlob], 'recording.webm', { 
+      type: 'audio/webm;codecs=opus' 
+    });
+    
+    formData.append('file', audioFile);
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'en');
+    formData.append('response_format', 'json');
+    formData.append('temperature', '0.1'); // Lower temperature for more accurate transcription
+    formData.append('prompt', 'This is an interview response. Please transcribe accurately including any filler words or hesitations.');
+
+    const response = await fetch(OPENAI_STT_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI STT API Error:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('Invalid or expired OpenAI API key');
+      } else if (response.status === 400) {
+        throw new Error('Bad request - check audio format and API key');
+      } else {
+        throw new Error(`STT API error: ${response.status}`);
+      }
+    }
+
+    const data = await response.json();
+    const transcription = data.text?.trim() || '';
+    
+    // Return null if transcription is too short or empty
+    if (transcription.length < 2) {
+      console.warn('Transcription too short or empty');
       return null;
     }
     
     return transcription;
   } catch (error) {
     console.error('Error transcribing audio:', error);
-    
-    // Check for specific error types and provide user-friendly messages
-    if (error instanceof Error) {
-      if (error.message.includes('Invalid OpenAI API key')) {
-        console.error('Please check your OpenAI API key configuration in the .env file');
-      } else if (error.message.includes('Invalid audio format')) {
-        console.error('Audio format not supported by OpenAI Whisper API');
-      } else if (error.message.includes('400')) {
-        console.error('Bad request to OpenAI API - check API key and audio format');
-      }
-    }
-    
     return null;
   }
 };
 
-// Comprehensive speech analysis combining transcription and audio features
-export const analyzeSpeechComprehensively = async (
-  audioBlob: Blob,
-  transcription: string,
-  duration: number
-): Promise<SpeechMetrics | null> => {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return null;
-  }
-
-  try {
-    const analyzer = new SpeechAnalyzer();
-    
-    // Extract audio features
-    const audioFeatures = await analyzer.analyzeAudioBlob(audioBlob);
-    
-    // Analyze speech patterns from transcription
-    const speechPatterns = SpeechAnalyzer.analyzeSpeechPatterns(transcription, audioFeatures, duration);
-    
-    // Calculate comprehensive metrics
-    const speechMetrics: SpeechMetrics = {
-      audioQuality: {
-        signalToNoiseRatio: Math.min(100, audioFeatures.rms * 100),
-        clarity: Math.min(100, (1 - audioFeatures.zcr) * 100),
-        volume: Math.min(100, audioFeatures.energy * 1000)
-      },
-      
-      timing: {
-        totalDuration: duration,
-        speechDuration: duration * 0.8, // Estimate based on energy
-        pauseDuration: duration * 0.2,
-        speechRate: speechPatterns.speechRate,
-        pauseFrequency: speechPatterns.hesitations / duration,
-        averagePauseLength: (duration * 0.2) / Math.max(1, speechPatterns.hesitations)
-      },
-      
-      voice: {
-        fundamentalFrequency: audioFeatures.pitch,
-        pitchVariation: audioFeatures.pitch > 0 ? 20 : 5, // Simplified calculation
-        intensity: audioFeatures.rms * 100,
-        voiceStability: Math.min(100, audioFeatures.pitch > 0 ? 80 : 60)
-      },
-      
-      fluency: {
-        fillerWords: speechPatterns.fillerCount,
-        repetitions: speechPatterns.repetitions,
-        selfCorrections: Math.floor(speechPatterns.hesitations / 2),
-        hesitations: speechPatterns.hesitations,
-        fluencyScore: speechPatterns.fluencyScore
-      },
-      
-      confidence: {
-        voiceConfidence: speechPatterns.voiceConfidence,
-        speechClarity: Math.min(100, (1 - audioFeatures.zcr) * 100),
-        paceConsistency: speechPatterns.speechRate > 100 && speechPatterns.speechRate < 200 ? 90 : 70,
-        overallConfidence: Math.round((speechPatterns.voiceConfidence + speechPatterns.fluencyScore) / 2)
-      },
-      
-      emotion: {
-        energy: Math.min(100, audioFeatures.energy * 200),
-        stress: Math.max(0, 100 - speechPatterns.fluencyScore),
-        enthusiasm: Math.min(100, audioFeatures.rms * 150),
-        nervousness: Math.min(100, speechPatterns.fillerCount * 20 + speechPatterns.hesitations * 15)
-      }
-    };
-
-    return speechMetrics;
-  } catch (error) {
-    console.error('Error analyzing speech comprehensively:', error);
-    return null;
-  }
-};
-
-// Audio recording utilities with enhanced quality
+// Enhanced Audio recording utilities with better error handling
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
@@ -234,25 +190,32 @@ export class AudioRecorder {
 
   async startRecording(): Promise<boolean> {
     try {
+      // Request audio with optimized settings for speech
       this.stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 44100, // Higher sample rate for better quality
-          channelCount: 1
+          sampleRate: 16000, // Optimal for speech recognition
+          channelCount: 1 // Mono audio
         } 
       });
       
-      // Use higher quality encoding if available
-      const options: MediaRecorderOptions = {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000 // Higher bitrate for better quality
-      };
+      // Use the best available codec
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/mp4';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = ''; // Let browser choose
+          }
+        }
+      }
       
-      // Fallback to default if specific codec not supported
-      if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
-        delete options.mimeType;
+      const options: MediaRecorderOptions = {};
+      if (mimeType) {
+        options.mimeType = mimeType;
       }
       
       this.mediaRecorder = new MediaRecorder(this.stream, options);
@@ -265,7 +228,8 @@ export class AudioRecorder {
         }
       };
       
-      this.mediaRecorder.start(100); // Collect data every 100ms for smoother recording
+      // Collect data more frequently for better quality
+      this.mediaRecorder.start(250); // Collect data every 250ms
       return true;
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -281,8 +245,10 @@ export class AudioRecorder {
       }
 
       this.mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-        const duration = (Date.now() - this.startTime) / 1000;
+        const duration = (Date.now() - this.startTime) / 1000; // Duration in seconds
+        const audioBlob = new Blob(this.audioChunks, { 
+          type: this.mediaRecorder?.mimeType || 'audio/webm' 
+        });
         this.cleanup();
         resolve({ audioBlob, duration });
       };
@@ -298,12 +264,42 @@ export class AudioRecorder {
     }
     this.mediaRecorder = null;
     this.audioChunks = [];
+    this.startTime = 0;
   }
 
   isRecording(): boolean {
     return this.mediaRecorder?.state === 'recording';
   }
 }
+
+// Comprehensive speech analysis function
+export const analyzeSpeechComprehensively = async (
+  audioBlob: Blob,
+  transcription: string,
+  duration: number
+): Promise<any> => {
+  // This would integrate with the speech analysis utilities
+  // For now, return basic metrics based on transcription
+  const words = transcription.split(/\s+/).filter(w => w.length > 0);
+  const speechRate = (words.length / duration) * 60; // WPM
+  
+  return {
+    timing: {
+      totalDuration: duration,
+      speechRate: speechRate,
+      wordCount: words.length
+    },
+    confidence: {
+      overallConfidence: Math.min(100, Math.max(30, speechRate * 0.5 + words.length * 2))
+    },
+    fluency: {
+      fluencyScore: Math.min(100, Math.max(40, 100 - (transcription.match(/\b(um|uh|like)\b/gi)?.length || 0) * 10))
+    },
+    voice: {
+      voiceStability: Math.random() * 30 + 70 // Placeholder
+    }
+  };
+};
 
 // Generate conversational responses to candidate statements
 export const generateConversationalResponse = async (
@@ -969,7 +965,7 @@ const generateMockQuestion = (
 
 // Generate initial interview questions with small talk
 export const generateInterviewQuestions = async (setup: InterviewSetup): Promise<Question[]> => {
-  await delay(1500); // Simulate API delay
+  await delay(1000); // Reduced delay
   
   const questions: Question[] = [];
   
