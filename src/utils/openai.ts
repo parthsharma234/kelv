@@ -3,6 +3,8 @@ import { InterviewSetup, Question, AIInterviewerState } from '../types/interview
 // OpenAI API configuration
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_TTS_URL = 'https://api.openai.com/v1/audio/speech';
+const OPENAI_STT_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
 // Mock function to simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -55,6 +57,154 @@ const extractJsonFromMarkdown = (content: string): string => {
   // If no markdown blocks found, return the content as-is
   return content.trim();
 };
+
+// Text-to-Speech using OpenAI TTS
+export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement | null> => {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    // Simulate API delay for demo mode
+    await delay(1000);
+    return null;
+  }
+
+  try {
+    const response = await fetch(OPENAI_TTS_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'tts-1',
+        input: text,
+        voice: 'alloy', // Professional, friendly voice
+        response_format: 'mp3',
+        speed: 1.0
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`TTS API error: ${response.status}`);
+    }
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    
+    // Clean up the URL when audio finishes playing
+    audio.addEventListener('ended', () => {
+      URL.revokeObjectURL(audioUrl);
+    });
+
+    return audio;
+  } catch (error) {
+    console.error('Error synthesizing speech:', error);
+    // Fallback to no audio
+    await delay(1000);
+    return null;
+  }
+};
+
+// Speech-to-Text using OpenAI Whisper
+export const transcribeAudio = async (audioBlob: Blob): Promise<string | null> => {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    // Demo mode - return null to indicate no transcription
+    return null;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'en');
+    formData.append('response_format', 'json');
+
+    const response = await fetch(OPENAI_STT_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`STT API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.text || null;
+  } catch (error) {
+    console.error('Error transcribing audio:', error);
+    return null;
+  }
+};
+
+// Audio recording utilities
+export class AudioRecorder {
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+  private stream: MediaStream | null = null;
+
+  async startRecording(): Promise<boolean> {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000
+        } 
+      });
+      
+      this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      this.audioChunks = [];
+      
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+      
+      this.mediaRecorder.start(100); // Collect data every 100ms
+      return true;
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      return false;
+    }
+  }
+
+  async stopRecording(): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      if (!this.mediaRecorder) {
+        resolve(null);
+        return;
+      }
+
+      this.mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        this.cleanup();
+        resolve(audioBlob);
+      };
+
+      this.mediaRecorder.stop();
+    });
+  }
+
+  private cleanup() {
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.stream = null;
+    }
+    this.mediaRecorder = null;
+    this.audioChunks = [];
+  }
+
+  isRecording(): boolean {
+    return this.mediaRecorder?.state === 'recording';
+  }
+}
 
 // Generate conversational responses to candidate statements
 export const generateConversationalResponse = async (
@@ -1048,13 +1198,4 @@ export const generateNextQuestion = async (
   const question = await generateDynamicQuestion(setup, previousResponses, aiState, questionType);
   
   return question;
-};
-
-export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement | null> => {
-  // Simulate API delay
-  await delay(1000);
-  
-  // In UI mode, we don't actually synthesize speech
-  // This is just a mock to simulate the delay
-  return null;
 };

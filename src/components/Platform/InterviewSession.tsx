@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send } from 'lucide-react';
+import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
-import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech } from '../../utils/openai';
+import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, transcribeAudio, AudioRecorder } from '../../utils/openai';
 
 interface InterviewSessionProps {
   setup: InterviewSetup;
@@ -12,6 +12,8 @@ interface InterviewSessionProps {
 export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onComplete, onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const audioRecorderRef = useRef<AudioRecorder | null>(null);
+  
   const [session, setSession] = useState<IInterviewSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -38,6 +40,12 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   });
   const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
   const [isInterviewComplete, setIsInterviewComplete] = useState(false);
+  
+  // Speech-to-text states
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [speechMode, setSpeechMode] = useState<'text' | 'voice'>('text');
+  const [audioEnabled, setAudioEnabled] = useState(true);
 
   // Check if OpenAI API key is configured
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
@@ -45,9 +53,16 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
   useEffect(() => {
     initializeSession();
+    // Initialize audio recorder
+    audioRecorderRef.current = new AudioRecorder();
+    
     return () => {
       stopPreviewCamera();
       stopCamera();
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = '';
+      }
     };
   }, []);
 
@@ -227,6 +242,13 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     }
   };
 
+  const toggleAudio = () => {
+    setAudioEnabled(!audioEnabled);
+    if (currentAudio) {
+      currentAudio.muted = audioEnabled;
+    }
+  };
+
   const initializeSession = async () => {
     setIsLoading(true);
     try {
@@ -258,6 +280,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   };
 
   const playQuestion = async (questionText: string) => {
+    if (!audioEnabled) return;
+    
     try {
       setIsPlaying(true);
       if (currentAudio) {
@@ -268,6 +292,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       const audio = await synthesizeSpeech(questionText);
       if (audio) {
         setCurrentAudio(audio);
+        audio.muted = !audioEnabled;
         audio.play();
         audio.onended = () => {
           setIsPlaying(false);
@@ -282,6 +307,38 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       console.error('Error playing question:', error);
       setIsPlaying(false);
     }
+  };
+
+  const startRecording = async () => {
+    if (!audioRecorderRef.current) return;
+    
+    const success = await audioRecorderRef.current.startRecording();
+    if (success) {
+      setIsRecording(true);
+      setSpeechMode('voice');
+    } else {
+      console.error('Failed to start recording');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!audioRecorderRef.current) return;
+    
+    setIsRecording(false);
+    setIsTranscribing(true);
+    
+    const audioBlob = await audioRecorderRef.current.stopRecording();
+    if (audioBlob) {
+      const transcription = await transcribeAudio(audioBlob);
+      if (transcription) {
+        setUserResponse(transcription);
+      } else {
+        // Fallback to text mode if transcription fails
+        setSpeechMode('text');
+      }
+    }
+    
+    setIsTranscribing(false);
   };
 
   const handleSubmitResponse = async () => {
@@ -303,6 +360,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
       // Clear the response input
       setUserResponse('');
+      setSpeechMode('text'); // Reset to text mode
 
       // Generate next question or complete interview
       await moveToNextQuestion(updatedResponses);
@@ -449,6 +507,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const handleEndCall = () => {
     stopCamera();
     stopPreviewCamera();
+    if (audioRecorderRef.current?.isRecording()) {
+      audioRecorderRef.current.stopRecording();
+    }
     onBack();
   };
 
@@ -467,14 +528,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">AI Interview Setup</h2>
           <p className="text-gray-400 mb-8 leading-relaxed">
-            To conduct your AI-powered mock interview, we need access to your camera and microphone. 
-            This allows us to simulate a real interview experience with dynamic question adaptation.
+            To conduct your AI-powered mock interview with speech capabilities, we need access to your camera and microphone. 
+            This allows us to simulate a real interview experience with voice interaction and dynamic question adaptation.
           </p>
           
           <div className="bg-gray-900/50 rounded-xl p-6 mb-8 border border-[#FF5722]/20">
             <h3 className="text-white font-semibold mb-3 flex items-center justify-center">
               <Settings className="w-5 h-5 mr-2 text-[#FF5722]" />
-              AI Analysis Status:
+              AI Features Status:
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
@@ -487,10 +548,30 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   {hasOpenAIKey ? 'REAL AI' : 'DEMO MODE'}
                 </span>
               </div>
+              <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
+                <span className="text-sm text-gray-300">Speech-to-Text (Whisper):</span>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  hasOpenAIKey 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {hasOpenAIKey ? 'ENABLED' : 'TEXT ONLY'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
+                <span className="text-sm text-gray-300">Text-to-Speech:</span>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  hasOpenAIKey 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {hasOpenAIKey ? 'ENABLED' : 'SILENT MODE'}
+                </span>
+              </div>
               <div className="text-xs text-gray-400">
                 {hasOpenAIKey 
-                  ? '✅ Real-time AI analysis with GPT-4o' 
-                  : '⚠️ Using demo responses - add VITE_OPENAI_API_KEY for real AI'
+                  ? '✅ Full voice-enabled AI interview experience' 
+                  : '⚠️ Text-only mode - add VITE_OPENAI_API_KEY for voice features'
                 }
               </div>
             </div>
@@ -599,10 +680,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             <ArrowLeft className="w-5 h-5 text-gray-400" />
           </button>
           <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-pulse"></div>
-          <span className="text-white font-medium">AI Dynamic Interview</span>
+          <span className="text-white font-medium">AI Voice Interview</span>
           {hasStartedInterview && (
             <div className="px-2 py-1 bg-[#FF5722]/20 rounded text-[#FF5722] text-xs font-medium border border-[#FF5722]/30">
-              {hasOpenAIKey ? 'GPT-4o' : 'DEMO'}
+              {hasOpenAIKey ? 'GPT-4o + Voice' : 'DEMO'}
             </div>
           )}
         </div>
@@ -619,6 +700,18 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   {responses.length + 1} of ~5-8 questions
                 </span>
               </div>
+              <button
+                onClick={toggleAudio}
+                className={`p-2 rounded-lg transition-colors ${
+                  audioEnabled ? 'bg-gray-800 hover:bg-gray-700' : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
+                {audioEnabled ? (
+                  <Volume2 className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-white" />
+                )}
+              </button>
             </>
           )}
         </div>
@@ -641,7 +734,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <p className="text-gray-300 text-base leading-relaxed">
                   {hasStartedInterview 
                     ? currentQuestion?.text || "Generating next question..."
-                    : "Click 'Start AI Interview' to begin your personalized mock interview. Feedback will be provided at the end of the complete interview."}
+                    : "Click 'Start AI Interview' to begin your personalized voice-enabled mock interview. You can respond by typing or speaking."}
                 </p>
                 {hasStartedInterview && currentQuestion && (
                   <div className="mt-3 flex items-center gap-2">
@@ -654,6 +747,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                         ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                         : currentQuestion.type === 'follow_up'
                         ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                        : currentQuestion.type === 'conversational'
+                        ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
                         : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
                     }`}>
                       {currentQuestion.type.replace('_', ' ').charAt(0).toUpperCase() + currentQuestion.type.replace('_', ' ').slice(1)}
@@ -677,18 +772,73 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             {/* Response input section */}
             {hasStartedInterview && currentQuestion && (
               <div className="flex-1 flex flex-col space-y-4">
+                {/* Speech mode toggle */}
+                {hasOpenAIKey && (
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <button
+                      onClick={() => setSpeechMode('text')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        speechMode === 'text'
+                          ? 'bg-[#FF5722] text-white'
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      }`}
+                    >
+                      Type Response
+                    </button>
+                    <button
+                      onClick={() => setSpeechMode('voice')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        speechMode === 'voice'
+                          ? 'bg-[#FF5722] text-white'
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      }`}
+                    >
+                      Voice Response
+                    </button>
+                  </div>
+                )}
+                
                 <div className="flex-1">
-                  <textarea
-                    value={userResponse}
-                    onChange={(e) => setUserResponse(e.target.value)}
-                    placeholder="Type your response here..."
-                    className="w-full h-32 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors resize-none"
-                  />
+                  {speechMode === 'voice' && hasOpenAIKey ? (
+                    <div className="text-center">
+                      <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={isTranscribing}
+                        className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
+                          isRecording
+                            ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+                            : 'bg-[#FF5722] hover:bg-[#D84315]'
+                        } disabled:opacity-50`}
+                      >
+                        {isTranscribing ? (
+                          <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Mic className="w-8 h-8 text-white" />
+                        )}
+                      </button>
+                      <p className="text-sm text-gray-400 mt-3">
+                        {isRecording ? 'Recording... Click to stop' : 
+                         isTranscribing ? 'Transcribing...' : 'Click to record your response'}
+                      </p>
+                      {userResponse && (
+                        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
+                          <p className="text-sm text-gray-300">{userResponse}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={userResponse}
+                      onChange={(e) => setUserResponse(e.target.value)}
+                      placeholder="Type your response here..."
+                      className="w-full h-32 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors resize-none"
+                    />
+                  )}
                 </div>
                 
                 <button
                   onClick={handleSubmitResponse}
-                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion}
+                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion || isRecording || isTranscribing}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
                 >
                   {isAnalyzing || isGeneratingQuestion ? (
@@ -709,7 +859,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 {/* Progress indicator */}
                 <div className="text-center">
                   <p className="text-sm text-gray-400">
-                    Question {responses.length + 1} • Feedback at interview completion
+                    Question {responses.length + 1} • Comprehensive feedback at completion
                   </p>
                   <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
                     <div 
@@ -734,12 +884,12 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 </button>
                 
                 <div className="mt-4 p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="text-sm font-medium text-white mb-2">Interview Flow:</h4>
+                  <h4 className="text-sm font-medium text-white mb-2">Voice Interview Features:</h4>
                   <ul className="text-xs text-gray-400 space-y-1">
-                    <li>• 5-8 adaptive questions based on your responses</li>
-                    <li>• {hasOpenAIKey ? 'Real GPT-4o analysis' : 'Demo mode responses'}</li>
-                    <li>• Comprehensive feedback table at the end</li>
-                    <li>• Natural interview conclusion when appropriate</li>
+                    <li>• {hasOpenAIKey ? 'AI speaks questions aloud' : 'Text-based questions'}</li>
+                    <li>• {hasOpenAIKey ? 'Voice or text responses' : 'Text responses only'}</li>
+                    <li>• 5-8 adaptive questions with natural conversation flow</li>
+                    <li>• Comprehensive feedback table at completion</li>
                   </ul>
                 </div>
               </div>
@@ -750,11 +900,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
-                  disabled={isPlaying}
+                  disabled={isPlaying || !audioEnabled}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-3"
                 >
                   {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  <span>{isPlaying ? 'Playing' : 'Repeat Question'}</span>
+                  <span>{isPlaying ? 'Playing' : hasOpenAIKey ? 'Repeat Question' : 'Read Question'}</span>
                 </button>
               </div>
             )}
@@ -820,7 +970,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     <span className="text-[#FF5722] text-lg font-medium">
                       {isGeneratingQuestion ? 'Generating Question...' : 
                        isAnalyzing ? 'Processing...' :
-                       isPlaying ? 'Speaking...' : 'Listening...'}
+                       isPlaying ? 'Speaking...' : 
+                       isRecording ? 'Listening...' :
+                       isTranscribing ? 'Understanding...' : 'Ready...'}
                     </span>
                   </div>
                   <div className="mt-2">
@@ -829,7 +981,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                         ? 'bg-green-500/20 text-green-400' 
                         : 'bg-yellow-500/20 text-yellow-400'
                     }`}>
-                      {hasOpenAIKey ? 'Real GPT-4o AI' : 'Demo Mode'}
+                      {hasOpenAIKey ? 'Real GPT-4o + Voice AI' : 'Demo Mode'}
                     </span>
                   </div>
                 </div>
