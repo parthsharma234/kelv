@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus, Trash2, Heart } from 'lucide-react';
+import { ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus, Trash2, Heart, Wand2 } from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
 import { 
   getUserInterviewSetups, 
@@ -32,6 +32,59 @@ const experienceLevels = [
   'Senior Level (6-10 years)', 'Executive Level (10+ years)'
 ];
 
+// Function to generate setup name based on choices
+const generateSetupName = (setup: Partial<InterviewSetup>): string => {
+  if (!setup.industry || !setup.jobType || !setup.experienceLevel) {
+    return '';
+  }
+
+  // Extract experience level prefix
+  const experienceMap: Record<string, string> = {
+    'Entry Level (0-2 years)': 'Entry',
+    'Mid Level (3-5 years)': 'Mid-Level',
+    'Senior Level (6-10 years)': 'Senior',
+    'Executive Level (10+ years)': 'Executive'
+  };
+
+  const experiencePrefix = experienceMap[setup.experienceLevel] || 'Mid-Level';
+  
+  // Shorten common job titles
+  const jobTitleMap: Record<string, string> = {
+    'Software Engineer': 'SWE',
+    'Product Manager': 'PM',
+    'Data Scientist': 'Data Scientist',
+    'UX/UI Designer': 'UX Designer',
+    'Marketing Manager': 'Marketing',
+    'Sales Representative': 'Sales',
+    'Business Analyst': 'BA',
+    'DevOps Engineer': 'DevOps',
+    'Customer Success': 'CS',
+    'Project Manager': 'PM',
+    'HR Specialist': 'HR'
+  };
+
+  const jobTitle = jobTitleMap[setup.jobType] || setup.jobType;
+  
+  // Shorten industry names
+  const industryMap: Record<string, string> = {
+    'Technology': 'Tech',
+    'Healthcare': 'Healthcare',
+    'Finance': 'Finance',
+    'Marketing': 'Marketing',
+    'Sales': 'Sales',
+    'Education': 'Education',
+    'Consulting': 'Consulting',
+    'Retail': 'Retail',
+    'Manufacturing': 'Manufacturing',
+    'Non-profit': 'Non-profit',
+    'Government': 'Government'
+  };
+
+  const industry = industryMap[setup.industry] || setup.industry;
+
+  return `${experiencePrefix} ${jobTitle} - ${industry}`;
+};
+
 export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [setup, setSetup] = useState<Partial<InterviewSetup>>({});
@@ -45,10 +98,19 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [setupName, setSetupName] = useState('');
   const [saveAsFavorite, setSaveAsFavorite] = useState(false);
+  const [useAutoName, setUseAutoName] = useState(true);
 
   useEffect(() => {
     loadSavedSetups();
   }, []);
+
+  // Auto-generate name when setup changes
+  useEffect(() => {
+    if (useAutoName && setup.industry && setup.jobType && setup.experienceLevel) {
+      const autoName = generateSetupName(setup);
+      setSetupName(autoName);
+    }
+  }, [setup, useAutoName]);
 
   const loadSavedSetups = async () => {
     setIsLoadingSetups(true);
@@ -99,6 +161,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
       setShowSaveDialog(false);
       setSetupName('');
       setSaveAsFavorite(false);
+      setUseAutoName(true);
       await loadSavedSetups(); // Refresh the list
       onComplete(setup as InterviewSetup);
     } catch (error) {
@@ -535,17 +598,38 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Setup Name
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-300">
+                      Setup Name
+                    </label>
+                    <button
+                      onClick={() => setUseAutoName(!useAutoName)}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        useAutoName 
+                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' 
+                          : 'bg-gray-700 text-gray-400 border border-gray-600'
+                      }`}
+                    >
+                      <Wand2 className="w-3 h-3" />
+                      Auto-generate
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={setupName}
-                    onChange={(e) => setSetupName(e.target.value)}
+                    onChange={(e) => {
+                      setSetupName(e.target.value);
+                      setUseAutoName(false);
+                    }}
                     placeholder="e.g., Senior Software Engineer - Tech"
                     className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none transition-colors"
-                    autoFocus
+                    autoFocus={!useAutoName}
                   />
+                  {useAutoName && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Name automatically generated from your choices
+                    </p>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-3">
