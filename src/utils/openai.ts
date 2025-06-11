@@ -107,15 +107,47 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
 // Enhanced Speech-to-Text using OpenAI Whisper with optimization
 export const transcribeAudio = async (audioBlob: Blob): Promise<string | null> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    // Demo mode - return null to indicate no transcription
+    console.warn('OpenAI API key not configured - transcription disabled');
+    return null;
+  }
+
+  // Validate audio blob
+  if (!audioBlob || audioBlob.size === 0) {
+    console.warn('Invalid or empty audio blob provided for transcription');
+    return null;
+  }
+
+  // Check if audio is too short (less than 1 second worth of data)
+  if (audioBlob.size < 1000) {
+    console.warn('Audio too short for meaningful transcription');
     return null;
   }
 
   try {
-    // Use the optimized transcription method
-    return await FastTranscription.transcribeWithStreaming(audioBlob, OPENAI_API_KEY);
+    // Use the optimized transcription method with better error handling
+    const transcription = await FastTranscription.transcribeWithStreaming(audioBlob, OPENAI_API_KEY);
+    
+    // Return null if transcription is empty or just whitespace
+    if (!transcription || transcription.trim().length === 0) {
+      console.warn('Transcription returned empty result');
+      return null;
+    }
+    
+    return transcription;
   } catch (error) {
     console.error('Error transcribing audio:', error);
+    
+    // Check for specific error types and provide user-friendly messages
+    if (error instanceof Error) {
+      if (error.message.includes('Invalid OpenAI API key')) {
+        console.error('Please check your OpenAI API key configuration in the .env file');
+      } else if (error.message.includes('Invalid audio format')) {
+        console.error('Audio format not supported by OpenAI Whisper API');
+      } else if (error.message.includes('400')) {
+        console.error('Bad request to OpenAI API - check API key and audio format');
+      }
+    }
+    
     return null;
   }
 };

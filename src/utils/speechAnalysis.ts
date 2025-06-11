@@ -295,6 +295,19 @@ export class FastTranscription {
   
   static async transcribeWithStreaming(audioBlob: Blob, apiKey: string): Promise<string> {
     if (!apiKey || apiKey === 'your_openai_api_key_here') {
+      console.warn('OpenAI API key not configured');
+      return '';
+    }
+
+    // Validate audio blob
+    if (!audioBlob || audioBlob.size === 0) {
+      console.warn('Invalid or empty audio blob');
+      return '';
+    }
+
+    // Check if audio blob is too small (less than 1 second of audio)
+    if (audioBlob.size < 1000) {
+      console.warn('Audio blob too small for transcription');
       return '';
     }
 
@@ -308,13 +321,40 @@ export class FastTranscription {
       return await this.chunkedTranscription(audioBlob, apiKey);
     } catch (error) {
       console.error('Transcription error:', error);
+      
+      // Check if it's an API key error
+      if (error instanceof Error && error.message.includes('401')) {
+        console.error('Invalid or expired OpenAI API key');
+        throw new Error('Invalid OpenAI API key. Please check your API key configuration.');
+      }
+      
+      // Check if it's a bad request error
+      if (error instanceof Error && error.message.includes('400')) {
+        console.error('Bad request to OpenAI API - likely invalid audio format or API key');
+        throw new Error('Invalid audio format or API configuration. Please check your audio recording and API key.');
+      }
+      
       return '';
     }
   }
 
   private static async directTranscription(audioBlob: Blob, apiKey: string): Promise<string> {
+    // Validate API key format
+    if (!apiKey.startsWith('sk-')) {
+      throw new Error('Invalid OpenAI API key format');
+    }
+
+    // Convert webm to a more compatible format if needed
+    let processedBlob = audioBlob;
+    
+    // If the blob is webm, try to ensure it's in a format OpenAI accepts
+    if (audioBlob.type.includes('webm')) {
+      // Create a new blob with explicit audio/webm type
+      processedBlob = new Blob([audioBlob], { type: 'audio/webm' });
+    }
+
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('file', processedBlob, 'audio.webm');
     formData.append('model', 'whisper-1');
     formData.append('language', 'en');
     formData.append('response_format', 'json');
@@ -329,7 +369,16 @@ export class FastTranscription {
     });
 
     if (!response.ok) {
-      throw new Error(`Transcription API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('OpenAI API Error Response:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('Transcription API error: 401 - Invalid API key');
+      } else if (response.status === 400) {
+        throw new Error('Transcription API error: 400 - Bad request (check audio format and API key)');
+      } else {
+        throw new Error(`Transcription API error: ${response.status}`);
+      }
     }
 
     const data = await response.json();
