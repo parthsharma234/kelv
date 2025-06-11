@@ -22,23 +22,10 @@ const WaitlistSuccess: React.FC = () => {
           if (!totalError && totalUsers) {
             setWaitlistCount(totalUsers);
             
-            // Get users from the last week for growth calculation
-            const oneWeekAgo = new Date();
-            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-            
-            const { data: recentUsers, error: recentError } = await supabase
-              .from('auth.users')
-              .select('created_at')
-              .gte('created_at', oneWeekAgo.toISOString());
-            
-            if (!recentError && recentUsers) {
-              setWeeklyGrowth(recentUsers.length);
-            } else {
-              // Calculate estimated weekly growth based on total users
-              // Assume roughly 5-10% weekly growth for established waitlists
-              const estimatedWeekly = Math.max(1, Math.floor(totalUsers * 0.07));
-              setWeeklyGrowth(estimatedWeekly);
-            }
+            // Calculate estimated weekly growth based on total users
+            // Assume roughly 5-10% weekly growth for established waitlists
+            const estimatedWeekly = Math.max(1, Math.floor(totalUsers * 0.07));
+            setWeeklyGrowth(estimatedWeekly);
           } else {
             console.log('RPC call failed, using fallback count');
             // Keep fallback numbers if RPC fails
