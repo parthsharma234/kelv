@@ -13,7 +13,8 @@ export const QUESTION_TYPES = {
   BEHAVIORAL: 'behavioral', 
   TECHNICAL: 'technical',
   SITUATIONAL: 'situational',
-  FOLLOW_UP: 'follow_up'
+  FOLLOW_UP: 'follow_up',
+  CONVERSATIONAL: 'conversational'
 } as const;
 
 // Small talk questions to start the interview
@@ -55,6 +56,165 @@ const extractJsonFromMarkdown = (content: string): string => {
   return content.trim();
 };
 
+// Generate conversational responses to candidate statements
+export const generateConversationalResponse = async (
+  candidateResponse: string,
+  setup: InterviewSetup,
+  previousResponses: any[]
+): Promise<Question> => {
+  
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    return generateMockConversationalResponse(candidateResponse, setup, previousResponses);
+  }
+
+  try {
+    const prompt = `
+You are conducting a ${setup.jobType} interview for a ${setup.experienceLevel} candidate in ${setup.industry}.
+
+The candidate just said: "${candidateResponse}"
+
+Generate a natural, conversational response that:
+1. ACKNOWLEDGES what they said specifically (reference their exact words)
+2. Shows empathy or understanding for their situation
+3. Transitions naturally into a relevant follow-up question
+4. Maintains a warm, professional tone
+5. Builds rapport while gathering more information
+
+Examples of good conversational responses:
+- "I can understand staying up all night - that shows real dedication! That kind of preparation tells me a lot about your work ethic. Speaking of dedication, can you tell me about a time when you went above and beyond on a project?"
+- "That's really interesting that you mentioned [specific thing they said]. I'd love to hear more about that experience. What was the most challenging part of [what they mentioned]?"
+
+Make it feel like a real conversation, not a robotic question sequence.
+
+Respond with JSON:
+{
+  "question": "The conversational response and follow-up question",
+  "type": "conversational",
+  "category": "natural_flow",
+  "difficulty": "medium",
+  "reasoning": "Why this response builds on what they said"
+}`;
+
+    const response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert interviewer who creates natural, flowing conversations. You always acknowledge what candidates say and respond with empathy before transitioning to relevant questions. You make interviews feel like genuine conversations, not interrogations.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 300
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error('No content received from OpenAI');
+    }
+
+    const jsonContent = extractJsonFromMarkdown(content);
+    const questionData = JSON.parse(jsonContent);
+    
+    return {
+      id: `conv_${Date.now()}`,
+      text: questionData.question,
+      type: 'conversational',
+      category: questionData.category,
+      difficulty: questionData.difficulty
+    };
+
+  } catch (error) {
+    console.error('Error generating conversational response:', error);
+    return generateMockConversationalResponse(candidateResponse, setup, previousResponses);
+  }
+};
+
+// Mock conversational responses
+const generateMockConversationalResponse = (
+  candidateResponse: string,
+  setup: InterviewSetup,
+  previousResponses: any[]
+): Question => {
+  const response = candidateResponse.toLowerCase();
+  
+  // Detect specific mentions and respond conversationally
+  if (response.includes('stayed up') || response.includes('all night') || response.includes('nervous') || response.includes('anxious')) {
+    return {
+      id: 'conv_dedication',
+      text: "I can really appreciate that level of preparation - staying up all night shows real dedication! That kind of commitment tells me a lot about your work ethic. Speaking of going the extra mile, can you tell me about a time when you went above and beyond on a project or task?",
+      type: 'conversational',
+      category: 'dedication_follow_up',
+      difficulty: 'medium'
+    };
+  }
+  
+  if (response.includes('excited') || response.includes('passionate') || response.includes('love')) {
+    return {
+      id: 'conv_passion',
+      text: "That enthusiasm really comes through! It's great to see someone who's genuinely passionate about their work. I'd love to hear more about what specifically excites you most about this field - what got you started on this path?",
+      type: 'conversational',
+      category: 'passion_follow_up',
+      difficulty: 'easy'
+    };
+  }
+  
+  if (response.includes('challenging') || response.includes('difficult') || response.includes('struggle')) {
+    return {
+      id: 'conv_challenges',
+      text: "I appreciate your honesty about the challenges - that shows good self-awareness. Every field has its difficulties, and how we handle them often defines our growth. Can you walk me through a specific challenging situation you've faced and how you approached solving it?",
+      type: 'conversational',
+      category: 'challenge_follow_up',
+      difficulty: 'medium'
+    };
+  }
+  
+  if (response.includes('team') || response.includes('collaborate') || response.includes('work with others')) {
+    return {
+      id: 'conv_teamwork',
+      text: "That's wonderful that you mentioned teamwork - collaboration is so important in most roles today. I'm curious about your experience working with different types of people. Can you tell me about a time when you had to work with someone who had a very different working style than you?",
+      type: 'conversational',
+      category: 'teamwork_follow_up',
+      difficulty: 'medium'
+    };
+  }
+  
+  if (response.includes('learn') || response.includes('growth') || response.includes('develop')) {
+    return {
+      id: 'conv_learning',
+      text: "I love hearing about people who are focused on learning and growth - that's such a valuable mindset! Continuous learning is crucial in today's fast-paced world. What's something new you've learned recently that you're particularly proud of?",
+      type: 'conversational',
+      category: 'learning_follow_up',
+      difficulty: 'easy'
+    };
+  }
+  
+  // Default conversational response
+  return {
+    id: 'conv_general',
+    text: "That's really interesting! I can tell you've put thought into this. Building on what you just shared, I'd love to dive a bit deeper. Can you give me a specific example that illustrates what you just mentioned?",
+    type: 'conversational',
+    category: 'general_follow_up',
+    difficulty: 'medium'
+  };
+};
+
 // Generate dynamic questions using GPT-4o
 export const generateDynamicQuestion = async (
   setup: InterviewSetup,
@@ -85,34 +245,35 @@ export const generateDynamicQuestion = async (
             content: `You are an expert AI interviewer conducting a comprehensive ${setup.jobType} interview for a ${setup.experienceLevel} candidate in the ${setup.industry} industry. 
 
 CRITICAL INTERVIEW GUIDELINES:
-- Conduct THOROUGH interviews with 8-12 questions minimum
-- Cover ALL major areas: background, behavioral, technical, situational, and role-specific questions
-- Ask SPECIFIC follow-up questions that dig deeper into the candidate's actual responses
-- When asking follow-ups, reference their exact words and ask for more details about what they mentioned
-- Adapt difficulty based on performance but maintain comprehensive coverage
-- Only conclude when you've thoroughly assessed the candidate across all dimensions
+- Create NATURAL, CONVERSATIONAL interviews that feel like real human interactions
+- ALWAYS acknowledge and respond to what candidates actually say before asking new questions
+- Show empathy, understanding, and genuine interest in their responses
+- Build rapport through conversational bridges and transitions
+- Conduct THOROUGH interviews with 8-12 questions minimum covering all competency areas
+- Ask SPECIFIC follow-up questions that reference their exact words and dig deeper
+- Adapt your personality and tone based on how they're responding
 
-FOLLOW-UP STRATEGY:
-- If they mention a specific technology, project, or experience, ask detailed questions about it
-- If they give a high-level answer, ask for specific examples and details
-- If they mention challenges or successes, dig into the specifics of how they handled it
-- Reference their exact words when asking follow-ups (e.g., "You mentioned X, can you tell me more about...")
+CONVERSATIONAL FLOW:
+- Reference specific things they mentioned: "You mentioned X, that's really interesting..."
+- Show empathy: "I can understand that..." "That must have been challenging..."
+- Build bridges: "That reminds me of..." "Building on what you said..."
+- Use natural transitions: "Speaking of..." "That's a great example, and it makes me curious about..."
 
 QUESTION TYPES TO COVER:
-1. Small talk (1-2 questions)
-2. Background and motivation (2-3 questions)
+1. Small talk and rapport building (1-2 questions)
+2. Background and motivation (2-3 questions)  
 3. Behavioral/STAR method questions (3-4 questions)
 4. Technical/role-specific questions (2-4 questions)
 5. Situational/problem-solving (1-2 questions)
-6. Follow-up questions based on their specific responses
+6. Conversational follow-ups based on their specific responses
 
 Always respond with a JSON object:
 {
-  "question": "The interview question text",
+  "question": "The conversational interview question with natural acknowledgment",
   "type": "question_type",
   "category": "specific_category", 
   "difficulty": "easy|medium|hard",
-  "reasoning": "Why this question was chosen and how it builds on previous responses"
+  "reasoning": "Why this question builds naturally on the conversation"
 }`
           },
           {
@@ -120,7 +281,7 @@ Always respond with a JSON object:
             content: prompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.8,
         max_tokens: 400
       })
     });
@@ -167,15 +328,20 @@ const buildPrompt = (
   prompt += `INTERVIEW PROGRESS: Question ${previousResponses.length + 1} of planned 8-12 questions\n\n`;
   
   if (previousResponses.length > 0) {
-    prompt += `PREVIOUS RESPONSES AND CONTEXT:\n`;
+    prompt += `CONVERSATION HISTORY AND CONTEXT:\n`;
     previousResponses.forEach((response, index) => {
       const score = response.analysis?.score || 0;
       const confidence = response.analysis?.confidenceIndicators?.enthusiasm || 5;
       prompt += `Q${index + 1}: "${response.questionText || 'Previous question'}"\n`;
-      prompt += `Response: "${response.response}"\n`;
-      prompt += `Score: ${score}/10, Confidence: ${confidence}/10\n`;
+      prompt += `Their response: "${response.response}"\n`;
+      prompt += `Performance: ${score}/10, Confidence: ${confidence}/10\n`;
       prompt += `Feedback: ${response.analysis?.feedback || 'No feedback'}\n\n`;
     });
+    
+    // Get the most recent response for conversational context
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    prompt += `MOST RECENT RESPONSE TO ACKNOWLEDGE: "${lastResponse.response}"\n`;
+    prompt += `IMPORTANT: Reference something specific from their last response to create natural conversation flow.\n\n`;
     
     // Calculate performance metrics
     const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
@@ -192,6 +358,19 @@ const buildPrompt = (
     prompt += `Generate a warm, engaging question to build rapport and help the candidate feel comfortable.\n`;
     prompt += `Keep it professional but friendly. This should ease them into the interview.\n`;
   } 
+  else if (questionType === 'conversational') {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    if (lastResponse) {
+      prompt += `CONVERSATIONAL RESPONSE INSTRUCTIONS:\n`;
+      prompt += `The candidate just said: "${lastResponse.response}"\n`;
+      prompt += `Create a natural, conversational response that:\n`;
+      prompt += `- Acknowledges something specific they mentioned\n`;
+      prompt += `- Shows understanding or empathy for their situation\n`;
+      prompt += `- Transitions smoothly into a relevant follow-up question\n`;
+      prompt += `- Feels like a natural conversation, not an interrogation\n`;
+      prompt += `- References their exact words when possible\n\n`;
+    }
+  }
   else if (questionType === 'follow_up') {
     const lastResponse = previousResponses[previousResponses.length - 1];
     if (lastResponse) {
@@ -201,11 +380,12 @@ const buildPrompt = (
       prompt += `- References something specific they mentioned in their response\n`;
       prompt += `- Asks for more details, examples, or clarification about what they said\n`;
       prompt += `- Digs deeper into their experience, process, or thinking\n`;
-      prompt += `- Uses phrases like "You mentioned..." or "Tell me more about..." or "Can you elaborate on..."\n`;
-      prompt += `- Builds directly on their actual words and content\n\n`;
+      prompt += `- Uses conversational phrases like "You mentioned..." or "That's interesting, tell me more about..." or "I'm curious about..."\n`;
+      prompt += `- Builds directly on their actual words and content\n`;
+      prompt += `- Shows you were actively listening to their response\n\n`;
       prompt += `Their performance on the last question was ${lastResponse.analysis?.score || 0}/10.\n`;
       if (lastResponse.analysis?.score < 6) {
-        prompt += `Since they struggled, help them succeed by asking a more specific or easier follow-up.\n`;
+        prompt += `Since they struggled, help them succeed by asking a more specific or easier follow-up that builds their confidence.\n`;
       } else {
         prompt += `Since they did well, you can dig deeper or ask for more complex details.\n`;
       }
@@ -218,6 +398,8 @@ const buildPrompt = (
     prompt += `Adjust difficulty based on their experience level and previous performance.\n`;
     if (previousResponses.length > 0) {
       const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
+      const lastResponse = previousResponses[previousResponses.length - 1];
+      prompt += `Start with a conversational acknowledgment of their previous response: "${lastResponse.response}"\n`;
       if (avgScore < 6) {
         prompt += `Make this question more straightforward since they've been struggling.\n`;
       } else if (avgScore >= 8) {
@@ -230,12 +412,20 @@ const buildPrompt = (
     prompt += `Generate a technical question relevant to the ${setup.jobType} role.\n`;
     prompt += `Adjust complexity based on their experience level (${setup.experienceLevel}) and previous responses.\n`;
     prompt += `Focus on practical skills, problem-solving, or industry knowledge.\n`;
+    if (previousResponses.length > 0) {
+      const lastResponse = previousResponses[previousResponses.length - 1];
+      prompt += `Create a natural transition from their previous response: "${lastResponse.response}"\n`;
+    }
   }
   else if (questionType === 'situational') {
     prompt += `SITUATIONAL QUESTION INSTRUCTIONS:\n`;
     prompt += `Generate a hypothetical scenario question relevant to the role.\n`;
     prompt += `Present a realistic workplace situation they might encounter.\n`;
     prompt += `Ask how they would handle it, focusing on their thought process and approach.\n`;
+    if (previousResponses.length > 0) {
+      const lastResponse = previousResponses[previousResponses.length - 1];
+      prompt += `Build naturally from their previous response: "${lastResponse.response}"\n`;
+    }
   }
 
   // Interview conclusion logic - be more deliberate about when to end
@@ -275,16 +465,30 @@ const generateMockQuestion = (
     };
   }
 
+  // For conversational responses, acknowledge what they said
+  if (questionType === 'conversational' && previousResponses.length > 0) {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    return generateMockConversationalResponse(lastResponse.response, setup, previousResponses);
+  }
+
   // For follow-up questions, reference the last response
   if (questionType === 'follow_up' && previousResponses.length > 0) {
     const lastResponse = previousResponses[previousResponses.length - 1];
     const responseText = lastResponse.response.toLowerCase();
     
     // Generate contextual follow-ups based on what they mentioned
-    if (responseText.includes('project') || responseText.includes('built') || responseText.includes('developed')) {
+    if (responseText.includes('stayed up') || responseText.includes('all night') || responseText.includes('nervous')) {
+      return {
+        id: 'followup_dedication',
+        text: `I really appreciate that level of preparation - staying up all night shows real dedication! That kind of commitment tells me a lot about your work ethic. Speaking of going the extra mile, can you tell me about a time when you went above and beyond on a project?`,
+        type: 'follow_up',
+        category: 'dedication_follow_up',
+        difficulty: 'medium'
+      };
+    } else if (responseText.includes('project') || responseText.includes('built') || responseText.includes('developed')) {
       return {
         id: 'followup_project',
-        text: `You mentioned working on a project. Can you walk me through the specific technologies you used and any challenges you encountered during development?`,
+        text: `That's really interesting that you mentioned working on a project. I'd love to hear more about that experience. Can you walk me through the specific technologies you used and any challenges you encountered during development?`,
         type: 'follow_up',
         category: 'project_details',
         difficulty: 'medium'
@@ -292,7 +496,7 @@ const generateMockQuestion = (
     } else if (responseText.includes('team') || responseText.includes('collaborate')) {
       return {
         id: 'followup_team',
-        text: `You mentioned working with a team. Tell me more about your role in that team and how you handled any disagreements or conflicts that arose.`,
+        text: `I love that you brought up teamwork - collaboration is so important in most roles today. Tell me more about your role in that team and how you handled any disagreements or conflicts that arose.`,
         type: 'follow_up',
         category: 'teamwork_details',
         difficulty: 'medium'
@@ -300,7 +504,7 @@ const generateMockQuestion = (
     } else if (responseText.includes('challenge') || responseText.includes('difficult') || responseText.includes('problem')) {
       return {
         id: 'followup_challenge',
-        text: `You mentioned facing a challenge. Can you break down your specific approach to solving it and what you learned from that experience?`,
+        text: `I appreciate your honesty about the challenges - that shows good self-awareness. Can you break down your specific approach to solving it and what you learned from that experience?`,
         type: 'follow_up',
         category: 'problem_solving_details',
         difficulty: 'medium'
@@ -308,7 +512,7 @@ const generateMockQuestion = (
     } else {
       return {
         id: 'followup_general',
-        text: `That's interesting. Can you give me a specific example of what you just described and walk me through the details?`,
+        text: `That's really interesting! I can tell you've put thought into this. Building on what you just shared, can you give me a specific example that illustrates what you just mentioned?`,
         type: 'follow_up',
         category: 'elaboration',
         difficulty: 'medium'
@@ -322,6 +526,30 @@ const generateMockQuestion = (
     const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
     if (avgScore < 6) difficulty = 'easy';
     else if (avgScore >= 8) difficulty = 'hard';
+  }
+
+  // Add conversational transitions to behavioral questions
+  if (questionType === 'behavioral' && previousResponses.length > 0) {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    const responseText = lastResponse.response.toLowerCase();
+    
+    if (responseText.includes('team') || responseText.includes('collaborate')) {
+      return {
+        id: 'behavioral_teamwork_transition',
+        text: `That's great that you mentioned teamwork! Since collaboration seems important to you, I'd love to hear about a specific time when you had to work with a difficult team member. How did you handle that situation?`,
+        type: 'behavioral',
+        category: 'teamwork_transition',
+        difficulty: difficulty
+      };
+    } else if (responseText.includes('learn') || responseText.includes('growth')) {
+      return {
+        id: 'behavioral_learning_transition',
+        text: `I love hearing about people focused on learning and growth! That mindset is so valuable. Can you tell me about a time when you had to learn something completely new under pressure? How did you approach it?`,
+        type: 'behavioral',
+        category: 'learning_transition',
+        difficulty: difficulty
+      };
+    }
   }
 
   // Comprehensive mock questions by industry and type
@@ -557,17 +785,19 @@ ANALYSIS REQUIREMENTS:
 4. Strategic next question type recommendation
 5. Adaptive insights for interview progression
 
-NEXT QUESTION STRATEGY:
+CONVERSATIONAL NEXT QUESTION STRATEGY:
+- If response reveals interesting details: suggest "conversational" to acknowledge and build rapport
 - If response lacks detail or examples: suggest "follow_up" to dig deeper
 - If performance is strong and we need technical assessment: suggest "technical"
 - If we need behavioral examples: suggest "behavioral"
 - If we need scenario-based assessment: suggest "situational"
 - Only suggest conclusion after 8+ questions with comprehensive coverage
 
-FOLLOW-UP LOGIC:
-- If they mention specific technologies, projects, or experiences, recommend follow-up
-- If answer is vague or high-level, recommend follow-up for specifics
-- If they show expertise in one area, probe deeper with follow-up
+CONVERSATIONAL FLOW PRIORITY:
+- Always prioritize natural conversation flow over rigid question types
+- If they mention something personal or emotional (stress, excitement, challenges), suggest "conversational"
+- If they share specific experiences or projects, suggest "follow_up" to explore details
+- Build rapport before diving into harder technical or behavioral questions
 
 Respond with JSON:
 {
@@ -601,7 +831,7 @@ Respond with JSON:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert interview coach analyzing candidate responses. Provide constructive, specific feedback that helps candidates improve while being encouraging and realistic. Focus on comprehensive interview coverage and strategic question progression.'
+            content: 'You are an expert interview coach analyzing candidate responses. Provide constructive, specific feedback that helps candidates improve while being encouraging and realistic. Focus on comprehensive interview coverage, natural conversation flow, and strategic question progression that builds rapport.'
           },
           {
             role: 'user',
@@ -642,12 +872,13 @@ const generateMockAnalysis = (
   previousResponses: any[]
 ) => {
   const responseLength = response.length;
-  const hasSpecificExamples = response.toLowerCase().includes('example') || 
-                             response.toLowerCase().includes('instance') ||
-                             response.toLowerCase().includes('time when') ||
-                             response.toLowerCase().includes('experience') ||
-                             response.toLowerCase().includes('project') ||
-                             response.toLowerCase().includes('worked on');
+  const responseText = response.toLowerCase();
+  const hasSpecificExamples = responseText.includes('example') || 
+                             responseText.includes('instance') ||
+                             responseText.includes('time when') ||
+                             responseText.includes('experience') ||
+                             responseText.includes('project') ||
+                             responseText.includes('worked on');
   const hasMetrics = /\d+/.test(response);
   const hasStructure = response.includes('first') || response.includes('then') || response.includes('finally') || response.includes('initially');
   
@@ -660,35 +891,39 @@ const generateMockAnalysis = (
   const score = Math.min(10, baseScore);
   const enthusiasm = Math.min(10, Math.max(3, Math.floor(responseLength / 20) + (hasSpecificExamples ? 2 : 0)));
   
-  // Determine next question type based on performance and interview progress
+  // Determine next question type based on conversational flow
   let nextQuestionType = 'behavioral';
   const avgScore = previousResponses.length > 0 
     ? previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length 
     : score;
   
-  // More deliberate question progression
-  if (question.type === 'small_talk') {
-    nextQuestionType = 'behavioral'; // Always move to behavioral after small talk
+  // Prioritize conversational flow
+  if (responseText.includes('stayed up') || responseText.includes('all night') || 
+      responseText.includes('nervous') || responseText.includes('excited') ||
+      responseText.includes('passionate') || responseText.includes('challenging')) {
+    nextQuestionType = 'conversational'; // Acknowledge their emotional state
+  } else if (question.type === 'small_talk') {
+    nextQuestionType = 'conversational'; // Build rapport after small talk
   } else if (previousResponses.length < 3) {
-    // Early interview - focus on behavioral questions
-    nextQuestionType = score < 6 ? 'follow_up' : 'behavioral';
+    // Early interview - focus on building rapport and behavioral questions
+    nextQuestionType = score < 6 ? 'follow_up' : 'conversational';
   } else if (previousResponses.length < 6) {
-    // Mid interview - mix behavioral and technical
+    // Mid interview - mix conversational, behavioral and technical
     if (score < 5) {
       nextQuestionType = 'follow_up';
     } else if (score >= 7 && !previousResponses.some(r => r.questionType === 'technical')) {
       nextQuestionType = 'technical';
     } else {
-      nextQuestionType = 'behavioral';
+      nextQuestionType = Math.random() > 0.5 ? 'conversational' : 'behavioral';
     }
   } else if (previousResponses.length < 8) {
-    // Later interview - technical and situational
+    // Later interview - technical and situational with conversational bridges
     if (score < 5) {
       nextQuestionType = 'follow_up';
     } else if (score >= 7) {
-      nextQuestionType = Math.random() > 0.5 ? 'technical' : 'situational';
+      nextQuestionType = Math.random() > 0.3 ? 'technical' : 'situational';
     } else {
-      nextQuestionType = 'behavioral';
+      nextQuestionType = 'conversational';
     }
   } else {
     // Final questions - wrap up or conclude
@@ -697,7 +932,7 @@ const generateMockAnalysis = (
     } else if (score < 6) {
       nextQuestionType = 'follow_up';
     } else {
-      nextQuestionType = 'behavioral';
+      nextQuestionType = 'conversational';
     }
   }
 
@@ -706,6 +941,11 @@ const generateMockAnalysis = (
       high: "Great start! You seem comfortable and engaged. I can tell you're ready for the main interview questions.",
       medium: "Good! You're warming up nicely. Let's continue building that confidence.",
       low: "Thanks for sharing! Let's take a moment to get more comfortable before we dive deeper."
+    },
+    conversational: {
+      high: "I really appreciate your openness and the details you shared. That gives me great insight into who you are.",
+      medium: "Thank you for sharing that with me. It's helpful to understand your perspective and experience.",
+      low: "I appreciate you being open about that. Let's continue exploring your background and experience."
     },
     behavioral: {
       high: "Excellent response! You provided specific details and showed clear impact. This demonstrates strong experience.",
@@ -794,25 +1034,18 @@ export const generateNextQuestion = async (
     questionType = 'small_talk';
   } else {
     const lastResponse = previousResponses[previousResponses.length - 1];
-    const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
     
-    // Enhanced question type logic
+    // Enhanced question type logic with conversational priority
     if (lastResponse?.analysis?.score < 5) {
       questionType = 'follow_up'; // Always follow up on poor responses
-    } else if (questionType === 'follow_up') {
-      // Use the suggested type from analysis
-      questionType = suggestedType || 'behavioral';
+    } else if (questionType === 'conversational') {
+      // For conversational responses, generate a conversational question
+      return await generateConversationalResponse(lastResponse.response, setup, previousResponses);
     }
   }
 
-  // Add the question text to the response for better follow-up context
-  const question = await generateDynamicQuestion(setup, previousResponses, aiState, questionType);
-  
   // Store the question text in the response for follow-up reference
-  if (previousResponses.length > 0) {
-    const lastResponse = previousResponses[previousResponses.length - 1];
-    lastResponse.questionText = question.text;
-  }
+  const question = await generateDynamicQuestion(setup, previousResponses, aiState, questionType);
   
   return question;
 };
