@@ -9,6 +9,7 @@ import Waitlist from './components/Waitlist';
 import Footer from './components/Footer';
 import LoginPage from './components/Auth/LoginPage';
 import WaitlistSuccess from './components/WaitlistSuccess';
+import PlatformContainer from './components/Platform/PlatformContainer';
 
 const HomePage: React.FC = () => {
   useEffect(() => {
@@ -56,6 +57,17 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route 
+          path="/platform" 
+          element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-dark-900 text-white">
+                <Navbar />
+                <PlatformContainer />
+              </div>
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="/waitlist-success" 
           element={
