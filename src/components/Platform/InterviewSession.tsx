@@ -308,7 +308,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       } else {
         setTimeout(() => {
           setIsPlaying(false);
-        }, 2000);
+        }, 1500); // Reduced delay
       }
     } catch (error) {
       console.error('Error playing question:', error);
@@ -339,7 +339,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       
       // Transcribe audio with optimized method
       const transcription = await transcribeAudio(audioBlob);
-      if (transcription) {
+      if (transcription && transcription.trim().length > 0) {
         setUserResponse(transcription);
         
         // Analyze speech metrics in the background
@@ -359,6 +359,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             console.error('Error analyzing speech metrics:', error);
           }
         }
+      } else {
+        // If transcription failed or was empty, keep the recording interface active
+        console.warn('Transcription failed or was empty');
       }
     }
     
