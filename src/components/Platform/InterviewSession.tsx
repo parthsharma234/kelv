@@ -357,8 +357,13 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       
     } catch (error) {
       console.error('Error generating next question:', error);
-      // Fallback to completing interview if question generation fails
-      completeInterview();
+      // Check if this is the interview completion signal
+      if (error instanceof Error && error.message === 'INTERVIEW_COMPLETE') {
+        completeInterview();
+      } else {
+        // Fallback to completing interview if question generation fails
+        completeInterview();
+      }
     } finally {
       setIsGeneratingQuestion(false);
     }
@@ -382,7 +387,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       isActive: false
     };
 
-    // Save to localStorage
+    // Save to localStorage as backup
     const existingHistory = JSON.parse(localStorage.getItem('kelv-interview-history') || '[]');
     const historyEntry = {
       id: session.id,
@@ -484,7 +489,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-3 border-gray-800 border-t-[#FF5722] mx-auto mb-4"></div>
           <p className="text-gray-300 text-lg">Initializing AI interviewer...</p>
-          <p className="text-gray-500 text-sm mt-2">Generating personalized questions with GPT-4o</p>
+          <p className="text-gray-500 text-sm mt-2">Preparing dynamic questions with GPT-4o</p>
         </div>
       </div>
     );
@@ -499,7 +504,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   }
 
   const currentQuestion = session.questions[session.currentQuestionIndex];
-  const progress = responses.length > 0 ? (responses.length / (responses.length + 1)) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col pt-20">
@@ -530,7 +534,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="flex items-center space-x-2">
                 <Brain className="w-4 h-4 text-orange-400" />
                 <span className="text-sm text-gray-400">
-                  {aiState.currentPersonality} • {responses.length} responses
+                  {responses.length} responses • {aiState.currentPersonality}
                 </span>
               </div>
             </>
@@ -708,7 +712,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   ) : responses.length >= 5 ? (
                     <>
                       <CheckCircle className="w-5 h-5" />
-                      <span>Complete Interview</span>
+                      <span>Continue or Complete</span>
                     </>
                   ) : (
                     <>

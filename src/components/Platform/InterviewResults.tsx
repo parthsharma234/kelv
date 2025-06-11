@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   CheckCircle, 
@@ -9,8 +9,10 @@ import {
   ArrowRight,
   BarChart3,
   Award,
-  MessageSquare
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
+import { saveInterviewSession } from '../../utils/supabase-interview';
 
 interface InterviewResultsProps {
   sessionData: any;
@@ -23,6 +25,20 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   onBackToDashboard, 
   onStartNewInterview 
 }) => {
+  
+  useEffect(() => {
+    // Save session to Supabase when component mounts
+    const saveSession = async () => {
+      try {
+        await saveInterviewSession(sessionData);
+      } catch (error) {
+        console.error('Failed to save session to Supabase:', error);
+      }
+    };
+
+    saveSession();
+  }, [sessionData]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -45,6 +61,21 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
   const overallGrade = getOverallGrade(sessionData.overallScore);
 
+  // Calculate AI insights
+  const avgConfidence = sessionData.responses.reduce((sum: number, r: any) => 
+    sum + (r.analysis?.confidenceIndicators?.enthusiasm || 5), 0) / sessionData.responses.length;
+  
+  const hasSpecificExamples = sessionData.responses.some((r: any) => 
+    r.analysis?.confidenceIndicators?.specificExamples);
+  
+  const questionTypes = sessionData.responses.reduce((acc: any, r: any) => {
+    const question = sessionData.questions.find((q: any) => q.id === r.questionId);
+    if (question) {
+      acc[question.type] = (acc[question.type] || 0) + 1;
+    }
+    return acc;
+  }, {});
+
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">
@@ -57,8 +88,8 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
           <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-400 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold gradient-text mb-4">Interview Complete!</h1>
-          <p className="text-gray-400 text-lg">Here's your detailed performance analysis</p>
+          <h1 className="text-4xl font-bold gradient-text mb-4">AI Interview Complete!</h1>
+          <p className="text-gray-400 text-lg">Your dynamic interview session has been analyzed and saved</p>
         </motion.div>
 
         {/* Overall Score Card */}
@@ -83,8 +114,11 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               <p className="text-gray-400 text-sm">Questions Answered</p>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">{sessionData.setup.experienceLevel.split(' ')[0]}</div>
-              <p className="text-gray-400 text-sm">Level</p>
+              <div className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <Brain className="w-8 h-8 text-orange-400" />
+                AI
+              </div>
+              <p className="text-gray-400 text-sm">Adaptive Interview</p>
             </div>
           </div>
         </motion.div>
@@ -100,7 +134,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
               <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-orange-400" />
-                Question Breakdown
+                AI Interview Flow
               </h3>
               
               <div className="space-y-6">
@@ -113,14 +147,29 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-sm font-medium text-gray-400">Question {index + 1}</span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              question?.type === 'behavioral'
+                              question?.type === 'small_talk'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : question?.type === 'behavioral'
                                 ? 'bg-purple-500/20 text-purple-400'
                                 : question?.type === 'technical'
                                 ? 'bg-green-500/20 text-green-400'
+                                : question?.type === 'follow_up'
+                                ? 'bg-yellow-500/20 text-yellow-400'
                                 : 'bg-orange-500/20 text-orange-400'
                             }`}>
-                              {question?.type}
+                              {question?.type?.replace('_', ' ')}
                             </span>
+                            {question?.difficulty && (
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                question.difficulty === 'easy'
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : question.difficulty === 'medium'
+                                  ? 'bg-yellow-500/20 text-yellow-400'
+                                  : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {question.difficulty}
+                              </span>
+                            )}
                           </div>
                           <p className="text-white font-medium mb-3">{question?.text}</p>
                         </div>
@@ -137,15 +186,35 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       {response.analysis && (
                         <div className="space-y-3">
                           <div>
-                            <h5 className="text-sm font-medium text-gray-400 mb-2">Feedback</h5>
+                            <h5 className="text-sm font-medium text-gray-400 mb-2">AI Feedback</h5>
                             <p className="text-gray-300 text-sm">{response.analysis.feedback}</p>
                           </div>
+                          
+                          {response.analysis.confidenceIndicators && (
+                            <div className="grid grid-cols-2 gap-4 text-xs">
+                              <div>
+                                <span className="text-gray-400">Confidence:</span>
+                                <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
+                                  <div 
+                                    className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                                    style={{ width: `${(response.analysis.confidenceIndicators.enthusiasm || 5) * 10}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-gray-400">Examples:</span>
+                                <span className={`ml-2 ${response.analysis.confidenceIndicators.specificExamples ? 'text-green-400' : 'text-orange-400'}`}>
+                                  {response.analysis.confidenceIndicators.specificExamples ? 'Good' : 'Improve'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <h5 className="text-sm font-medium text-green-400 mb-2">Strengths</h5>
                               <ul className="space-y-1">
-                                {response.analysis.strengths.map((strength: string, idx: number) => (
+                                {response.analysis.strengths?.slice(0, 2).map((strength: string, idx: number) => (
                                   <li key={idx} className="text-xs text-gray-300 flex items-center">
                                     <CheckCircle className="w-3 h-3 mr-2 text-green-400" />
                                     {strength}
@@ -157,7 +226,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                             <div>
                               <h5 className="text-sm font-medium text-orange-400 mb-2">Areas for Improvement</h5>
                               <ul className="space-y-1">
-                                {response.analysis.areasForImprovement.map((area: string, idx: number) => (
+                                {response.analysis.areasForImprovement?.slice(0, 2).map((area: string, idx: number) => (
                                   <li key={idx} className="text-xs text-gray-300 flex items-center">
                                     <Target className="w-3 h-3 mr-2 text-orange-400" />
                                     {area}
@@ -175,47 +244,62 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             </div>
           </motion.div>
 
-          {/* Insights & Actions */}
+          {/* AI Insights & Actions */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
             className="space-y-6"
           >
-            {/* Performance Insights */}
+            {/* AI Performance Analysis */}
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Brain className="w-5 h-5 text-orange-400" />
-                Key Insights
+                AI Analysis
               </h3>
               
               <div className="space-y-4">
                 <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Overall Performance</h4>
+                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-orange-400" />
+                    Adaptive Performance
+                  </h4>
                   <p className="text-sm text-gray-400">
                     {sessionData.overallScore >= 80 
-                      ? "Excellent performance! You demonstrated strong interview skills across all areas."
+                      ? "Excellent! The AI recognized your strong performance and provided appropriately challenging questions."
                       : sessionData.overallScore >= 60
-                      ? "Good performance with room for improvement. Focus on providing more specific examples."
-                      : "Keep practicing! Focus on structuring your responses and providing concrete examples."
+                      ? "Good progress! The AI adapted to help you improve throughout the interview."
+                      : "The AI provided supportive questions to help build your confidence. Keep practicing!"
                     }
                   </p>
                 </div>
                 
                 <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Communication Style</h4>
-                  <p className="text-sm text-gray-400">
-                    Your responses show {sessionData.responses.length > 3 ? 'consistent' : 'developing'} communication skills. 
-                    Continue practicing to build confidence and clarity.
-                  </p>
+                  <h4 className="font-medium text-white mb-2">Question Flow</h4>
+                  <div className="space-y-2">
+                    {Object.entries(questionTypes).map(([type, count]) => (
+                      <div key={type} className="flex justify-between text-sm">
+                        <span className="text-gray-400 capitalize">{type.replace('_', ' ')}:</span>
+                        <span className="text-white">{count as number}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
                 <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Next Steps</h4>
-                  <p className="text-sm text-gray-400">
-                    Practice more {sessionData.setup.jobType} interviews and focus on the STAR method 
-                    for behavioral questions.
-                  </p>
+                  <h4 className="font-medium text-white mb-2">Communication Style</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Avg Confidence:</span>
+                      <span className="text-white">{Math.round(avgConfidence)}/10</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Used Examples:</span>
+                      <span className={hasSpecificExamples ? 'text-green-400' : 'text-orange-400'}>
+                        {hasSpecificExamples ? 'Yes' : 'Improve'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -230,7 +314,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-medium hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
                 >
                   <Brain className="w-5 h-5" />
-                  Practice Again
+                  New AI Interview
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 
@@ -246,7 +330,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
             {/* Interview Details */}
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Interview Details</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Session Details</h3>
               
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
@@ -266,6 +350,10 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   <span className="text-white">
                     {new Date(sessionData.startTime).toLocaleDateString()}
                   </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">AI Model:</span>
+                  <span className="text-white">GPT-4o Dynamic</span>
                 </div>
               </div>
             </div>
