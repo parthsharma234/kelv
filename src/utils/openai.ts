@@ -82,27 +82,37 @@ export const generateDynamicQuestion = async (
         messages: [
           {
             role: 'system',
-            content: `You are an expert AI interviewer conducting a ${setup.jobType} interview for a ${setup.experienceLevel} candidate in the ${setup.industry} industry. 
+            content: `You are an expert AI interviewer conducting a comprehensive ${setup.jobType} interview for a ${setup.experienceLevel} candidate in the ${setup.industry} industry. 
 
-Your goal is to create a realistic interview experience that:
-- Adapts difficulty based on candidate performance
-- Asks follow-up questions when responses are weak
-- Concludes naturally when appropriate (typically after 5-8 questions)
-- Maintains a professional but friendly tone
+CRITICAL INTERVIEW GUIDELINES:
+- Conduct THOROUGH interviews with 8-12 questions minimum
+- Cover ALL major areas: background, behavioral, technical, situational, and role-specific questions
+- Ask SPECIFIC follow-up questions that dig deeper into the candidate's actual responses
+- When asking follow-ups, reference their exact words and ask for more details about what they mentioned
+- Adapt difficulty based on performance but maintain comprehensive coverage
+- Only conclude when you've thoroughly assessed the candidate across all dimensions
 
-Generate interview questions that are:
-- Appropriate for the candidate's experience level
-- Relevant to their target role and industry  
-- Adaptive based on their previous responses
-- Classified by type: ${Object.values(QUESTION_TYPES).join(', ')}
+FOLLOW-UP STRATEGY:
+- If they mention a specific technology, project, or experience, ask detailed questions about it
+- If they give a high-level answer, ask for specific examples and details
+- If they mention challenges or successes, dig into the specifics of how they handled it
+- Reference their exact words when asking follow-ups (e.g., "You mentioned X, can you tell me more about...")
 
-Always respond with a JSON object containing:
+QUESTION TYPES TO COVER:
+1. Small talk (1-2 questions)
+2. Background and motivation (2-3 questions)
+3. Behavioral/STAR method questions (3-4 questions)
+4. Technical/role-specific questions (2-4 questions)
+5. Situational/problem-solving (1-2 questions)
+6. Follow-up questions based on their specific responses
+
+Always respond with a JSON object:
 {
   "question": "The interview question text",
   "type": "question_type",
   "category": "specific_category", 
   "difficulty": "easy|medium|hard",
-  "reasoning": "Why this question was chosen based on previous responses"
+  "reasoning": "Why this question was chosen and how it builds on previous responses"
 }`
           },
           {
@@ -111,7 +121,7 @@ Always respond with a JSON object containing:
           }
         ],
         temperature: 0.7,
-        max_tokens: 300
+        max_tokens: 400
       })
     });
 
@@ -153,37 +163,98 @@ const buildPrompt = (
 ): string => {
   let prompt = `Generate a ${questionType} interview question for a ${setup.jobType} position in ${setup.industry} for a ${setup.experienceLevel} candidate.\n\n`;
   
+  // Add comprehensive interview context
+  prompt += `INTERVIEW PROGRESS: Question ${previousResponses.length + 1} of planned 8-12 questions\n\n`;
+  
   if (previousResponses.length > 0) {
-    prompt += `Previous responses analysis:\n`;
+    prompt += `PREVIOUS RESPONSES AND CONTEXT:\n`;
     previousResponses.forEach((response, index) => {
       const score = response.analysis?.score || 0;
       const confidence = response.analysis?.confidenceIndicators?.enthusiasm || 5;
-      prompt += `Q${index + 1}: Score ${score}/10, Confidence ${confidence}/10 - ${response.analysis?.feedback || 'No feedback'}\n`;
+      prompt += `Q${index + 1}: "${response.questionText || 'Previous question'}"\n`;
+      prompt += `Response: "${response.response}"\n`;
+      prompt += `Score: ${score}/10, Confidence: ${confidence}/10\n`;
+      prompt += `Feedback: ${response.analysis?.feedback || 'No feedback'}\n\n`;
     });
     
-    prompt += `\nAdaptive considerations:\n`;
-    prompt += `- Average performance: ${previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length}/10\n`;
+    // Calculate performance metrics
+    const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
+    prompt += `PERFORMANCE ANALYSIS:\n`;
+    prompt += `- Average performance: ${avgScore.toFixed(1)}/10\n`;
+    prompt += `- Total questions asked: ${previousResponses.length}\n`;
     prompt += `- Focus areas: ${aiState.focusAreas.join(', ') || 'General interview skills'}\n`;
-    prompt += `- Question flow: ${aiState.questionFlow}\n`;
-    
-    // Determine if interview should conclude
-    if (previousResponses.length >= 5) {
-      const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
-      if (avgScore >= 7 || previousResponses.length >= 8) {
-        prompt += `\nIMPORTANT: Consider if this should be a concluding question. The interview has covered ${previousResponses.length} questions with average score ${avgScore.toFixed(1)}/10.\n`;
+    prompt += `- Question flow: ${aiState.questionFlow}\n\n`;
+  }
+
+  // Specific instructions based on question type
+  if (questionType === 'small_talk') {
+    prompt += `SMALL TALK INSTRUCTIONS:\n`;
+    prompt += `Generate a warm, engaging question to build rapport and help the candidate feel comfortable.\n`;
+    prompt += `Keep it professional but friendly. This should ease them into the interview.\n`;
+  } 
+  else if (questionType === 'follow_up') {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    if (lastResponse) {
+      prompt += `FOLLOW-UP INSTRUCTIONS:\n`;
+      prompt += `The candidate just said: "${lastResponse.response}"\n`;
+      prompt += `Generate a specific follow-up question that:\n`;
+      prompt += `- References something specific they mentioned in their response\n`;
+      prompt += `- Asks for more details, examples, or clarification about what they said\n`;
+      prompt += `- Digs deeper into their experience, process, or thinking\n`;
+      prompt += `- Uses phrases like "You mentioned..." or "Tell me more about..." or "Can you elaborate on..."\n`;
+      prompt += `- Builds directly on their actual words and content\n\n`;
+      prompt += `Their performance on the last question was ${lastResponse.analysis?.score || 0}/10.\n`;
+      if (lastResponse.analysis?.score < 6) {
+        prompt += `Since they struggled, help them succeed by asking a more specific or easier follow-up.\n`;
+      } else {
+        prompt += `Since they did well, you can dig deeper or ask for more complex details.\n`;
       }
     }
   }
+  else if (questionType === 'behavioral') {
+    prompt += `BEHAVIORAL QUESTION INSTRUCTIONS:\n`;
+    prompt += `Generate a behavioral question using the STAR method framework.\n`;
+    prompt += `Focus on: leadership, teamwork, problem-solving, conflict resolution, or achievement.\n`;
+    prompt += `Adjust difficulty based on their experience level and previous performance.\n`;
+    if (previousResponses.length > 0) {
+      const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
+      if (avgScore < 6) {
+        prompt += `Make this question more straightforward since they've been struggling.\n`;
+      } else if (avgScore >= 8) {
+        prompt += `Make this question more challenging since they're performing well.\n`;
+      }
+    }
+  }
+  else if (questionType === 'technical') {
+    prompt += `TECHNICAL QUESTION INSTRUCTIONS:\n`;
+    prompt += `Generate a technical question relevant to the ${setup.jobType} role.\n`;
+    prompt += `Adjust complexity based on their experience level (${setup.experienceLevel}) and previous responses.\n`;
+    prompt += `Focus on practical skills, problem-solving, or industry knowledge.\n`;
+  }
+  else if (questionType === 'situational') {
+    prompt += `SITUATIONAL QUESTION INSTRUCTIONS:\n`;
+    prompt += `Generate a hypothetical scenario question relevant to the role.\n`;
+    prompt += `Present a realistic workplace situation they might encounter.\n`;
+    prompt += `Ask how they would handle it, focusing on their thought process and approach.\n`;
+  }
 
-  if (questionType === 'small_talk') {
-    prompt += `\nGenerate a warm, engaging small talk question to help the candidate feel comfortable and build rapport.`;
-  } else if (questionType === 'follow_up') {
-    const lastResponse = previousResponses[previousResponses.length - 1];
-    prompt += `\nGenerate a follow-up question that digs deeper into their previous response: "${lastResponse?.response}". The candidate scored ${lastResponse?.analysis?.score || 0}/10 on this response.`;
-  } else if (questionType === 'behavioral') {
-    prompt += `\nGenerate a behavioral question using the STAR method framework. Adjust difficulty based on previous performance.`;
-  } else if (questionType === 'technical') {
-    prompt += `\nGenerate a technical question relevant to the ${setup.jobType} role. Adjust complexity based on experience level and previous responses.`;
+  // Interview conclusion logic - be more deliberate about when to end
+  if (previousResponses.length >= 7) {
+    const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
+    prompt += `\nINTERVIEW CONCLUSION CONSIDERATION:\n`;
+    prompt += `We've asked ${previousResponses.length} questions with average score ${avgScore.toFixed(1)}/10.\n`;
+    
+    // Only suggest conclusion if we've covered enough ground AND performance is clear
+    if (previousResponses.length >= 10 || (previousResponses.length >= 8 && (avgScore >= 8 || avgScore <= 4))) {
+      prompt += `Consider if this should be a concluding question that wraps up the interview naturally.\n`;
+      prompt += `If concluding, make it a final assessment question or ask about their questions for us.\n`;
+    } else {
+      prompt += `Continue the interview - we need more comprehensive coverage of their abilities.\n`;
+      prompt += `Focus on areas we haven't fully explored yet.\n`;
+    }
+  } else {
+    prompt += `\nCONTINUE INTERVIEW: We need more questions to thoroughly assess the candidate.\n`;
+    prompt += `Ensure we cover all major competency areas before concluding.\n`;
   }
 
   return prompt;
@@ -204,6 +275,47 @@ const generateMockQuestion = (
     };
   }
 
+  // For follow-up questions, reference the last response
+  if (questionType === 'follow_up' && previousResponses.length > 0) {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    const responseText = lastResponse.response.toLowerCase();
+    
+    // Generate contextual follow-ups based on what they mentioned
+    if (responseText.includes('project') || responseText.includes('built') || responseText.includes('developed')) {
+      return {
+        id: 'followup_project',
+        text: `You mentioned working on a project. Can you walk me through the specific technologies you used and any challenges you encountered during development?`,
+        type: 'follow_up',
+        category: 'project_details',
+        difficulty: 'medium'
+      };
+    } else if (responseText.includes('team') || responseText.includes('collaborate')) {
+      return {
+        id: 'followup_team',
+        text: `You mentioned working with a team. Tell me more about your role in that team and how you handled any disagreements or conflicts that arose.`,
+        type: 'follow_up',
+        category: 'teamwork_details',
+        difficulty: 'medium'
+      };
+    } else if (responseText.includes('challenge') || responseText.includes('difficult') || responseText.includes('problem')) {
+      return {
+        id: 'followup_challenge',
+        text: `You mentioned facing a challenge. Can you break down your specific approach to solving it and what you learned from that experience?`,
+        type: 'follow_up',
+        category: 'problem_solving_details',
+        difficulty: 'medium'
+      };
+    } else {
+      return {
+        id: 'followup_general',
+        text: `That's interesting. Can you give me a specific example of what you just described and walk me through the details?`,
+        type: 'follow_up',
+        category: 'elaboration',
+        difficulty: 'medium'
+      };
+    }
+  }
+
   // Determine difficulty based on previous performance
   let difficulty: 'easy' | 'medium' | 'hard' = 'medium';
   if (previousResponses.length > 0) {
@@ -212,53 +324,67 @@ const generateMockQuestion = (
     else if (avgScore >= 8) difficulty = 'hard';
   }
 
-  // Mock questions by industry and type
+  // Comprehensive mock questions by industry and type
   const mockQuestions: Record<string, Record<string, Record<string, Question[]>>> = {
     'Technology': {
       'behavioral': {
         'easy': [
           {
             id: 'tech_beh_easy_1',
-            text: 'Tell me about a time when you had to learn something new for work or school.',
+            text: 'Tell me about a time when you had to learn a new technology or programming language. How did you approach it?',
             type: 'behavioral',
             category: 'learning',
             difficulty: 'easy'
           },
           {
             id: 'tech_beh_easy_2',
-            text: 'Describe a project you worked on that you\'re proud of.',
+            text: 'Describe a project you worked on that you\'re particularly proud of. What made it special?',
             type: 'behavioral',
             category: 'achievement',
+            difficulty: 'easy'
+          },
+          {
+            id: 'tech_beh_easy_3',
+            text: 'Tell me about a time when you helped a colleague or teammate. What was the situation?',
+            type: 'behavioral',
+            category: 'collaboration',
             difficulty: 'easy'
           }
         ],
         'medium': [
           {
             id: 'tech_beh_med_1',
-            text: 'Tell me about a time when you had to work with a difficult team member.',
+            text: 'Describe a situation where you had to work with a difficult team member. How did you handle it?',
             type: 'behavioral',
             category: 'teamwork',
             difficulty: 'medium'
           },
           {
             id: 'tech_beh_med_2',
-            text: 'Describe a situation where you had to meet a tight deadline.',
+            text: 'Tell me about a time when you had to meet a tight deadline. What was your approach?',
             type: 'behavioral',
             category: 'time_management',
+            difficulty: 'medium'
+          },
+          {
+            id: 'tech_beh_med_3',
+            text: 'Describe a time when you had to debug a particularly challenging issue. Walk me through your process.',
+            type: 'behavioral',
+            category: 'problem_solving',
             difficulty: 'medium'
           }
         ],
         'hard': [
           {
             id: 'tech_beh_hard_1',
-            text: 'Tell me about a time when you had to make a difficult decision with limited information.',
+            text: 'Tell me about a time when you had to make a technical decision with incomplete information. How did you approach it?',
             type: 'behavioral',
             category: 'decision_making',
             difficulty: 'hard'
           },
           {
             id: 'tech_beh_hard_2',
-            text: 'Describe a situation where you had to influence others without having direct authority.',
+            text: 'Describe a situation where you had to influence others to adopt a technical solution without having direct authority.',
             type: 'behavioral',
             category: 'leadership',
             difficulty: 'hard'
@@ -269,27 +395,77 @@ const generateMockQuestion = (
         'easy': [
           {
             id: 'tech_tech_easy_1',
-            text: 'What programming languages are you most comfortable with?',
+            text: 'What programming languages and frameworks are you most comfortable with, and why do you prefer them?',
             type: 'technical',
             category: 'programming',
+            difficulty: 'easy'
+          },
+          {
+            id: 'tech_tech_easy_2',
+            text: 'How do you typically approach testing your code? What tools or methods do you use?',
+            type: 'technical',
+            category: 'testing',
             difficulty: 'easy'
           }
         ],
         'medium': [
           {
             id: 'tech_tech_med_1',
-            text: 'How would you explain APIs to a non-technical person?',
+            text: 'How would you explain the concept of APIs to a non-technical stakeholder?',
             type: 'technical',
             category: 'communication',
+            difficulty: 'medium'
+          },
+          {
+            id: 'tech_tech_med_2',
+            text: 'Walk me through how you would optimize a slow-performing database query.',
+            type: 'technical',
+            category: 'optimization',
             difficulty: 'medium'
           }
         ],
         'hard': [
           {
             id: 'tech_tech_hard_1',
-            text: 'How would you design a system to handle millions of concurrent users?',
+            text: 'How would you design a system to handle millions of concurrent users? What are the key considerations?',
             type: 'technical',
             category: 'system_design',
+            difficulty: 'hard'
+          },
+          {
+            id: 'tech_tech_hard_2',
+            text: 'Explain how you would implement a real-time notification system. What technologies and patterns would you use?',
+            type: 'technical',
+            category: 'architecture',
+            difficulty: 'hard'
+          }
+        ]
+      },
+      'situational': {
+        'easy': [
+          {
+            id: 'tech_sit_easy_1',
+            text: 'If you discovered a security vulnerability in production code, what would be your immediate steps?',
+            type: 'situational',
+            category: 'security',
+            difficulty: 'easy'
+          }
+        ],
+        'medium': [
+          {
+            id: 'tech_sit_med_1',
+            text: 'Your team is split on whether to use Technology A or Technology B for a new project. How would you help resolve this?',
+            type: 'situational',
+            category: 'decision_making',
+            difficulty: 'medium'
+          }
+        ],
+        'hard': [
+          {
+            id: 'tech_sit_hard_1',
+            text: 'You\'re leading a project that\'s behind schedule, and stakeholders are pressuring you to cut corners on testing. How do you handle this?',
+            type: 'situational',
+            category: 'leadership_pressure',
             difficulty: 'hard'
           }
         ]
@@ -367,24 +543,31 @@ Analyze this interview response for a ${setup.jobType} position in ${setup.indus
 Question (${question.type}): ${question.text}
 Response: ${response}
 
-Previous performance context:
-${previousResponses.length > 0 ? 
-  `- Total questions answered: ${previousResponses.length}
-  - Average score so far: ${(previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length).toFixed(1)}/10` 
-  : '- This is the first question'}
+Interview Context:
+- Question ${previousResponses.length + 1} of planned 8-12 question comprehensive interview
+- Experience level: ${setup.experienceLevel}
+- Previous performance: ${previousResponses.length > 0 ? 
+  `Average score: ${(previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length).toFixed(1)}/10` 
+  : 'First question'}
 
-Provide detailed analysis including:
-1. Score (1-10) based on relevance, specificity, and structure
-2. Constructive feedback
-3. Confidence indicators
-4. Suggested next question type (small_talk, behavioral, technical, situational, follow_up)
-5. Adaptive insights for interview flow
+ANALYSIS REQUIREMENTS:
+1. Score (1-10) based on relevance, specificity, structure, and depth
+2. Constructive feedback that helps them improve
+3. Confidence indicators assessment
+4. Strategic next question type recommendation
+5. Adaptive insights for interview progression
 
-Consider:
-- If this is small talk, be encouraging and focus on building confidence
-- If performance is consistently low, suggest easier questions or follow-ups
-- If performance is strong, suggest more challenging questions
-- After 5+ questions with good performance, consider concluding
+NEXT QUESTION STRATEGY:
+- If response lacks detail or examples: suggest "follow_up" to dig deeper
+- If performance is strong and we need technical assessment: suggest "technical"
+- If we need behavioral examples: suggest "behavioral"
+- If we need scenario-based assessment: suggest "situational"
+- Only suggest conclusion after 8+ questions with comprehensive coverage
+
+FOLLOW-UP LOGIC:
+- If they mention specific technologies, projects, or experiences, recommend follow-up
+- If answer is vague or high-level, recommend follow-up for specifics
+- If they show expertise in one area, probe deeper with follow-up
 
 Respond with JSON:
 {
@@ -418,7 +601,7 @@ Respond with JSON:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert interview coach analyzing candidate responses. Provide constructive, specific feedback that helps candidates improve while being encouraging and realistic.'
+            content: 'You are an expert interview coach analyzing candidate responses. Provide constructive, specific feedback that helps candidates improve while being encouraging and realistic. Focus on comprehensive interview coverage and strategic question progression.'
           },
           {
             role: 'user',
@@ -462,7 +645,9 @@ const generateMockAnalysis = (
   const hasSpecificExamples = response.toLowerCase().includes('example') || 
                              response.toLowerCase().includes('instance') ||
                              response.toLowerCase().includes('time when') ||
-                             response.toLowerCase().includes('experience');
+                             response.toLowerCase().includes('experience') ||
+                             response.toLowerCase().includes('project') ||
+                             response.toLowerCase().includes('worked on');
   const hasMetrics = /\d+/.test(response);
   const hasStructure = response.includes('first') || response.includes('then') || response.includes('finally') || response.includes('initially');
   
@@ -481,21 +666,39 @@ const generateMockAnalysis = (
     ? previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length 
     : score;
   
+  // More deliberate question progression
   if (question.type === 'small_talk') {
-    nextQuestionType = score >= 6 ? 'behavioral' : 'small_talk';
-  } else if (previousResponses.length >= 4) {
-    // Consider concluding after 5+ questions
-    if (avgScore >= 7) {
+    nextQuestionType = 'behavioral'; // Always move to behavioral after small talk
+  } else if (previousResponses.length < 3) {
+    // Early interview - focus on behavioral questions
+    nextQuestionType = score < 6 ? 'follow_up' : 'behavioral';
+  } else if (previousResponses.length < 6) {
+    // Mid interview - mix behavioral and technical
+    if (score < 5) {
+      nextQuestionType = 'follow_up';
+    } else if (score >= 7 && !previousResponses.some(r => r.questionType === 'technical')) {
+      nextQuestionType = 'technical';
+    } else {
+      nextQuestionType = 'behavioral';
+    }
+  } else if (previousResponses.length < 8) {
+    // Later interview - technical and situational
+    if (score < 5) {
+      nextQuestionType = 'follow_up';
+    } else if (score >= 7) {
+      nextQuestionType = Math.random() > 0.5 ? 'technical' : 'situational';
+    } else {
+      nextQuestionType = 'behavioral';
+    }
+  } else {
+    // Final questions - wrap up or conclude
+    if (avgScore >= 7 && previousResponses.length >= 8) {
       nextQuestionType = 'situational'; // Final challenging question
     } else if (score < 6) {
       nextQuestionType = 'follow_up';
     } else {
       nextQuestionType = 'behavioral';
     }
-  } else if (score < 5) {
-    nextQuestionType = 'follow_up';
-  } else if (score >= 8 && question.type === 'behavioral') {
-    nextQuestionType = 'technical';
   }
 
   const feedbackMessages = {
@@ -513,6 +716,16 @@ const generateMockAnalysis = (
       high: "Outstanding technical knowledge! You explained complex concepts clearly and showed deep understanding.",
       medium: "Good technical understanding. Consider providing more specific examples or diving deeper into implementation details.",
       low: "That's a start. Let's explore this topic further with a more specific example or simpler approach."
+    },
+    follow_up: {
+      high: "Perfect! That additional detail really helps me understand your experience and approach.",
+      medium: "Good elaboration. The extra context helps paint a clearer picture of your capabilities.",
+      low: "Thank you for the additional information. Let's continue exploring your experience."
+    },
+    situational: {
+      high: "Excellent problem-solving approach! You considered multiple factors and provided a thoughtful solution.",
+      medium: "Good thinking! You showed a solid approach to handling this type of situation.",
+      low: "That's a reasonable start. Consider thinking through the potential challenges and stakeholder impacts."
     }
   };
 
@@ -559,13 +772,17 @@ export const generateNextQuestion = async (
   suggestedType?: string
 ): Promise<Question> => {
   
-  // Determine if interview should conclude
-  if (previousResponses.length >= 5) {
+  // More deliberate interview conclusion logic
+  if (previousResponses.length >= 8) {
     const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
     const lastScore = previousResponses[previousResponses.length - 1]?.analysis?.score || 0;
     
-    // Conclude if we have good performance and sufficient questions, or if we've reached max questions
-    if ((avgScore >= 7 && lastScore >= 6) || previousResponses.length >= 8) {
+    // Only conclude if we have comprehensive coverage AND clear performance assessment
+    const hasGoodCoverage = previousResponses.length >= 10;
+    const hasClearPerformance = (avgScore >= 8 && lastScore >= 7) || (avgScore <= 4 && lastScore <= 5);
+    const hasMaxQuestions = previousResponses.length >= 12;
+    
+    if (hasMaxQuestions || (hasGoodCoverage && hasClearPerformance)) {
       throw new Error('INTERVIEW_COMPLETE'); // Signal to complete interview
     }
   }
@@ -579,19 +796,25 @@ export const generateNextQuestion = async (
     const lastResponse = previousResponses[previousResponses.length - 1];
     const avgScore = previousResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / previousResponses.length;
     
-    // If last response was poor, provide follow-up or easier question
+    // Enhanced question type logic
     if (lastResponse?.analysis?.score < 5) {
-      questionType = 'follow_up';
-    } else if (avgScore < 6 && previousResponses.length >= 2) {
-      // If overall performance is low, stick to behavioral or provide easier questions
-      questionType = 'behavioral';
-    } else if (avgScore >= 8 && previousResponses.length >= 3) {
-      // If performance is strong, escalate to technical or situational
-      questionType = Math.random() > 0.5 ? 'technical' : 'situational';
+      questionType = 'follow_up'; // Always follow up on poor responses
+    } else if (questionType === 'follow_up') {
+      // Use the suggested type from analysis
+      questionType = suggestedType || 'behavioral';
     }
   }
 
-  return await generateDynamicQuestion(setup, previousResponses, aiState, questionType);
+  // Add the question text to the response for better follow-up context
+  const question = await generateDynamicQuestion(setup, previousResponses, aiState, questionType);
+  
+  // Store the question text in the response for follow-up reference
+  if (previousResponses.length > 0) {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    lastResponse.questionText = question.text;
+  }
+  
+  return question;
 };
 
 export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement | null> => {
