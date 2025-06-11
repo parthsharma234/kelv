@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
-import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, transcribeAudio, AudioRecorder } from '../../utils/openai';
+import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, transcribeAudio, AudioRecorder, analyzeSpeechComprehensively } from '../../utils/openai';
+import { saveSpeechAnalysisCache } from '../../utils/supabase-interview';
 
 interface InterviewSessionProps {
   setup: InterviewSetup;
@@ -332,11 +333,32 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     setIsRecording(false);
     setIsTranscribing(true);
     
-    const audioBlob = await audioRecorderRef.current.stopRecording();
-    if (audioBlob) {
+    const result = await audioRecorderRef.current.stopRecording();
+    if (result) {
+      const { audioBlob, duration } = result;
+      
+      // Transcribe audio with optimized method
       const transcription = await transcribeAudio(audioBlob);
       if (transcription) {
         setUserResponse(transcription);
+        
+        // Analyze speech metrics in the background
+        if (hasOpenAIKey && session) {
+          try {
+            const speechMetrics = await analyzeSpeechComprehensively(audioBlob, transcription, duration);
+            if (speechMetrics) {
+              // Cache the speech analysis
+              await saveSpeechAnalysisCache(
+                session.id,
+                session.questions[session.currentQuestionIndex]?.id || 'unknown',
+                speechMetrics,
+                { transcription, duration }
+              );
+            }
+          } catch (error) {
+            console.error('Error analyzing speech metrics:', error);
+          }
+        }
       }
     }
     

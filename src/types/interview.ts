@@ -14,6 +14,58 @@ export interface Question {
   followUp?: string;
 }
 
+export interface SpeechMetrics {
+  // Audio quality metrics
+  audioQuality: {
+    signalToNoiseRatio: number;
+    clarity: number;
+    volume: number;
+  };
+  
+  // Speech timing metrics
+  timing: {
+    totalDuration: number;
+    speechDuration: number;
+    pauseDuration: number;
+    speechRate: number; // words per minute
+    pauseFrequency: number;
+    averagePauseLength: number;
+  };
+  
+  // Voice characteristics
+  voice: {
+    fundamentalFrequency: number; // pitch
+    pitchVariation: number;
+    intensity: number;
+    voiceStability: number;
+  };
+  
+  // Fluency metrics
+  fluency: {
+    fillerWords: number;
+    repetitions: number;
+    selfCorrections: number;
+    hesitations: number;
+    fluencyScore: number; // 0-100
+  };
+  
+  // Confidence indicators
+  confidence: {
+    voiceConfidence: number; // 0-100
+    speechClarity: number;
+    paceConsistency: number;
+    overallConfidence: number;
+  };
+  
+  // Emotional analysis
+  emotion: {
+    energy: number;
+    stress: number;
+    enthusiasm: number;
+    nervousness: number;
+  };
+}
+
 export interface InterviewSession {
   id: string;
   setup: InterviewSetup;
@@ -36,6 +88,8 @@ export interface InterviewSession {
 export interface InterviewResponse {
   questionId: string;
   response: string;
+  audioBlob?: Blob; // Store audio for speech analysis
+  speechMetrics?: SpeechMetrics; // Detailed speech analysis
   analysis?: {
     score: number;
     feedback: string;
@@ -60,6 +114,12 @@ export interface InterviewHistory {
   duration: number;
   questionsAnswered: number;
   status: 'completed' | 'incomplete';
+  speechMetricsAverage?: {
+    overallConfidence: number;
+    fluencyScore: number;
+    speechRate: number;
+    voiceStability: number;
+  };
 }
 
 export interface AIInterviewerState {

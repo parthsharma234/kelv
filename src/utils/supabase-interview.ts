@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { InterviewSession, InterviewHistory, InterviewSetup } from '../types/interview';
+import { InterviewSession, InterviewHistory, InterviewSetup, SpeechMetrics } from '../types/interview';
 
 export interface SavedInterviewSetup {
   id: string;
@@ -23,6 +23,10 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       throw new Error('User not authenticated');
     }
 
+    // Prepare speech metrics for storage
+    const speechMetrics = sessionData.speechMetrics || {};
+    const audioData = sessionData.audioData || {};
+
     const { error } = await supabase
       .from('interview_sessions')
       .insert({
@@ -32,16 +36,132 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
         overall_score: sessionData.overallScore,
         duration: sessionData.duration,
         questions_answered: sessionData.responses.length,
-        status: 'completed'
+        status: 'completed',
+        speech_metrics: speechMetrics,
+        audio_data: audioData
       });
 
     if (error) {
       console.error('Error saving interview session:', error);
       throw error;
     }
+
+    // Update user speech profile asynchronously
+    try {
+      await updateUserSpeechProfile(user.id);
+    } catch (profileError) {
+      console.warn('Failed to update speech profile:', profileError);
+      // Don't throw error as session was saved successfully
+    }
   } catch (error) {
     console.error('Failed to save interview session:', error);
     // Don't throw error to prevent blocking user flow
+  }
+};
+
+export const saveSpeechAnalysisCache = async (
+  sessionId: string,
+  questionId: string,
+  audioFeatures: any,
+  speechPatterns: any
+): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('speech_analysis_cache')
+      .insert({
+        user_id: user.id,
+        session_id: sessionId,
+        question_id: questionId,
+        audio_features: audioFeatures,
+        speech_patterns: speechPatterns
+      });
+
+    if (error) {
+      console.error('Error saving speech analysis cache:', error);
+    }
+  } catch (error) {
+    console.error('Failed to save speech analysis cache:', error);
+  }
+};
+
+export const getUserSpeechMetrics = async (): Promise<any> => {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .rpc('get_user_speech_metrics_average', { user_uuid: user.id });
+
+    if (error) {
+      console.error('Error fetching speech metrics:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch speech metrics:', error);
+    return null;
+  }
+};
+
+export const getSpeechImprovementTrends = async (daysBack: number = 30): Promise<any> => {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .rpc('get_speech_improvement_trends', { 
+        user_uuid: user.id,
+        days_back: daysBack 
+      });
+
+    if (error) {
+      console.error('Error fetching speech improvement trends:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch speech improvement trends:', error);
+    return null;
+  }
+};
+
+export const updateUserSpeechProfile = async (userId: string): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .rpc('update_user_speech_profile', { user_uuid: userId });
+
+    if (error) {
+      console.error('Error updating speech profile:', error);
+    }
+  } catch (error) {
+    console.error('Failed to update speech profile:', error);
   }
 };
 
@@ -218,7 +338,13 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
       overallScore: session.overall_score,
       duration: session.duration,
       questionsAnswered: session.questions_answered,
-      status: session.status as 'completed' | 'incomplete'
+      status: session.status as 'completed' | 'incomplete',
+      speechMetricsAverage: session.speech_metrics ? {
+        overallConfidence: session.speech_metrics.confidence?.overallConfidence || 0,
+        fluencyScore: session.speech_metrics.fluency?.fluencyScore || 0,
+        speechRate: session.speech_metrics.timing?.speechRate || 0,
+        voiceStability: session.speech_metrics.voice?.voiceStability || 0
+      } : undefined
     }));
 
   } catch (error) {
@@ -250,20 +376,21 @@ export const getInterviewStats = async () => {
       totalInterviews,
       averageScore: Math.round(averageScore),
       totalHours: Math.round(totalHours * 10) / 10,
-      improvement: Math.round(improvement)
+      improvement: Math.round(improvement),
+      speechMetrics: null
     };
   }
 
   try {
     const { data, error } = await supabase
       .from('interview_sessions')
-      .select('overall_score, duration, created_at')
+      .select('overall_score, duration, created_at, speech_metrics')
       .eq('status', 'completed')
       .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching interview stats:', error);
-      return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0 };
+      return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0, speechMetrics: null };
     }
 
     const totalInterviews = data.length;
@@ -276,16 +403,45 @@ export const getInterviewStats = async () => {
       const initial = data.slice(0, 3).reduce((sum, session) => sum + session.overall_score, 0) / 3;
       improvement = ((recent - initial) / initial) * 100;
     }
+
+    // Calculate speech metrics averages
+    const sessionsWithSpeech = data.filter(session => 
+      session.speech_metrics && Object.keys(session.speech_metrics).length > 0
+    );
+
+    let speechMetrics = null;
+    if (sessionsWithSpeech.length > 0) {
+      const avgConfidence = sessionsWithSpeech.reduce((sum, session) => 
+        sum + (session.speech_metrics?.confidence?.overallConfidence || 0), 0) / sessionsWithSpeech.length;
+      
+      const avgFluency = sessionsWithSpeech.reduce((sum, session) => 
+        sum + (session.speech_metrics?.fluency?.fluencyScore || 0), 0) / sessionsWithSpeech.length;
+      
+      const avgSpeechRate = sessionsWithSpeech.reduce((sum, session) => 
+        sum + (session.speech_metrics?.timing?.speechRate || 0), 0) / sessionsWithSpeech.length;
+      
+      const avgVoiceStability = sessionsWithSpeech.reduce((sum, session) => 
+        sum + (session.speech_metrics?.voice?.voiceStability || 0), 0) / sessionsWithSpeech.length;
+
+      speechMetrics = {
+        averageConfidence: Math.round(avgConfidence),
+        averageFluency: Math.round(avgFluency),
+        averageSpeechRate: Math.round(avgSpeechRate),
+        averageVoiceStability: Math.round(avgVoiceStability),
+        voiceSessionCount: sessionsWithSpeech.length
+      };
+    }
     
     return {
       totalInterviews,
       averageScore: Math.round(averageScore),
       totalHours: Math.round(totalHours * 10) / 10,
-      improvement: Math.round(improvement)
+      improvement: Math.round(improvement),
+      speechMetrics
     };
 
   } catch (error) {
     console.error('Failed to fetch interview stats:', error);
-    return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0 };
+    return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0, speechMetrics: null };
   }
 };

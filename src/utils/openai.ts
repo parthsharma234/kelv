@@ -1,10 +1,10 @@
-import { InterviewSetup, Question, AIInterviewerState } from '../types/interview';
+import { InterviewSetup, Question, AIInterviewerState, SpeechMetrics } from '../types/interview';
+import { SpeechAnalyzer, FastTranscription } from './speechAnalysis';
 
 // OpenAI API configuration
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_TTS_URL = 'https://api.openai.com/v1/audio/speech';
-const OPENAI_STT_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
 // Mock function to simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -74,7 +74,7 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
+        model: 'tts-1-hd', // Use HD model for better quality
         input: text,
         voice: 'alloy', // Professional, friendly voice
         response_format: 'mp3',
@@ -104,7 +104,7 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
   }
 };
 
-// Speech-to-Text using OpenAI Whisper
+// Enhanced Speech-to-Text using OpenAI Whisper with optimization
 export const transcribeAudio = async (audioBlob: Blob): Promise<string | null> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
     // Demo mode - return null to indicate no transcription
@@ -112,37 +112,93 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string | null> =
   }
 
   try {
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
-    formData.append('language', 'en');
-    formData.append('response_format', 'json');
-
-    const response = await fetch(OPENAI_STT_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`STT API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.text || null;
+    // Use the optimized transcription method
+    return await FastTranscription.transcribeWithStreaming(audioBlob, OPENAI_API_KEY);
   } catch (error) {
     console.error('Error transcribing audio:', error);
     return null;
   }
 };
 
-// Audio recording utilities
+// Comprehensive speech analysis combining transcription and audio features
+export const analyzeSpeechComprehensively = async (
+  audioBlob: Blob,
+  transcription: string,
+  duration: number
+): Promise<SpeechMetrics | null> => {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    return null;
+  }
+
+  try {
+    const analyzer = new SpeechAnalyzer();
+    
+    // Extract audio features
+    const audioFeatures = await analyzer.analyzeAudioBlob(audioBlob);
+    
+    // Analyze speech patterns from transcription
+    const speechPatterns = SpeechAnalyzer.analyzeSpeechPatterns(transcription, audioFeatures, duration);
+    
+    // Calculate comprehensive metrics
+    const speechMetrics: SpeechMetrics = {
+      audioQuality: {
+        signalToNoiseRatio: Math.min(100, audioFeatures.rms * 100),
+        clarity: Math.min(100, (1 - audioFeatures.zcr) * 100),
+        volume: Math.min(100, audioFeatures.energy * 1000)
+      },
+      
+      timing: {
+        totalDuration: duration,
+        speechDuration: duration * 0.8, // Estimate based on energy
+        pauseDuration: duration * 0.2,
+        speechRate: speechPatterns.speechRate,
+        pauseFrequency: speechPatterns.hesitations / duration,
+        averagePauseLength: (duration * 0.2) / Math.max(1, speechPatterns.hesitations)
+      },
+      
+      voice: {
+        fundamentalFrequency: audioFeatures.pitch,
+        pitchVariation: audioFeatures.pitch > 0 ? 20 : 5, // Simplified calculation
+        intensity: audioFeatures.rms * 100,
+        voiceStability: Math.min(100, audioFeatures.pitch > 0 ? 80 : 60)
+      },
+      
+      fluency: {
+        fillerWords: speechPatterns.fillerCount,
+        repetitions: speechPatterns.repetitions,
+        selfCorrections: Math.floor(speechPatterns.hesitations / 2),
+        hesitations: speechPatterns.hesitations,
+        fluencyScore: speechPatterns.fluencyScore
+      },
+      
+      confidence: {
+        voiceConfidence: speechPatterns.voiceConfidence,
+        speechClarity: Math.min(100, (1 - audioFeatures.zcr) * 100),
+        paceConsistency: speechPatterns.speechRate > 100 && speechPatterns.speechRate < 200 ? 90 : 70,
+        overallConfidence: Math.round((speechPatterns.voiceConfidence + speechPatterns.fluencyScore) / 2)
+      },
+      
+      emotion: {
+        energy: Math.min(100, audioFeatures.energy * 200),
+        stress: Math.max(0, 100 - speechPatterns.fluencyScore),
+        enthusiasm: Math.min(100, audioFeatures.rms * 150),
+        nervousness: Math.min(100, speechPatterns.fillerCount * 20 + speechPatterns.hesitations * 15)
+      }
+    };
+
+    return speechMetrics;
+  } catch (error) {
+    console.error('Error analyzing speech comprehensively:', error);
+    return null;
+  }
+};
+
+// Audio recording utilities with enhanced quality
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private stream: MediaStream | null = null;
+  private startTime: number = 0;
 
   async startRecording(): Promise<boolean> {
     try {
@@ -151,15 +207,25 @@ export class AudioRecorder {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 16000
+          sampleRate: 44100, // Higher sample rate for better quality
+          channelCount: 1
         } 
       });
       
-      this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Use higher quality encoding if available
+      const options: MediaRecorderOptions = {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 128000 // Higher bitrate for better quality
+      };
       
+      // Fallback to default if specific codec not supported
+      if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
+        delete options.mimeType;
+      }
+      
+      this.mediaRecorder = new MediaRecorder(this.stream, options);
       this.audioChunks = [];
+      this.startTime = Date.now();
       
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -167,7 +233,7 @@ export class AudioRecorder {
         }
       };
       
-      this.mediaRecorder.start(100); // Collect data every 100ms
+      this.mediaRecorder.start(100); // Collect data every 100ms for smoother recording
       return true;
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -175,7 +241,7 @@ export class AudioRecorder {
     }
   }
 
-  async stopRecording(): Promise<Blob | null> {
+  async stopRecording(): Promise<{ audioBlob: Blob; duration: number } | null> {
     return new Promise((resolve) => {
       if (!this.mediaRecorder) {
         resolve(null);
@@ -184,8 +250,9 @@ export class AudioRecorder {
 
       this.mediaRecorder.onstop = () => {
         const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        const duration = (Date.now() - this.startTime) / 1000;
         this.cleanup();
-        resolve(audioBlob);
+        resolve({ audioBlob, duration });
       };
 
       this.mediaRecorder.stop();
