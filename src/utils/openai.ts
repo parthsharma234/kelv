@@ -41,6 +41,20 @@ const SMALL_TALK_QUESTIONS = [
   }
 ];
 
+// Helper function to extract JSON from markdown code blocks
+const extractJsonFromMarkdown = (content: string): string => {
+  // Check if content is wrapped in markdown code blocks
+  const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+  const match = content.match(jsonBlockRegex);
+  
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  
+  // If no markdown blocks found, return the content as-is
+  return content.trim();
+};
+
 // Generate dynamic questions using GPT-4o
 export const generateDynamicQuestion = async (
   setup: InterviewSetup,
@@ -112,7 +126,9 @@ Always respond with a JSON object containing:
       throw new Error('No content received from OpenAI');
     }
 
-    const questionData = JSON.parse(content);
+    // Extract JSON from markdown code blocks if present
+    const jsonContent = extractJsonFromMarkdown(content);
+    const questionData = JSON.parse(jsonContent);
     
     return {
       id: `ai_${Date.now()}`,
@@ -425,7 +441,9 @@ Respond with JSON:
       throw new Error('No content received from OpenAI');
     }
 
-    return JSON.parse(content);
+    // Extract JSON from markdown code blocks if present
+    const jsonContent = extractJsonFromMarkdown(content);
+    return JSON.parse(jsonContent);
 
   } catch (error) {
     console.error('Error analyzing response:', error);
