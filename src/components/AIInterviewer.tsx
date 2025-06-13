@@ -5,6 +5,7 @@ interface AIInterviewerProps {
   isActive?: boolean;
   isSpeaking?: boolean;
   isListening?: boolean;
+  isProcessing?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showStatus?: boolean;
 }
@@ -13,6 +14,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
   isActive = false,
   isSpeaking = false,
   isListening = false,
+  isProcessing = false,
   size = 'lg',
   showStatus = true
 }) => {
@@ -46,11 +48,6 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
   // Listening animation - subtle pulse
   const listeningAnimation = isListening ? {
     scale: [1, 1.03, 1],
-    boxShadow: [
-      "0 0 20px rgba(34, 197, 94, 0.3)",
-      "0 0 40px rgba(34, 197, 94, 0.6)",
-      "0 0 20px rgba(34, 197, 94, 0.3)"
-    ],
     transition: {
       duration: 2,
       repeat: Infinity,
@@ -58,13 +55,23 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
     }
   } : speakingAnimation;
 
+  // Processing animation - gentle glow
+  const processingAnimation = isProcessing ? {
+    scale: [1, 1.04, 1],
+    transition: {
+      duration: 1.5,
+      repeat: Infinity,
+      ease: "easeInOut"
+    }
+  } : listeningAnimation;
+
   // Eye blink animation
   const blinkAnimation = {
     scaleY: [1, 0.1, 1],
     transition: {
       duration: 0.2,
       repeat: Infinity,
-      repeatDelay: Math.random() * 4 + 2, // Random blink interval
+      repeatDelay: Math.random() * 4 + 2,
       ease: "easeInOut"
     }
   };
@@ -84,16 +91,18 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
     <div className="flex flex-col items-center">
       <motion.div 
         className={`${sizeClasses[size]} relative`}
-        animate={listeningAnimation}
+        animate={processingAnimation}
       >
         {/* Background glow */}
-        <div className={`absolute inset-0 rounded-full ${
+        <div className={`absolute inset-0 rounded-full transition-all duration-500 ${
           isListening 
             ? 'bg-green-500/20 shadow-lg shadow-green-500/30' 
             : isSpeaking 
             ? 'bg-orange-500/20 shadow-lg shadow-orange-500/30'
+            : isProcessing
+            ? 'bg-blue-500/20 shadow-lg shadow-blue-500/30'
             : 'bg-orange-500/10'
-        } transition-all duration-500`} />
+        }`} />
         
         <svg viewBox="0 0 120 120" className="w-full h-full relative z-10">
           <defs>
@@ -112,21 +121,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
               <stop offset="0%" stopColor="#FFE4B5" />
               <stop offset="100%" stopColor="#F5DEB3" />
             </radialGradient>
-            <linearGradient id="aiBodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#FF5722" />
-              <stop offset="100%" stopColor="#D84315" />
-            </linearGradient>
           </defs>
-          
-          {/* Body/Chest area */}
-          <ellipse 
-            cx="60" 
-            cy="95" 
-            rx="25" 
-            ry="15" 
-            fill="url(#aiBodyGradient)"
-            opacity="0.8"
-          />
           
           {/* Main head circle */}
           <circle 
@@ -207,41 +202,6 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
               strokeLinecap="round"
             />
           )}
-          
-          {/* AI indicator dots */}
-          <motion.circle 
-            cx="85" 
-            cy="45" 
-            r="2" 
-            fill="#00D9FF"
-            animate={{
-              opacity: [0.3, 1, 0.3],
-              scale: [0.8, 1.2, 0.8],
-              transition: { duration: 2, repeat: Infinity }
-            }}
-          />
-          <motion.circle 
-            cx="90" 
-            cy="50" 
-            r="1.5" 
-            fill="#00D9FF"
-            animate={{
-              opacity: [0.3, 1, 0.3],
-              scale: [0.8, 1.2, 0.8],
-              transition: { duration: 2, repeat: Infinity, delay: 0.5 }
-            }}
-          />
-          <motion.circle 
-            cx="85" 
-            cy="55" 
-            r="1" 
-            fill="#00D9FF"
-            animate={{
-              opacity: [0.3, 1, 0.3],
-              scale: [0.8, 1.2, 0.8],
-              transition: { duration: 2, repeat: Infinity, delay: 1 }
-            }}
-          />
         </svg>
       </motion.div>
       
@@ -276,6 +236,17 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
                 <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
               </motion.div>
             )}
+            {isProcessing && (
+              <motion.div 
+                className="flex gap-1"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              >
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+              </motion.div>
+            )}
           </div>
           
           <span className={`text-sm font-medium ${
@@ -283,10 +254,13 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
               ? 'text-green-400' 
               : isSpeaking 
               ? 'text-orange-400'
+              : isProcessing
+              ? 'text-blue-400'
               : 'text-gray-400'
           }`}>
             {isListening ? 'Listening...' : 
              isSpeaking ? 'Speaking...' : 
+             isProcessing ? 'Processing...' :
              isActive ? 'Ready...' : 'AI Interviewer'}
           </span>
         </motion.div>

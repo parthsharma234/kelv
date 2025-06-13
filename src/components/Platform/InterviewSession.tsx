@@ -3,6 +3,7 @@ import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, Vid
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics } from '../../utils/openai';
 import { saveSpeechAnalysisCache } from '../../utils/supabase-interview';
+import AIInterviewer from '../AIInterviewer';
 
 interface InterviewSessionProps {
   setup: InterviewSetup;
@@ -25,7 +26,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [hasStartedInterview, setHasStartedInterview] = useState(false);
-  const [pandaAnimation, setPandaAnimation] = useState('idle');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
@@ -81,16 +81,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     }
     return () => clearInterval(interval);
   }, [session?.isActive, hasStartedInterview, isInterviewComplete]);
-
-  useEffect(() => {
-    if (hasStartedInterview && !isInterviewComplete) {
-      // Animate panda periodically during interview
-      const interval = setInterval(() => {
-        setPandaAnimation(prev => prev === 'idle' ? 'talking' : 'idle');
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [hasStartedInterview, isInterviewComplete]);
 
   useEffect(() => {
     const currentVideoRef = hasStartedInterview ? videoRef : previewVideoRef;
@@ -794,7 +784,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <p className="text-gray-300 text-base leading-relaxed">
                   {hasStartedInterview 
                     ? currentQuestion?.text || "Generating next question..."
-                    : `Click 'Start ${isVoiceMode ? 'Voice' : 'Text'} Interview' to begin your personalized mock interview. You can respond by ${isVoiceMode ? 'speaking or typing' : 'typing'}.`}
+                    : `Click 'Start ${isVoiceMode ? 'Voice' : 'Text'} Interview' to begin your personalized mock interview. You can respond by ${isVoiceMode ? 'speaking' : 'typing'}.`}
                 </p>
                 {hasStartedInterview && currentQuestion && (
                   <div className="mt-3 flex items-center gap-2">
@@ -982,69 +972,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
             {/* AI Interviewer */}
-            <div className="relative w-96 h-96">
-              <div className={`absolute inset-0 bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl transform transition-transform duration-500 ${
-                pandaAnimation === 'talking' ? 'scale-105' : 'scale-100'
-              }`}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 bg-[#FF5722] rounded-full flex items-center justify-center relative">
-                    <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                      <div className="w-24 h-24 bg-[#FF5722] rounded-full flex items-center justify-center">
-                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                          <Brain className="w-8 h-8 text-[#FF5722]" />
-                        </div>
-                      </div>
-                    </div>
-                    {/* AI indicator */}
-                    <div className={`absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center ${
-                      hasOpenAIKey && isVoiceMode
-                        ? 'bg-gradient-to-br from-green-500 to-green-400' 
-                        : isVoiceMode
-                        ? 'bg-gradient-to-br from-yellow-500 to-yellow-400'
-                        : 'bg-gradient-to-br from-blue-500 to-blue-400'
-                    }`}>
-                      <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Status indicator */}
-              {hasStartedInterview && (
-                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 w-full text-center">
-                  <div className="flex items-center justify-center space-x-4">
-                    <div className="flex space-x-1">
-                      <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-bounce"></div>
-                      <div className="w-3 h-3 bg-[#FF7043] rounded-full animate-bounce delay-100"></div>
-                      <div className="w-3 h-3 bg-[#D84315] rounded-full animate-bounce delay-200"></div>
-                    </div>
-                    <span className="text-[#FF5722] text-lg font-medium">
-                      {isGeneratingQuestion ? 'Generating Question...' : 
-                       isAnalyzing ? 'Processing...' :
-                       isPlaying ? 'Speaking...' : 
-                       isRecording ? 'Listening...' :
-                       isProcessingVoice ? 'Understanding...' : 'Ready...'}
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      hasOpenAIKey && isVoiceMode
-                        ? 'bg-green-500/20 text-green-400' 
-                        : isVoiceMode
-                        ? 'bg-yellow-500/20 text-yellow-400'
-                        : 'bg-blue-500/20 text-blue-400'
-                    }`}>
-                      {hasOpenAIKey && isVoiceMode 
-                        ? 'Real GPT-4o + Voice AI' 
-                        : isVoiceMode 
-                        ? 'Voice Mode (Demo)'
-                        : 'Text Mode'
-                      }
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+            <AIInterviewer 
+              isActive={hasStartedInterview}
+              isSpeaking={isPlaying}
+              isListening={isRecording}
+              isProcessing={isProcessingVoice || isAnalyzing || isGeneratingQuestion}
+              size="xl"
+              showStatus={true}
+            />
           </div>
 
           {/* User video - picture in picture style */}
