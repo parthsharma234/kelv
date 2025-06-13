@@ -10,7 +10,11 @@ import {
   BarChart3,
   Award,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  Mic,
+  Volume2,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { saveInterviewSession } from '../../utils/supabase-interview';
 
@@ -76,6 +80,25 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     return acc;
   }, {});
 
+  // Calculate speech metrics averages if available
+  const speechMetricsAvailable = sessionData.speechMetrics && sessionData.speechMetrics.length > 0;
+  let avgSpeechMetrics = null;
+  
+  if (speechMetricsAvailable) {
+    const metrics = sessionData.speechMetrics.map((m: any) => m.metrics).filter(Boolean);
+    if (metrics.length > 0) {
+      avgSpeechMetrics = {
+        voiceConfidence: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / metrics.length),
+        fluencyScore: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / metrics.length),
+        speechRate: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / metrics.length),
+        clarity: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / metrics.length),
+        delivery: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / metrics.length),
+        fillerWordCount: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / metrics.length),
+        averageVolume: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / metrics.length)
+      };
+    }
+  }
+
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">
@@ -115,10 +138,16 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <Brain className="w-8 h-8 text-orange-400" />
+                {sessionData.setup.interviewMode === 'voice' ? (
+                  <Mic className="w-8 h-8 text-green-400" />
+                ) : (
+                  <MessageSquare className="w-8 h-8 text-blue-400" />
+                )}
                 AI
               </div>
-              <p className="text-gray-400 text-sm">Adaptive Interview</p>
+              <p className="text-gray-400 text-sm">
+                {sessionData.setup.interviewMode === 'voice' ? 'Voice Interview' : 'Text Interview'}
+              </p>
             </div>
           </div>
         </motion.div>
@@ -140,6 +169,8 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               <div className="space-y-6">
                 {sessionData.responses.map((response: any, index: number) => {
                   const question = sessionData.questions.find((q: any) => q.id === response.questionId);
+                  const speechMetric = sessionData.speechMetrics?.find((m: any) => m.questionId === response.questionId);
+                  
                   return (
                     <div key={response.questionId} className="border border-dark-600/50 rounded-xl p-6">
                       <div className="flex items-start justify-between mb-4">
@@ -170,6 +201,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                                 {question.difficulty}
                               </span>
                             )}
+                            {speechMetric && (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                                <Mic className="w-3 h-3 inline mr-1" />
+                                Voice
+                              </span>
+                            )}
                           </div>
                           <p className="text-white font-medium mb-3">{question?.text}</p>
                         </div>
@@ -182,6 +219,39 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                         <h5 className="text-sm font-medium text-gray-400 mb-2">Your Response</h5>
                         <p className="text-gray-300 text-sm">{response.response}</p>
                       </div>
+                      
+                      {/* Speech Metrics for this question */}
+                      {speechMetric?.metrics && (
+                        <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-4 mb-4">
+                          <h5 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
+                            <Volume2 className="w-4 h-4" />
+                            Speech Analysis
+                          </h5>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-white">{speechMetric.metrics.voiceConfidence}%</div>
+                              <div className="text-gray-400">Voice Confidence</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-white">{speechMetric.metrics.fluencyScore}%</div>
+                              <div className="text-gray-400">Fluency</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-white">{speechMetric.metrics.speechRate}</div>
+                              <div className="text-gray-400">WPM</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-white">{speechMetric.metrics.clarity}%</div>
+                              <div className="text-gray-400">Clarity</div>
+                            </div>
+                          </div>
+                          {speechMetric.metrics.fillerWordCount > 0 && (
+                            <div className="mt-3 text-xs text-yellow-400">
+                              ⚠️ {speechMetric.metrics.fillerWordCount} filler words detected
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       {response.analysis && (
                         <div className="space-y-3">
@@ -251,6 +321,60 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             transition={{ delay: 0.3 }}
             className="space-y-6"
           >
+            {/* Speech Metrics Summary */}
+            {avgSpeechMetrics && (
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-green-400" />
+                  Speech Performance
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-green-400">{avgSpeechMetrics.voiceConfidence}%</div>
+                      <div className="text-xs text-gray-400">Voice Confidence</div>
+                    </div>
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-400">{avgSpeechMetrics.fluencyScore}%</div>
+                      <div className="text-xs text-gray-400">Fluency Score</div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-400">{avgSpeechMetrics.speechRate}</div>
+                      <div className="text-xs text-gray-400">Words/Min</div>
+                    </div>
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-400">{avgSpeechMetrics.clarity}%</div>
+                      <div className="text-xs text-gray-400">Clarity</div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-dark-700/30 rounded-lg">
+                    <h4 className="font-medium text-white mb-2">Speech Insights</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Delivery Score:</span>
+                        <span className="text-white">{avgSpeechMetrics.delivery}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Avg Filler Words:</span>
+                        <span className={avgSpeechMetrics.fillerWordCount > 3 ? 'text-yellow-400' : 'text-green-400'}>
+                          {avgSpeechMetrics.fillerWordCount}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Voice Volume:</span>
+                        <span className="text-white">{avgSpeechMetrics.averageVolume}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AI Performance Analysis */}
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -299,6 +423,14 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                         {hasSpecificExamples ? 'Yes' : 'Improve'}
                       </span>
                     </div>
+                    {avgSpeechMetrics && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Speech Quality:</span>
+                        <span className={avgSpeechMetrics.voiceConfidence >= 70 ? 'text-green-400' : 'text-orange-400'}>
+                          {avgSpeechMetrics.voiceConfidence >= 70 ? 'Strong' : 'Developing'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -346,6 +478,22 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   <span className="text-white">{sessionData.setup.experienceLevel}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-gray-400">Mode:</span>
+                  <span className="text-white flex items-center gap-1">
+                    {sessionData.setup.interviewMode === 'voice' ? (
+                      <>
+                        <Mic className="w-3 h-3" />
+                        Voice Interview
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-3 h-3" />
+                        Text Interview
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-gray-400">Date:</span>
                   <span className="text-white">
                     {new Date(sessionData.startTime).toLocaleDateString()}
@@ -355,6 +503,15 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   <span className="text-gray-400">AI Model:</span>
                   <span className="text-white">GPT-4o Dynamic</span>
                 </div>
+                {avgSpeechMetrics && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Speech Analysis:</span>
+                    <span className="text-green-400 flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Enabled
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

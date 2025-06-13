@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
-import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, transcribeAudio, AudioRecorder, analyzeSpeechComprehensively } from '../../utils/openai';
+import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics } from '../../utils/openai';
 import { saveSpeechAnalysisCache } from '../../utils/supabase-interview';
 
 interface InterviewSessionProps {
@@ -44,8 +44,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   
   // Speech-to-text states - only for voice mode
   const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [speechMetrics, setSpeechMetrics] = useState<any[]>([]);
 
   // Check if OpenAI API key is configured
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
@@ -308,7 +309,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       } else {
         setTimeout(() => {
           setIsPlaying(false);
-        }, 1500); // Reduced delay
+        }, 1500);
       }
     } catch (error) {
       console.error('Error playing question:', error);
@@ -322,6 +323,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     const success = await audioRecorderRef.current.startRecording();
     if (success) {
       setIsRecording(true);
+      setUserResponse(''); // Clear any existing text
     } else {
       console.error('Failed to start recording');
     }
@@ -331,41 +333,49 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     if (!audioRecorderRef.current || !isVoiceMode) return;
     
     setIsRecording(false);
-    setIsTranscribing(true);
+    setIsProcessingVoice(true);
     
     const result = await audioRecorderRef.current.stopRecording();
     if (result) {
       const { audioBlob, duration } = result;
       
-      // Transcribe audio with optimized method
-      const transcription = await transcribeAudio(audioBlob);
-      if (transcription && transcription.trim().length > 0) {
-        setUserResponse(transcription);
-        
-        // Analyze speech metrics in the background
-        if (hasOpenAIKey && session) {
-          try {
-            const speechMetrics = await analyzeSpeechComprehensively(audioBlob, transcription, duration);
-            if (speechMetrics) {
-              // Cache the speech analysis
-              await saveSpeechAnalysisCache(
-                session.id,
-                session.questions[session.currentQuestionIndex]?.id || 'unknown',
-                speechMetrics,
-                { transcription, duration }
-              );
+      try {
+        // Process voice input directly
+        const transcription = await processVoiceInput(audioBlob);
+        if (transcription && transcription.trim().length > 0) {
+          setUserResponse(transcription);
+          
+          // Extract speech metrics in the background
+          if (hasOpenAIKey && session) {
+            try {
+              const metrics = await extractSpeechMetrics(audioBlob, transcription, duration);
+              if (metrics) {
+                setSpeechMetrics(prev => [...prev, {
+                  questionId: session.questions[session.currentQuestionIndex]?.id,
+                  metrics
+                }]);
+                
+                // Cache the speech analysis
+                await saveSpeechAnalysisCache(
+                  session.id,
+                  session.questions[session.currentQuestionIndex]?.id || 'unknown',
+                  metrics,
+                  { transcription, duration }
+                );
+              }
+            } catch (error) {
+              console.error('Error analyzing speech metrics:', error);
             }
-          } catch (error) {
-            console.error('Error analyzing speech metrics:', error);
           }
+        } else {
+          console.warn('Voice processing failed or was empty');
         }
-      } else {
-        // If transcription failed or was empty, keep the recording interface active
-        console.warn('Transcription failed or was empty');
+      } catch (error) {
+        console.error('Error processing voice input:', error);
       }
     }
     
-    setIsTranscribing(false);
+    setIsProcessingVoice(false);
   };
 
   const handleSubmitResponse = async () => {
@@ -401,8 +411,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const moveToNextQuestion = async (currentResponses: InterviewResponse[]) => {
     if (!session) return;
 
-    // Check if we should complete the interview
-    if (currentResponses.length >= 5) {
+    // Check if we should complete the interview (8-12 questions)
+    if (currentResponses.length >= 8) {
       // Complete the interview and show comprehensive feedback
       await completeInterview(currentResponses);
       return;
@@ -462,9 +472,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           if (!question) return response;
 
           const analysis = await analyzeResponse(question, response.response, setup, finalResponses.slice(0, index));
+          
+          // Add speech metrics if available
+          const speechMetric = speechMetrics.find(m => m.questionId === response.questionId);
+          
           return {
             ...response,
-            analysis
+            analysis,
+            speechMetrics: speechMetric?.metrics
           };
         })
       );
@@ -472,7 +487,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       const endTime = new Date();
       const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000);
       const overallScore = analyzedResponses.length > 0 
-        ? Math.round(analyzedResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / analyzedResponses.length)
+        ? Math.round(analyzedResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / analyzedResponses.length * 10)
         : 0;
 
       const sessionData = {
@@ -481,6 +496,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         duration,
         overallScore,
         responses: analyzedResponses,
+        speechMetrics: speechMetrics,
         isActive: false
       };
 
@@ -515,6 +531,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         duration,
         overallScore: 70, // Default score
         responses: finalResponses,
+        speechMetrics: speechMetrics,
         isActive: false
       };
 
@@ -581,7 +598,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
-                <span className="text-sm text-gray-300">Speech-to-Text (Whisper):</span>
+                <span className="text-sm text-gray-300">Voice Input (Direct):</span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                   hasOpenAIKey && isVoiceMode
                     ? 'bg-green-500/20 text-green-400' 
@@ -591,7 +608,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
-                <span className="text-sm text-gray-300">Text-to-Speech:</span>
+                <span className="text-sm text-gray-300">Speech Metrics:</span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                   hasOpenAIKey && isVoiceMode
                     ? 'bg-green-500/20 text-green-400' 
@@ -603,7 +620,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="text-xs text-gray-400">
                 {isVoiceMode 
                   ? hasOpenAIKey 
-                    ? '✅ Full voice-enabled AI interview experience' 
+                    ? '✅ Full voice-enabled AI interview with speech analysis' 
                     : '⚠️ Voice mode selected but no API key - will fallback to text mode'
                   : '📝 Text-only interview mode selected'
                 }
@@ -738,7 +755,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="flex items-center space-x-2">
                 <MessageSquare className="w-4 h-4 text-orange-400" />
                 <span className="text-sm text-gray-400">
-                  {responses.length + 1} of ~5-8 questions
+                  {responses.length + 1} of 8-12 questions
                 </span>
               </div>
               {isVoiceMode && (
@@ -820,14 +837,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     <div className="text-center">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}
-                        disabled={isTranscribing}
+                        disabled={isProcessingVoice}
                         className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
                           isRecording
                             ? 'bg-red-500 hover:bg-red-600 animate-pulse'
                             : 'bg-[#FF5722] hover:bg-[#D84315]'
                         } disabled:opacity-50`}
                       >
-                        {isTranscribing ? (
+                        {isProcessingVoice ? (
                           <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <Mic className="w-8 h-8 text-white" />
@@ -835,24 +852,13 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                       </button>
                       <p className="text-sm text-gray-400 mt-3">
                         {isRecording ? 'Recording... Click to stop' : 
-                         isTranscribing ? 'Transcribing...' : 'Click to record your response'}
+                         isProcessingVoice ? 'Processing voice...' : 'Click to record your response'}
                       </p>
                       {userResponse && (
                         <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
                           <p className="text-sm text-gray-300">{userResponse}</p>
                         </div>
                       )}
-                      
-                      {/* Text input fallback for voice mode */}
-                      <div className="mt-6 pt-4 border-t border-gray-700">
-                        <p className="text-xs text-gray-500 mb-2">Or type your response:</p>
-                        <textarea
-                          value={userResponse}
-                          onChange={(e) => setUserResponse(e.target.value)}
-                          placeholder="Type your response here..."
-                          className="w-full h-24 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors resize-none text-sm"
-                        />
-                      </div>
                     </div>
                   ) : (
                     <textarea
@@ -866,7 +872,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 
                 <button
                   onClick={handleSubmitResponse}
-                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion || isRecording || isTranscribing}
+                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion || isRecording || isProcessingVoice}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
                 >
                   {isAnalyzing || isGeneratingQuestion ? (
@@ -892,7 +898,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
                     <div 
                       className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(((responses.length + 1) / 6) * 100, 100)}%` }}
+                      style={{ width: `${Math.min(((responses.length + 1) / 10) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -919,9 +925,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     {isVoiceMode ? (
                       <>
                         <li>• {hasOpenAIKey ? 'AI speaks questions aloud' : 'Text-based questions (no API key)'}</li>
-                        <li>• {hasOpenAIKey ? 'Voice or text responses' : 'Text responses only'}</li>
+                        <li>• {hasOpenAIKey ? 'Direct voice input to OpenAI' : 'Text responses only'}</li>
                         <li>• Voice confidence and delivery analysis</li>
-                        <li>• Natural conversation flow with speech patterns</li>
+                        <li>• Speech metrics and fluency scoring</li>
                       </>
                     ) : (
                       <>
@@ -931,7 +937,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                         <li>• Silent interview experience</li>
                       </>
                     )}
-                    <li>• 5-8 adaptive questions with natural conversation flow</li>
+                    <li>• 8-12 adaptive questions with natural conversation flow</li>
                     <li>• Comprehensive feedback table at completion</li>
                   </ul>
                 </div>
@@ -1017,7 +1023,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                        isAnalyzing ? 'Processing...' :
                        isPlaying ? 'Speaking...' : 
                        isRecording ? 'Listening...' :
-                       isTranscribing ? 'Understanding...' : 'Ready...'}
+                       isProcessingVoice ? 'Understanding...' : 'Ready...'}
                     </span>
                   </div>
                   <div className="mt-2">
