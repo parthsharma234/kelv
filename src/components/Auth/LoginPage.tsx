@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Sparkles, Brain, Target, ArrowRight, Zap, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import RedPandaLogo from '../RedPandaLogo';
 
 const LoginPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -99,33 +100,7 @@ const LoginPage: React.FC = () => {
         to="/"
         className="absolute top-8 left-8 flex items-center gap-3 text-gray-400 hover:text-orange-400 transition-all duration-300 z-10 group"
       >
-        <motion.div 
-          whileHover={{ scale: 1.05, rotate: 5 }}
-          className="relative"
-        >
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30 relative overflow-hidden group-hover:shadow-orange-500/50 transition-all">
-            <div className="absolute inset-0 opacity-20">
-              <div className="absolute top-1 left-1 w-1 h-1 bg-white rounded-full"></div>
-              <div className="absolute top-3 right-2 w-0.5 h-0.5 bg-white rounded-full"></div>
-              <div className="absolute bottom-2 left-2 w-0.5 h-0.5 bg-white rounded-full"></div>
-              <div className="absolute bottom-1 right-1 w-1 h-1 bg-white rounded-full"></div>
-              <div className="absolute top-1.5 left-1.5 w-6 h-0.5 bg-white/30 rotate-45 origin-left"></div>
-              <div className="absolute top-3.5 left-3 w-4 h-0.5 bg-white/30 -rotate-45 origin-left"></div>
-            </div>
-            <div className="relative z-10 w-5 h-5 border-2 border-white rounded-lg flex items-center justify-center">
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="w-1.5 h-1.5 bg-white rounded-full"
-              />
-            </div>
-          </div>
-          <motion.div
-            animate={{ scale: [1, 1.3, 1] }}
-            transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-            className="absolute -top-1 -right-1 w-3 h-3 bg-orange-300 rounded-full"
-          />
-        </motion.div>
+        <RedPandaLogo size="md" animate={true} className="group-hover:scale-110 transition-transform" />
         <span className="text-xl font-bold group-hover:text-orange-400 transition-colors">Kelv AI</span>
       </Link>
 

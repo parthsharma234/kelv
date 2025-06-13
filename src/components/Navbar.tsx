@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, User, LogOut, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import RedPandaLogo from './RedPandaLogo';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -48,25 +49,7 @@ const Navbar: React.FC = () => {
       <div className="container">
         <nav className="flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30 relative overflow-hidden">
-                {/* Neural network pattern */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute top-1 left-1 w-1 h-1 bg-white rounded-full"></div>
-                  <div className="absolute top-3 right-2 w-0.5 h-0.5 bg-white rounded-full"></div>
-                  <div className="absolute bottom-2 left-2 w-0.5 h-0.5 bg-white rounded-full"></div>
-                  <div className="absolute bottom-1 right-1 w-1 h-1 bg-white rounded-full"></div>
-                  {/* Connection lines */}
-                  <div className="absolute top-1.5 left-1.5 w-6 h-0.5 bg-white/30 rotate-45 origin-left"></div>
-                  <div className="absolute top-3.5 left-3 w-4 h-0.5 bg-white/30 -rotate-45 origin-left"></div>
-                </div>
-                {/* Central AI symbol */}
-                <div className="relative z-10 w-5 h-5 border-2 border-white rounded-lg flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                </div>
-              </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-300 rounded-full animate-pulse"></div>
-            </div>
+            <RedPandaLogo size="md" animate={true} />
             <span className="text-2xl font-bold gradient-text">Kelv AI</span>
           </Link>
           
@@ -105,9 +88,7 @@ const Navbar: React.FC = () => {
                       className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      <div className="w-4 h-4 bg-gradient-to-br from-orange-500 to-orange-400 rounded flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                      </div>
+                      <RedPandaLogo size="sm" animate={false} />
                       Waitlist Status
                     </Link>
                     <Link
