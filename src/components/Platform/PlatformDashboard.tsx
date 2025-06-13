@@ -30,6 +30,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Scroll to top when component mounts
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     const loadData = async () => {
       try {
         const [history, statsData] = await Promise.all([

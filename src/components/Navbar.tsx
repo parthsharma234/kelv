@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, User, LogOut, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import RedPandaLogo from './RedPandaLogo';
 
 const Navbar: React.FC = () => {
@@ -11,6 +11,7 @@ const Navbar: React.FC = () => {
   
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -33,11 +34,38 @@ const Navbar: React.FC = () => {
 
   const handlePlatformClick = () => {
     if (user) {
-      navigate('/platform');
+      // If we're already on the platform page, scroll to top
+      if (location.pathname === '/platform') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        navigate('/platform');
+      }
     } else {
       navigate('/login');
     }
     setIsOpen(false);
+  };
+
+  const handleNavClick = (href: string) => {
+    setIsOpen(false);
+    
+    // If we're on a different page, navigate to home first
+    if (location.pathname !== '/') {
+      navigate('/');
+      // Wait for navigation to complete, then scroll
+      setTimeout(() => {
+        const element = document.querySelector(href);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      // We're on the home page, just scroll
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   };
   
   return (
@@ -55,8 +83,18 @@ const Navbar: React.FC = () => {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-300 hover:text-orange-400 transition-colors duration-300">Features</a>
-            <a href="#how-it-works" className="text-gray-300 hover:text-orange-400 transition-colors duration-300">How It Works</a>
+            <button 
+              onClick={() => handleNavClick('#features')}
+              className="text-gray-300 hover:text-orange-400 transition-colors duration-300"
+            >
+              Features
+            </button>
+            <button 
+              onClick={() => handleNavClick('#how-it-works')}
+              className="text-gray-300 hover:text-orange-400 transition-colors duration-300"
+            >
+              How It Works
+            </button>
             <button
               onClick={handlePlatformClick}
               className="flex items-center gap-2 text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium"
@@ -117,7 +155,12 @@ const Navbar: React.FC = () => {
                 >
                   Sign In
                 </Link>
-                <a href="#waitlist" className="btn btn-primary">Join Waitlist</a>
+                <button 
+                  onClick={() => handleNavClick('#waitlist')}
+                  className="btn btn-primary"
+                >
+                  Join Waitlist
+                </button>
               </>
             )}
           </div>
@@ -135,20 +178,18 @@ const Navbar: React.FC = () => {
         {isOpen && (
           <div className="md:hidden absolute top-full left-0 right-0 bg-dark-800 border-t border-dark-700 animate-slide-down">
             <div className="container py-4 flex flex-col space-y-4">
-              <a 
-                href="#features" 
-                className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
-                onClick={() => setIsOpen(false)}
+              <button 
+                onClick={() => handleNavClick('#features')}
+                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
               >
                 Features
-              </a>
-              <a 
-                href="#how-it-works" 
-                className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
-                onClick={() => setIsOpen(false)}
+              </button>
+              <button 
+                onClick={() => handleNavClick('#how-it-works')}
+                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
               >
                 How It Works
-              </a>
+              </button>
               <button
                 onClick={handlePlatformClick}
                 className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300 flex items-center gap-2"
@@ -185,13 +226,12 @@ const Navbar: React.FC = () => {
                   >
                     Sign In
                   </Link>
-                  <a 
-                    href="#waitlist" 
+                  <button 
+                    onClick={() => handleNavClick('#waitlist')}
                     className="btn btn-primary w-full"
-                    onClick={() => setIsOpen(false)}
                   >
                     Join Waitlist
-                  </a>
+                  </button>
                 </>
               )}
             </div>

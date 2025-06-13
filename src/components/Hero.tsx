@@ -141,10 +141,18 @@ const Hero: React.FC = () => {
                           >
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                               message.role === 'kelv' 
-                                ? 'bg-gradient-to-br from-orange-500 to-orange-400 text-white group-hover:scale-105 transition-transform shadow-lg'
+                                ? 'bg-gradient-to-br from-orange-500 to-orange-400 text-white group-hover:scale-105 transition-transform shadow-lg overflow-hidden'
                                 : 'bg-gray-600'
                             }`}>
-                              {message.role === 'kelv' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                              {message.role === 'kelv' ? (
+                                <img 
+                                  src="/logo.png" 
+                                  alt="Kelv AI" 
+                                  className="w-full h-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <User className="w-5 h-5" />
+                              )}
                             </div>
                             
                             <div className="flex-1 min-w-0">
