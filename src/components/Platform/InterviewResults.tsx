@@ -99,6 +99,63 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     }
   }
 
+  // Calculate skill breakdown metrics similar to hero section
+  const skillBreakdownMetrics = [
+    {
+      name: "Communication Clarity",
+      score: Math.round(sessionData.responses.reduce((sum: number, r: any) => 
+        sum + (r.analysis?.score || 5), 0) / sessionData.responses.length * 10),
+      icon: MessageSquare,
+      color: "from-blue-500 to-blue-400",
+      improvement: avgSpeechMetrics ? `+${Math.max(0, avgSpeechMetrics.clarity - 70)}%` : "+8%",
+      description: "How clearly you communicate your ideas and thoughts"
+    },
+    {
+      name: "Technical Depth",
+      score: Math.round(sessionData.responses.filter((r: any) => {
+        const question = sessionData.questions.find((q: any) => q.id === r.questionId);
+        return question?.type === 'technical';
+      }).reduce((sum: number, r: any) => sum + (r.analysis?.score || 5), 0) / 
+      Math.max(1, sessionData.responses.filter((r: any) => {
+        const question = sessionData.questions.find((q: any) => q.id === r.questionId);
+        return question?.type === 'technical';
+      }).length) * 10),
+      icon: Brain,
+      color: "from-purple-500 to-purple-400",
+      improvement: "+12%",
+      description: "Your technical knowledge and problem-solving abilities"
+    },
+    {
+      name: "Response Quality",
+      score: Math.round(sessionData.responses.reduce((sum: number, r: any) => 
+        sum + (r.analysis?.confidenceIndicators?.structuredAnswer ? 8 : 5), 0) / sessionData.responses.length * 10),
+      icon: Target,
+      color: "from-green-500 to-green-400",
+      improvement: "+15%",
+      description: "Structure, relevance, and completeness of your answers"
+    },
+    {
+      name: "Confidence Level",
+      score: Math.round(avgConfidence * 10),
+      icon: TrendingUp,
+      color: "from-orange-500 to-orange-400",
+      improvement: "+6%",
+      description: "Your confidence and enthusiasm during the interview"
+    }
+  ];
+
+  // Add voice-specific metrics if available
+  if (avgSpeechMetrics) {
+    skillBreakdownMetrics.push({
+      name: "Voice Delivery",
+      score: avgSpeechMetrics.delivery,
+      icon: Mic,
+      color: "from-pink-500 to-pink-400",
+      improvement: `+${Math.max(0, avgSpeechMetrics.delivery - 60)}%`,
+      description: "Your speaking pace, clarity, and vocal confidence"
+    });
+  }
+
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">
@@ -148,6 +205,63 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               <p className="text-gray-400 text-sm">
                 {sessionData.setup.interviewMode === 'voice' ? 'Voice Interview' : 'Text Interview'}
               </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Skill Breakdown Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mb-8"
+        >
+          <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+            <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+              <BarChart3 className="w-5 h-5 text-orange-400" />
+              Performance Breakdown
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {skillBreakdownMetrics.map((metric, index) => (
+                <motion.div
+                  key={metric.name}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + index * 0.1 }}
+                  className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 hover:border-orange-500/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color} group-hover:scale-110 transition-transform`}>
+                      <metric.icon className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white truncate">{metric.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white">{metric.score}%</span>
+                          <span className="text-xs text-green-400">{metric.improvement}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${metric.score}%` }}
+                        transition={{ duration: 1.5, delay: 0.3 + index * 0.1 }}
+                        className={`h-full bg-gradient-to-r ${metric.color} rounded-full relative`}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                      </motion.div>
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs text-gray-400">{metric.description}</p>
+                </motion.div>
+              ))}
             </div>
           </div>
         </motion.div>
