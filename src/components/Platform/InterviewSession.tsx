@@ -48,6 +48,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [speechMetrics, setSpeechMetrics] = useState<any[]>([]);
 
+  // NEW: Track if AI is currently speaking to prevent user input
+  const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [canUserRespond, setCanUserRespond] = useState(false);
+
   // Check if OpenAI API key is configured
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
                       import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
@@ -189,6 +193,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           const firstQuestion = session.questions[0];
           console.log('Playing first question:', firstQuestion.text);
           await playQuestion(firstQuestion.text);
+        } else {
+          // For text mode, user can respond immediately
+          setCanUserRespond(true);
         }
       }
       
@@ -269,10 +276,17 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   };
 
   const playQuestion = async (questionText: string) => {
-    if (!audioEnabled || !isVoiceMode || !hasOpenAIKey) return;
+    if (!audioEnabled || !isVoiceMode || !hasOpenAIKey) {
+      // For text mode or when audio is disabled, user can respond immediately
+      setCanUserRespond(true);
+      return;
+    }
     
     try {
+      setIsAISpeaking(true);
+      setCanUserRespond(false);
       setIsPlaying(true);
+      
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
@@ -283,24 +297,49 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       if (audio) {
         setCurrentAudio(audio);
         audio.muted = !audioEnabled;
-        audio.play();
+        
+        // Set up event listeners for when audio finishes
         audio.onended = () => {
           setIsPlaying(false);
+          setIsAISpeaking(false);
+          setCanUserRespond(true); // User can now respond
           setCurrentAudio(null);
         };
+        
+        audio.onerror = () => {
+          setIsPlaying(false);
+          setIsAISpeaking(false);
+          setCanUserRespond(true); // Allow response even if audio fails
+          setCurrentAudio(null);
+        };
+        
+        await audio.play();
       } else {
+        // If audio synthesis fails, allow user to respond after a short delay
         setTimeout(() => {
           setIsPlaying(false);
+          setIsAISpeaking(false);
+          setCanUserRespond(true);
         }, 1500);
       }
     } catch (error) {
       console.error('Error playing question:', error);
       setIsPlaying(false);
+      setIsAISpeaking(false);
+      setCanUserRespond(true); // Allow response if there's an error
     }
   };
 
   const startRecording = async () => {
-    if (!audioRecorderRef.current || !isVoiceMode) return;
+    if (!audioRecorderRef.current || !isVoiceMode || !canUserRespond || isAISpeaking) {
+      console.log('Cannot start recording:', { 
+        hasRecorder: !!audioRecorderRef.current, 
+        isVoiceMode, 
+        canUserRespond, 
+        isAISpeaking 
+      });
+      return;
+    }
     
     const success = await audioRecorderRef.current.startRecording();
     if (success) {
@@ -361,9 +400,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   };
 
   const handleSubmitResponse = async () => {
-    if (!session || !userResponse.trim()) return;
+    if (!session || !userResponse.trim() || !canUserRespond) return;
 
     setIsAnalyzing(true);
+    setCanUserRespond(false); // Prevent further input while processing
+    
     try {
       const currentQuestion = session.questions[session.currentQuestionIndex];
       
@@ -385,6 +426,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
     } catch (error) {
       console.error('Error processing response:', error);
+      setCanUserRespond(true); // Re-enable input if there's an error
     } finally {
       setIsAnalyzing(false);
     }
@@ -435,6 +477,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         setTimeout(() => {
           playQuestion(nextQuestion.text);
         }, 100);
+      } else {
+        // For text mode, user can respond immediately
+        setCanUserRespond(true);
       }
       
     } catch (error) {
@@ -871,11 +916,13 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     <div className="text-center">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}
-                        disabled={isProcessingVoice}
+                        disabled={isProcessingVoice || !canUserRespond || isAISpeaking}
                         className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
                           isRecording
                             ? 'bg-red-500 hover:bg-red-600 animate-pulse'
-                            : 'bg-[#FF5722] hover:bg-[#D84315]'
+                            : canUserRespond && !isAISpeaking
+                            ? 'bg-[#FF5722] hover:bg-[#D84315]'
+                            : 'bg-gray-600 cursor-not-allowed'
                         } disabled:opacity-50`}
                       >
                         {isProcessingVoice ? (
@@ -885,7 +932,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                         )}
                       </button>
                       <p className="text-sm text-gray-400 mt-3">
-                        {isRecording ? 'Recording... Click to stop' : 
+                        {isAISpeaking ? 'Please wait for the question to finish...' :
+                         !canUserRespond ? 'Please wait...' :
+                         isRecording ? 'Recording... Click to stop' : 
                          isProcessingVoice ? 'Processing voice...' : 'Click to record your response'}
                       </p>
                       {userResponse && (
@@ -898,15 +947,16 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     <textarea
                       value={userResponse}
                       onChange={(e) => setUserResponse(e.target.value)}
-                      placeholder="Type your response here..."
-                      className="w-full h-32 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors resize-none"
+                      placeholder={canUserRespond ? "Type your response here..." : "Please wait for the question to finish..."}
+                      disabled={!canUserRespond || isAISpeaking}
+                      className="w-full h-32 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   )}
                 </div>
                 
                 <button
                   onClick={handleSubmitResponse}
-                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion || isRecording || isProcessingVoice}
+                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion || isRecording || isProcessingVoice || !canUserRespond || isAISpeaking}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
                 >
                   {isAnalyzing || isGeneratingQuestion ? (
@@ -971,7 +1021,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
-                  disabled={isPlaying || !audioEnabled}
+                  disabled={isPlaying || !audioEnabled || isAISpeaking}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-3"
                 >
                   {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
@@ -1006,7 +1056,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             {/* AI Interviewer */}
             <AIInterviewer 
               isActive={hasStartedInterview}
-              isSpeaking={isPlaying}
+              isSpeaking={isAISpeaking}
               isListening={isRecording}
               isProcessing={isProcessingVoice || isAnalyzing || isGeneratingQuestion}
               size="xl"
