@@ -937,11 +937,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                          isRecording ? 'Recording... Click to stop' : 
                          isProcessingVoice ? 'Processing voice...' : 'Click to record your response'}
                       </p>
-                      {userResponse && (
-                        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
-                          <p className="text-sm text-gray-300">{userResponse}</p>
-                        </div>
-                      )}
+                      {/* REMOVED: Transcription display - no longer showing what user said */}
                     </div>
                   ) : (
                     <textarea
