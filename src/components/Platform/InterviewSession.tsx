@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
+import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics, updateGlobalQuestions } from '../../utils/openai';
 import { saveSpeechAnalysisCache, createInitialInterviewSession } from '../../utils/supabase-interview';
@@ -25,7 +25,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(true);
   const [hasStartedInterview, setHasStartedInterview] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -215,39 +214,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         track.enabled = !track.enabled;
       });
       setIsMuted(!isMuted);
-    }
-  };
-
-  const toggleVideo = async () => {
-    const currentStream = hasStartedInterview ? stream : previewStream;
-    if (!currentStream) return;
-
-    if (isVideoOn) {
-      currentStream.getVideoTracks().forEach(track => {
-        track.enabled = false;
-      });
-      setIsVideoOn(false);
-    } else {
-      try {
-        const videoTracks = currentStream.getVideoTracks();
-        if (videoTracks.length > 0) {
-          videoTracks.forEach(track => {
-            track.enabled = true;
-          });
-          setIsVideoOn(true);
-        } else {
-          const newVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          if (hasStartedInterview) {
-            setStream(newVideoStream);
-          } else {
-            setPreviewStream(newVideoStream);
-          }
-          setIsVideoOn(true);
-        }
-      } catch (error) {
-        console.error('Error turning video back on:', error);
-        setCameraError('Error accessing camera. Please check your browser settings.');
-      }
     }
   };
 
@@ -600,7 +566,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
         <div className="text-center max-w-md">
           <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl flex items-center justify-center">
-            <Video className="w-12 h-12 text-[#FF5722]" />
+            <Mic className="w-12 h-12 text-[#FF5722]" />
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">
             {isVoiceMode ? 'Voice Interview Setup' : 'Interview Setup'}
@@ -1058,7 +1024,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 playsInline
                 className="w-full h-full object-cover"
               />
-            ) : isVideoOn ? (
+            ) : (
               <video
                 ref={videoRef}
                 autoPlay
@@ -1070,14 +1036,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   setCameraError('Error playing video stream. Please check your browser settings.');
                 }}
               />
-            ) : (
-              <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                <VideoOff className="w-12 h-12 text-gray-400" />
-              </div>
             )}
           </div>
 
-          {/* Camera controls */}
+          {/* Camera controls - only microphone toggle */}
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-gray-900/90 backdrop-blur-sm px-6 py-3 rounded-full border border-gray-800 z-20">
             {isVoiceMode && (
               <button
@@ -1093,19 +1055,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 )}
               </button>
             )}
-            
-            <button
-              onClick={toggleVideo}
-              className={`p-2 rounded-full transition-colors ${
-                !isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-800 hover:bg-gray-700'
-              }`}
-            >
-              {isVideoOn ? (
-                <Video className="w-5 h-5 text-gray-400" />
-              ) : (
-                <VideoOff className="w-5 h-5 text-white" />
-              )}
-            </button>
             
             <button
               onClick={handleEndCall}
