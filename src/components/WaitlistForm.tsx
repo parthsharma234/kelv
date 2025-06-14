@@ -39,6 +39,7 @@ export default function WaitlistForm() {
     try {
       if (isConfigured) {
         // Use Supabase authentication for waitlist signup
+        // The welcome email will be automatically triggered by the database trigger
         const { error: authError } = await signUp(
           formData.email, 
           'waitlist-temp-password-' + Math.random().toString(36).substring(7), // Temporary password
@@ -60,6 +61,7 @@ export default function WaitlistForm() {
         }
 
         // Successfully signed up, navigate to waitlist success
+        // Welcome email will be sent automatically via database trigger
         setStatus('success');
         setFormData({ email: '', name: '' });
         setTimeout(() => {
@@ -117,11 +119,12 @@ export default function WaitlistForm() {
         className="text-center p-8 bg-dark-700/50 rounded-lg border border-dark-600 max-w-md mx-auto"
       >
         <CheckCircleIcon className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-        <h3 className="text-2xl font-semibold mb-2 text-white">Welcome aboard!</h3>
+        <h3 className="text-2xl font-semibold mb-2 text-white">Welcome aboard! 🎉</h3>
         <p className="text-gray-300 mb-4">
-          Redirecting you to your waitlist dashboard...
+          Check your email for a special welcome message with exclusive details about what's coming next.
         </p>
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <p className="text-gray-400 text-sm mt-2">Redirecting to your dashboard...</p>
       </motion.div>
     );
   }
@@ -214,6 +217,11 @@ export default function WaitlistForm() {
         
         <p className="text-sm text-gray-400 text-center pt-4">
           We respect your privacy. Unsubscribe at any time.
+          {isConfigured && (
+            <span className="block mt-1 text-orange-400">
+              ✨ You'll receive a beautiful welcome email with exclusive details!
+            </span>
+          )}
         </p>
       </form>
     </motion.div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star, Calendar, Users } from 'lucide-react';
+import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star, Calendar, Users, Gift } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -59,7 +59,7 @@ const WaitlistSuccess: React.FC = () => {
       description: "Receive dedicated support and direct feedback channels"
     },
     {
-      icon: Mail,
+      icon: Gift,
       title: "Special Pricing",
       description: "Enjoy exclusive discounts and early-bird pricing"
     }
@@ -168,7 +168,7 @@ const WaitlistSuccess: React.FC = () => {
             className="text-xl text-gray-300 mb-4 max-w-2xl mx-auto"
           >
             {user?.user_metadata?.full_name ? `Hi ${user.user_metadata.full_name}! ` : ''}
-            You're now on the exclusive Kelv AI waitlist. Get ready to revolutionize your interview preparation with cutting-edge AI technology.
+            You're now on the exclusive Kelv AI waitlist. Get ready to revolutionize your interview preparation with cutting-edge technology.
           </motion.p>
 
           <motion.div
@@ -179,12 +179,29 @@ const WaitlistSuccess: React.FC = () => {
           >
             <div className="flex items-center gap-2">
               <Mail className="w-5 h-5 text-orange-500" />
-              <span>Notifications sent to <strong className="text-white">{user?.email}</strong></span>
+              <span>Welcome email sent to <strong className="text-white">{user?.email}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-orange-500" />
               <span>Joined on <strong className="text-white">{joinedDate}</strong></span>
             </div>
+          </motion.div>
+
+          {/* Email notification callout */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="bg-gradient-to-r from-orange-500/10 to-orange-400/5 rounded-xl p-4 border border-orange-500/20 mb-8 max-w-2xl mx-auto"
+          >
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Mail className="w-5 h-5 text-orange-400" />
+              <span className="text-orange-400 font-medium">Check Your Email!</span>
+            </div>
+            <p className="text-gray-300 text-sm">
+              We've sent you a beautiful welcome email with exclusive details about what's coming next. 
+              Don't forget to check your spam folder if you don't see it in your inbox.
+            </p>
           </motion.div>
         </motion.div>
 
@@ -192,7 +209,7 @@ const WaitlistSuccess: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.8 }}
           className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 max-w-4xl mx-auto"
         >
           {waitlistStats.map((stat, index) => {
@@ -202,7 +219,7 @@ const WaitlistSuccess: React.FC = () => {
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 + index * 0.1 }}
+                transition={{ delay: 0.9 + index * 0.1 }}
                 className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 text-center hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300"
               >
                 <div className="flex items-center justify-center mb-4">
@@ -222,7 +239,7 @@ const WaitlistSuccess: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
+          transition={{ delay: 1.1 }}
           className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"
         >
           {benefits.map((benefit, index) => {
@@ -232,7 +249,7 @@ const WaitlistSuccess: React.FC = () => {
                 key={benefit.title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.1 + index * 0.1 }}
+                transition={{ delay: 1.2 + index * 0.1 }}
                 className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 group"
               >
                 <div className="flex items-start gap-4">
@@ -253,7 +270,7 @@ const WaitlistSuccess: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.5 }}
+          transition={{ delay: 1.6 }}
           className="bg-gradient-to-r from-orange-500/10 to-orange-400/5 rounded-2xl p-8 border border-orange-500/20 text-center"
         >
           <div className="flex items-center justify-center gap-3 mb-6">
@@ -278,7 +295,7 @@ const WaitlistSuccess: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-2">Beta Access</h4>
-                <p className="text-gray-300 text-sm">Be among the first to test our AI-powered interview coaching platform</p>
+                <p className="text-gray-300 text-sm">Be among the first to test our interview coaching platform</p>
               </div>
             </div>
             
@@ -298,7 +315,7 @@ const WaitlistSuccess: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.7 }}
+          transition={{ delay: 1.8 }}
           className="text-center mt-12"
         >
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
