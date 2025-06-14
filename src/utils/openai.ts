@@ -214,23 +214,54 @@ const calculatePitch = (data: Float32Array, sampleRate: number): number => {
   return bestPeriod > 0 ? sampleRate / bestPeriod : 0;
 };
 
+// Store questions globally to access them by ID
+let globalQuestions: Question[] = [];
+
 export const generateInterviewQuestions = async (setup: InterviewSetup): Promise<Question[]> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return getFallbackQuestions(setup);
+    throw new Error('OpenAI API key is required for AI-generated questions. Please configure your API key to use the interview platform.');
   }
 
   try {
-    const prompt = `Generate 2 initial interview questions for a ${setup.experienceLevel} ${setup.jobType} position in ${setup.industry}. 
+    const prompt = `You are an expert ${setup.industry} hiring manager conducting a professional interview for a ${setup.experienceLevel} ${setup.jobType} position.
 
-Start with:
-1. One small talk/warm-up question to help the candidate feel comfortable
-2. One behavioral question using the STAR method
+Create exactly 2 initial interview questions that will start a natural, engaging conversation:
 
-Format as JSON array with objects containing: id, text, type, difficulty.
-Types: small_talk, behavioral, technical, situational
-Difficulties: easy, medium, hard
+1. OPENING QUESTION: A warm, professional greeting that helps the candidate feel comfortable while gathering relevant information about their background and motivation for this specific ${setup.jobType} role in ${setup.industry}.
 
-Make questions realistic and industry-appropriate.`;
+2. CORE QUESTION: A behavioral or experience-based question that explores their relevant skills and past experiences for this ${setup.jobType} position.
+
+REQUIREMENTS:
+- Questions must sound like they come from a real ${setup.industry} hiring manager
+- Tailor complexity and technical depth to ${setup.experienceLevel} level
+- Use natural, conversational language that flows well
+- Make questions specific to ${setup.jobType} role and ${setup.industry} industry
+- Avoid generic templates - make them feel authentic and purposeful
+- Questions should encourage detailed, story-based responses
+
+EXPERIENCE LEVEL GUIDELINES:
+- Entry Level: Focus on potential, learning ability, and relevant projects/internships
+- Mid Level: Focus on specific achievements, problem-solving, and team collaboration
+- Senior Level: Focus on leadership, strategic thinking, and complex project management
+- Executive Level: Focus on vision, organizational impact, and industry expertise
+
+Return ONLY a JSON array with this exact format:
+[
+  {
+    "id": "q1",
+    "text": "Your opening question here - should be warm and engaging",
+    "type": "small_talk",
+    "difficulty": "easy"
+  },
+  {
+    "id": "q2", 
+    "text": "Your core question here - should explore relevant experience",
+    "type": "behavioral",
+    "difficulty": "medium"
+  }
+]
+
+No additional text, explanations, or formatting - just the JSON array.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -241,8 +272,8 @@ Make questions realistic and industry-appropriate.`;
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 1000,
+        temperature: 0.8,
+        max_tokens: 800,
       }),
     });
 
@@ -251,17 +282,31 @@ Make questions realistic and industry-appropriate.`;
     }
 
     const data = await response.json();
-    const questionsText = data.choices[0].message.content;
+    const questionsText = data.choices[0].message.content.trim();
+    
+    // Clean up the response to extract just the JSON
+    const jsonMatch = questionsText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
     
     try {
-      const questions = JSON.parse(questionsText);
-      return Array.isArray(questions) ? questions : getFallbackQuestions(setup);
-    } catch {
-      return getFallbackQuestions(setup);
+      const questions = JSON.parse(jsonMatch[0]);
+      if (!Array.isArray(questions) || questions.length !== 2) {
+        throw new Error('AI did not return exactly 2 questions');
+      }
+      
+      // Store questions globally for reference
+      globalQuestions = questions;
+      
+      return questions;
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', questionsText);
+      throw new Error('Failed to parse AI-generated questions');
     }
   } catch (error) {
     console.error('Error generating questions:', error);
-    return getFallbackQuestions(setup);
+    throw error;
   }
 };
 
@@ -272,7 +317,7 @@ export const generateNextQuestion = async (
   suggestedType?: string
 ): Promise<Question> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return getFallbackNextQuestion(responses.length);
+    throw new Error('OpenAI API key is required for AI-generated questions');
   }
 
   // Determine if interview should end (8-12 questions based on performance)
@@ -286,29 +331,68 @@ export const generateNextQuestion = async (
   }
 
   try {
-    const lastResponse = responses[responses.length - 1];
-    const conversationContext = responses.slice(-2).map(r => 
-      `Q: ${getQuestionText(r.questionId)} A: ${r.response}`
-    ).join('\n');
+    // Get the last 2 Q&A pairs for context
+    const recentContext = responses.slice(-2).map((r, index) => {
+      const questionNum = responses.length - 1 + index;
+      return `Q${questionNum + 1}: ${getQuestionById(r.questionId)} 
+A${questionNum + 1}: ${r.response}`;
+    }).join('\n\n');
 
-    const prompt = `You are conducting an interview for a ${setup.experienceLevel} ${setup.jobType} in ${setup.industry}.
+    const currentQuestionNumber = responses.length + 1;
+    const totalQuestions = responses.length + 1;
 
-Current conversation context:
-${conversationContext}
+    // Analyze what types of questions have been asked
+    const questionTypesAsked = responses.map(r => {
+      const question = globalQuestions.find(q => q.id === r.questionId);
+      return question?.type || 'unknown';
+    });
 
-Interview progress: ${responses.length + 1} questions asked
-Target: 8-12 questions total
+    const prompt = `You are a ${setup.industry} hiring manager continuing an interview for a ${setup.experienceLevel} ${setup.jobType} position.
 
-Generate the next question that:
-1. Flows naturally from the conversation
-2. ${suggestedType ? `Focuses on ${suggestedType} aspects` : 'Explores different competencies'}
-3. Adapts to the candidate's responses
-4. Maintains professional interview flow
+INTERVIEW CONTEXT:
+- Current question: #${currentQuestionNumber}
+- Total questions asked so far: ${totalQuestions}
+- Target: 8-12 total questions
+- Experience level: ${setup.experienceLevel}
+- Role: ${setup.jobType}
+- Industry: ${setup.industry}
+- Question types already covered: ${questionTypesAsked.join(', ')}
 
-Question types to vary: behavioral, technical, situational, follow_up
-Difficulties: easy, medium, hard
+RECENT CONVERSATION:
+${recentContext}
 
-Return JSON: {"id": "q${responses.length + 2}", "text": "question", "type": "type", "difficulty": "difficulty"}`;
+INSTRUCTIONS:
+Generate the next interview question that:
+1. Flows naturally from the candidate's previous responses
+2. Explores NEW competencies not yet thoroughly covered
+3. Is appropriate for a ${setup.experienceLevel} ${setup.jobType} candidate in ${setup.industry}
+4. Sounds like a real question a hiring manager would ask
+5. ${suggestedType ? `Focuses on ${suggestedType} aspects` : 'Covers unexplored areas relevant to the role'}
+6. Builds on or follows up on interesting points from previous answers
+
+QUESTION TYPES TO VARY (choose what hasn't been covered much):
+- behavioral: Past experience and situations using STAR method
+- technical: Role-specific skills, tools, and knowledge for ${setup.jobType}
+- situational: Hypothetical scenarios relevant to ${setup.industry}
+- follow_up: Deeper dive into previous answers or clarifications
+
+DIFFICULTY LEVELS:
+- easy: Basic questions, relationship building
+- medium: Standard interview questions requiring examples
+- hard: Complex scenarios, strategic thinking, leadership challenges
+
+INDUSTRY-SPECIFIC FOCUS FOR ${setup.industry}:
+Make sure the question is relevant to current ${setup.industry} challenges and ${setup.jobType} responsibilities.
+
+Return ONLY this JSON format:
+{
+  "id": "q${currentQuestionNumber}",
+  "text": "Your natural, conversational question here that a real hiring manager would ask",
+  "type": "behavioral|technical|situational|follow_up",
+  "difficulty": "easy|medium|hard"
+}
+
+No additional text - just the JSON object.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -319,8 +403,8 @@ Return JSON: {"id": "q${responses.length + 2}", "text": "question", "type": "typ
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.8,
-        max_tokens: 300,
+        temperature: 0.9,
+        max_tokens: 500,
       }),
     });
 
@@ -329,20 +413,34 @@ Return JSON: {"id": "q${responses.length + 2}", "text": "question", "type": "typ
     }
 
     const data = await response.json();
-    const questionText = data.choices[0].message.content;
+    const questionText = data.choices[0].message.content.trim();
+    
+    // Clean up the response to extract just the JSON
+    const jsonMatch = questionText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
     
     try {
-      const question = JSON.parse(questionText);
+      const question = JSON.parse(jsonMatch[0]);
+      if (!question.id || !question.text || !question.type) {
+        throw new Error('AI response missing required fields');
+      }
+      
+      // Add the new question to global questions
+      globalQuestions.push(question);
+      
       return question;
-    } catch {
-      return getFallbackNextQuestion(responses.length);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', questionText);
+      throw new Error('Failed to parse AI-generated question');
     }
   } catch (error) {
     console.error('Error generating next question:', error);
     if (error instanceof Error && error.message === 'INTERVIEW_COMPLETE') {
       throw error;
     }
-    return getFallbackNextQuestion(responses.length);
+    throw error;
   }
 };
 
@@ -357,27 +455,46 @@ export const analyzeResponse = async (
   }
 
   try {
-    const prompt = `Analyze this interview response for a ${setup.experienceLevel} ${setup.jobType} position:
+    const prompt = `You are an expert ${setup.industry} hiring manager analyzing a candidate's response for a ${setup.experienceLevel} ${setup.jobType} position.
 
-Question: ${question.text}
-Response: ${response}
+QUESTION ASKED: ${question.text}
+CANDIDATE RESPONSE: ${response}
 
-Provide analysis as JSON:
+CONTEXT:
+- Position: ${setup.jobType}
+- Industry: ${setup.industry}
+- Experience Level: ${setup.experienceLevel}
+- Question Type: ${question.type}
+
+Analyze this response and provide detailed, constructive feedback as JSON:
+
 {
   "score": 1-10,
-  "feedback": "constructive feedback",
-  "strengths": ["strength1", "strength2"],
-  "areasForImprovement": ["area1", "area2"],
+  "feedback": "Specific, actionable feedback focusing on content quality, structure, and relevance to the ${setup.jobType} role",
+  "strengths": ["specific strength 1", "specific strength 2"],
+  "areasForImprovement": ["specific improvement area 1", "specific improvement area 2"],
   "confidenceIndicators": {
     "responseLength": ${response.length},
-    "specificExamples": boolean,
-    "structuredAnswer": boolean,
+    "specificExamples": true/false,
+    "structuredAnswer": true/false,
     "enthusiasm": 1-10
   },
-  "nextQuestionType": "suggested_type"
+  "nextQuestionType": "behavioral|technical|situational|follow_up"
 }
 
-Focus on content quality, structure, and relevance to the role.`;
+SCORING CRITERIA FOR ${setup.experienceLevel} LEVEL:
+- 9-10: Exceptional answer with specific examples, clear structure, highly relevant to ${setup.jobType}
+- 7-8: Strong answer with good examples and clear relevance to the role
+- 5-6: Adequate answer but missing depth, examples, or role relevance
+- 3-4: Weak answer, vague, or not well-suited to ${setup.experienceLevel} level
+- 1-2: Poor answer, very brief, irrelevant, or inappropriate for the role
+
+Focus on:
+- Relevance to ${setup.jobType} role and ${setup.industry} industry
+- Use of specific examples and quantifiable results
+- Communication clarity and professional structure
+- Demonstration of skills expected at ${setup.experienceLevel} level
+- Evidence of understanding ${setup.industry} challenges`;
 
     const response_api = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -389,7 +506,7 @@ Focus on content quality, structure, and relevance to the role.`;
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 500,
+        max_tokens: 600,
       }),
     });
 
@@ -398,11 +515,18 @@ Focus on content quality, structure, and relevance to the role.`;
     }
 
     const data = await response_api.json();
-    const analysisText = data.choices[0].message.content;
+    const analysisText = data.choices[0].message.content.trim();
+    
+    // Clean up the response to extract just the JSON
+    const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return getFallbackAnalysis(response);
+    }
     
     try {
-      return JSON.parse(analysisText);
-    } catch {
+      return JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('Failed to parse AI analysis:', analysisText);
       return getFallbackAnalysis(response);
     }
   } catch (error) {
@@ -426,8 +550,8 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
       body: JSON.stringify({
         model: 'tts-1',
         input: text,
-        voice: 'nova', // Changed from 'alloy' to 'nova' - more professional female voice
-        speed: 0.95, // Slightly slower for better clarity
+        voice: 'echo', // Professional and clear voice
+        speed: 0.9, // Slightly slower for better clarity
       }),
     });
 
@@ -446,47 +570,7 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
   }
 };
 
-// Fallback functions
-const getFallbackQuestions = (setup: InterviewSetup): Question[] => [
-  {
-    id: 'q1',
-    text: `Hi! Thanks for taking the time to interview with us today. To start off, could you tell me a bit about yourself and what drew you to apply for this ${setup.jobType} position?`,
-    type: 'small_talk',
-    difficulty: 'easy'
-  },
-  {
-    id: 'q2',
-    text: `Can you describe a challenging project you worked on and how you overcame the obstacles you faced?`,
-    type: 'behavioral',
-    difficulty: 'medium'
-  }
-];
-
-const getFallbackNextQuestion = (questionCount: number): Question => {
-  const questions = [
-    {
-      id: `q${questionCount + 1}`,
-      text: "What motivates you in your work, and how do you stay engaged during challenging periods?",
-      type: 'behavioral',
-      difficulty: 'medium'
-    },
-    {
-      id: `q${questionCount + 1}`,
-      text: "Describe a time when you had to work with a difficult team member. How did you handle the situation?",
-      type: 'behavioral',
-      difficulty: 'medium'
-    },
-    {
-      id: `q${questionCount + 1}`,
-      text: "Where do you see yourself in 5 years, and how does this role fit into your career goals?",
-      type: 'situational',
-      difficulty: 'easy'
-    }
-  ];
-  
-  return questions[questionCount % questions.length];
-};
-
+// Helper functions
 const getFallbackAnalysis = (response: string) => ({
   score: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
   feedback: "Good response! Try to include more specific examples to strengthen your answer.",
@@ -506,7 +590,12 @@ const getAverageScore = (responses: InterviewResponse[]): number => {
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 };
 
-const getQuestionText = (questionId: string): string => {
-  // This would need to be implemented to get question text by ID
-  return "Previous question";
+const getQuestionById = (questionId: string): string => {
+  const question = globalQuestions.find(q => q.id === questionId);
+  return question?.text || "Previous question";
+};
+
+// Export function to update global questions
+export const updateGlobalQuestions = (questions: Question[]) => {
+  globalQuestions = [...questions];
 };
