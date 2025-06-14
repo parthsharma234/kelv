@@ -36,7 +36,7 @@ const interviewModes = [
   {
     id: 'voice',
     title: 'Voice Interview',
-    description: 'Full AI voice interaction with speech analysis',
+    description: 'Full voice interaction with speech analysis',
     icon: Mic,
     features: ['Real-time speech analysis', 'Natural conversation flow', 'Voice confidence metrics', 'Pronunciation assessment'],
     recommended: true
@@ -123,9 +123,9 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [saveAsFavorite, setSaveAsFavorite] = useState(false);
   const [useAutoName, setUseAutoName] = useState(true);
 
-  // Check if OpenAI API key is configured
-  const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
-                      import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
+  // Check if API key is configured
+  const hasAPIKey = import.meta.env.VITE_OPENAI_API_KEY && 
+                    import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
 
   useEffect(() => {
     loadSavedSetups();
@@ -543,7 +543,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
                 {interviewModes.map((mode, index) => {
                   const Icon = mode.icon;
                   const isSelected = setup.interviewMode === mode.id;
-                  const isDisabled = mode.id === 'voice' && !hasOpenAIKey;
+                  const isDisabled = mode.id === 'voice' && !hasAPIKey;
                   
                   return (
                     <button
@@ -633,7 +633,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
                           <div className="flex items-start gap-2 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
                             <AlertTriangle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-gray-400">
-                              Voice mode requires OpenAI API key. Add VITE_OPENAI_API_KEY to enable voice features.
+                              Voice mode requires API key configuration. Add VITE_OPENAI_API_KEY to enable voice features.
                             </p>
                           </div>
                         )}
