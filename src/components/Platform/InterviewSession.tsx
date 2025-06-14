@@ -266,10 +266,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     
     try {
       if (!hasOpenAIKey) {
-        throw new Error('OpenAI API key is required for AI-generated questions. Please configure your API key to use the interview platform.');
+        throw new Error('OpenAI API key is required for the interview platform. Please configure your API key to continue.');
       }
 
-      console.log('Generating AI questions for:', setup);
+      console.log('Generating questions for:', setup);
       const questions = await generateInterviewQuestions(setup);
       console.log('Generated questions:', questions);
       
@@ -603,12 +603,12 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             <Video className="w-12 h-12 text-[#FF5722]" />
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">
-            {isVoiceMode ? 'AI Voice Interview Setup' : 'AI Interview Setup'}
+            {isVoiceMode ? 'Voice Interview Setup' : 'Interview Setup'}
           </h2>
           <p className="text-gray-400 mb-8 leading-relaxed">
             {isVoiceMode 
-              ? 'To conduct your AI-powered mock interview with speech capabilities, we need access to your camera and microphone. This allows us to simulate a real interview experience with voice interaction and dynamic question adaptation.'
-              : 'To conduct your AI-powered mock interview, we need access to your camera. This allows us to simulate a real interview experience with visual feedback and dynamic question adaptation.'
+              ? 'To conduct your mock interview with speech capabilities, we need access to your camera and microphone. This allows us to simulate a real interview experience with voice interaction and dynamic question adaptation.'
+              : 'To conduct your mock interview, we need access to your camera. This allows us to simulate a real interview experience with visual feedback and dynamic question adaptation.'
             }
           </p>
           
@@ -619,7 +619,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
-                <span className="text-sm text-gray-300">OpenAI GPT-4o Integration:</span>
+                <span className="text-sm text-gray-300">OpenAI Integration:</span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                   hasOpenAIKey 
                     ? 'bg-green-500/20 text-green-400' 
@@ -651,7 +651,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <div className="text-xs text-gray-400">
                 {isVoiceMode 
                   ? hasOpenAIKey 
-                    ? '✅ Full voice-enabled AI interview with speech analysis' 
+                    ? '✅ Full voice-enabled interview with speech analysis' 
                     : '❌ Voice mode requires OpenAI API key'
                   : '📝 Text-only interview mode selected'
                 }
@@ -671,7 +671,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             <div className="text-center">
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
                 <p className="text-red-400 text-sm">
-                  OpenAI API key is required to use the AI interview platform. Please configure your API key to continue.
+                  OpenAI API key is required to use the interview platform. Please configure your API key to continue.
                 </p>
               </div>
               <button
@@ -704,7 +704,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-3 border-gray-800 border-t-[#FF5722] mx-auto mb-4"></div>
-          <p className="text-gray-300 text-lg">Generating AI interview questions...</p>
+          <p className="text-gray-300 text-lg">Generating interview questions...</p>
           <p className="text-gray-500 text-sm mt-2">
             Creating personalized questions for {setup.experienceLevel} {setup.jobType} in {setup.industry}
           </p>
@@ -760,7 +760,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           <h2 className="text-3xl font-bold text-white mb-4">Interview Complete!</h2>
           <p className="text-gray-400 mb-8">
             {isAnalyzing 
-              ? 'GPT-4o is analyzing your responses and generating comprehensive feedback...'
+              ? 'Analyzing your responses and generating comprehensive feedback...'
               : 'Preparing your results...'
             }
           </p>
@@ -805,11 +805,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           </button>
           <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-pulse"></div>
           <span className="text-white font-medium">
-            AI {isVoiceMode ? 'Voice' : 'Text'} Interview
+            {isVoiceMode ? 'Voice' : 'Text'} Interview
           </span>
           {hasStartedInterview && (
             <div className="px-2 py-1 bg-[#FF5722]/20 rounded text-[#FF5722] text-xs font-medium border border-[#FF5722]/30">
-              GPT-4o Powered
+              Live Session
             </div>
           )}
         </div>
@@ -857,12 +857,12 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-3 text-lg">
-                  {hasStartedInterview ? "AI Interview Question" : "Ready to Start"}
+                  {hasStartedInterview ? "Interview Question" : "Ready to Start"}
                 </h3>
                 <p className="text-gray-300 text-base leading-relaxed">
                   {hasStartedInterview 
                     ? currentQuestion?.text || "Generating next question..."
-                    : `Click 'Start ${isVoiceMode ? 'Voice' : 'Text'} Interview' to begin your personalized mock interview with AI-generated questions tailored to your experience level.`}
+                    : `Click 'Start Interview' to begin your personalized mock interview with dynamically generated questions tailored to your experience level.`}
                 </p>
                 {hasStartedInterview && currentQuestion && (
                   <div className="mt-3 flex items-center gap-2">
@@ -982,15 +982,15 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                   className="w-full px-6 py-4 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-semibold flex items-center justify-center space-x-3"
                 >
                   <Brain className="w-6 h-6" />
-                  <span>Start AI Interview</span>
+                  <span>Start Interview</span>
                 </button>
                 
                 <div className="mt-4 p-4 bg-dark-700/30 rounded-lg">
                   <h4 className="text-sm font-medium text-white mb-2">
-                    AI Interview Features:
+                    Interview Features:
                   </h4>
                   <ul className="text-xs text-gray-400 space-y-1">
-                    <li>• Fully AI-generated questions tailored to your role</li>
+                    <li>• Fully generated questions tailored to your role</li>
                     <li>• Dynamic question flow based on your responses</li>
                     <li>• {isVoiceMode ? 'Voice interaction with speech analysis' : 'Text-based professional interview'}</li>
                     <li>• 8-12 adaptive questions with natural conversation flow</li>

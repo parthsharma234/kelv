@@ -74,8 +74,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <h1 className="text-4xl font-bold gradient-text mb-4">AI Interview Platform</h1>
-          <p className="text-gray-400 text-lg">Practice with dynamic AI interviews that adapt to your responses in real-time.</p>
+          <h1 className="text-4xl font-bold gradient-text mb-4">Interview Platform</h1>
+          <p className="text-gray-400 text-lg">Practice with dynamic interviews that adapt to your responses in real-time.</p>
         </motion.div>
 
         {/* Stats Grid */}
@@ -148,7 +148,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
                   <Brain className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Dynamic AI Interview</h2>
+                  <h2 className="text-2xl font-bold text-white mb-2">Dynamic Interview</h2>
                   <p className="text-gray-300">Experience adaptive questioning that adjusts difficulty based on your responses</p>
                 </div>
               </div>
@@ -156,7 +156,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="bg-dark-800/30 rounded-lg p-4">
                   <h4 className="font-medium text-white mb-2">🧠 Smart Adaptation</h4>
-                  <p className="text-sm text-gray-400">AI adjusts question difficulty based on your performance</p>
+                  <p className="text-sm text-gray-400">Questions adjust difficulty based on your performance</p>
                 </div>
                 <div className="bg-dark-800/30 rounded-lg p-4">
                   <h4 className="font-medium text-white mb-2">⚡ Real-time Analysis</h4>
@@ -173,7 +173,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-3 group"
               >
                 <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Start AI Interview
+                Start Interview
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
@@ -203,7 +203,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
                     <Plus className="w-8 h-8 text-gray-500" />
                   </div>
                   <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
-                  <p className="text-gray-500 text-sm">Start your first AI interview to see your progress here</p>
+                  <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -251,16 +251,16 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
             transition={{ delay: 0.3 }}
             className="space-y-6"
           >
-            {/* AI Features */}
+            {/* Features */}
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Brain className="w-5 h-5 text-orange-400" />
-                AI Features
+                Platform Features
               </h3>
               <div className="space-y-4">
                 <div className="p-4 bg-dark-700/30 rounded-lg">
                   <h4 className="font-medium text-white mb-2">Dynamic Questions</h4>
-                  <p className="text-sm text-gray-400">AI generates questions based on your responses and adapts difficulty in real-time.</p>
+                  <p className="text-sm text-gray-400">Questions generated based on your responses and adapt difficulty in real-time.</p>
                 </div>
                 <div className="p-4 bg-dark-700/30 rounded-lg">
                   <h4 className="font-medium text-white mb-2">Smart Follow-ups</h4>
@@ -268,7 +268,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
                 </div>
                 <div className="p-4 bg-dark-700/30 rounded-lg">
                   <h4 className="font-medium text-white mb-2">Natural Conclusion</h4>
-                  <p className="text-sm text-gray-400">AI knows when to end the interview at an appropriate time based on your performance.</p>
+                  <p className="text-sm text-gray-400">The system knows when to end the interview at an appropriate time based on your performance.</p>
                 </div>
               </div>
             </div>
@@ -320,15 +320,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p className="text-gray-300">Start with confidence - the AI begins with small talk to help you warm up</p>
+                  <p className="text-gray-300">Start with confidence - the system begins with small talk to help you warm up</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p className="text-gray-300">Use specific examples - the AI recognizes and rewards concrete details</p>
+                  <p className="text-gray-300">Use specific examples - the system recognizes and rewards concrete details</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p className="text-gray-300">Don't worry about mistakes - the AI adapts and helps you improve</p>
+                  <p className="text-gray-300">Don't worry about mistakes - the system adapts and helps you improve</p>
                 </div>
               </div>
             </div>

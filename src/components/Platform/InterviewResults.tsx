@@ -65,7 +65,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
   const overallGrade = getOverallGrade(sessionData.overallScore);
 
-  // Calculate AI insights
+  // Calculate insights
   const avgConfidence = sessionData.responses.reduce((sum: number, r: any) => 
     sum + (r.analysis?.confidenceIndicators?.enthusiasm || 5), 0) / sessionData.responses.length;
   
@@ -168,7 +168,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
           <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-400 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold gradient-text mb-4">AI Interview Complete!</h1>
+          <h1 className="text-4xl font-bold gradient-text mb-4">Interview Complete!</h1>
           <p className="text-gray-400 text-lg">Your dynamic interview session has been analyzed and saved</p>
         </motion.div>
 
@@ -200,7 +200,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 ) : (
                   <MessageSquare className="w-8 h-8 text-blue-400" />
                 )}
-                AI
+                Dynamic
               </div>
               <p className="text-gray-400 text-sm">
                 {sessionData.setup.interviewMode === 'voice' ? 'Voice Interview' : 'Text Interview'}
@@ -277,7 +277,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
               <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-orange-400" />
-                AI Interview Flow
+                Interview Flow
               </h3>
               
               <div className="space-y-6">
@@ -370,7 +370,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       {response.analysis && (
                         <div className="space-y-3">
                           <div>
-                            <h5 className="text-sm font-medium text-gray-400 mb-2">AI Feedback</h5>
+                            <h5 className="text-sm font-medium text-gray-400 mb-2">Feedback</h5>
                             <p className="text-gray-300 text-sm">{response.analysis.feedback}</p>
                           </div>
                           
@@ -428,7 +428,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             </div>
           </motion.div>
 
-          {/* AI Insights & Actions */}
+          {/* Insights & Actions */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -489,11 +489,11 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               </div>
             )}
 
-            {/* AI Performance Analysis */}
+            {/* Performance Analysis */}
             <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Brain className="w-5 h-5 text-orange-400" />
-                AI Analysis
+                Analysis
               </h3>
               
               <div className="space-y-4">
@@ -504,10 +504,10 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   </h4>
                   <p className="text-sm text-gray-400">
                     {sessionData.overallScore >= 80 
-                      ? "Excellent! The AI recognized your strong performance and provided appropriately challenging questions."
+                      ? "Excellent! The system recognized your strong performance and provided appropriately challenging questions."
                       : sessionData.overallScore >= 60
-                      ? "Good progress! The AI adapted to help you improve throughout the interview."
-                      : "The AI provided supportive questions to help build your confidence. Keep practicing!"
+                      ? "Good progress! The system adapted to help you improve throughout the interview."
+                      : "The system provided supportive questions to help build your confidence. Keep practicing!"
                     }
                   </p>
                 </div>
@@ -560,7 +560,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-medium hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
                 >
                   <Brain className="w-5 h-5" />
-                  New AI Interview
+                  New Interview
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 
@@ -614,7 +614,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">AI Model:</span>
+                  <span className="text-gray-400">Model:</span>
                   <span className="text-white">GPT-4o Dynamic</span>
                 </div>
                 {avgSpeechMetrics && (
