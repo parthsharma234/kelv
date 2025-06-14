@@ -426,8 +426,8 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
       body: JSON.stringify({
         model: 'tts-1',
         input: text,
-        voice: 'alloy',
-        speed: 1.0,
+        voice: 'nova', // Changed from 'alloy' to 'nova' - more professional female voice
+        speed: 0.95, // Slightly slower for better clarity
       }),
     });
 

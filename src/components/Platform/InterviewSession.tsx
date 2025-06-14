@@ -48,6 +48,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [speechMetrics, setSpeechMetrics] = useState<any[]>([]);
 
+  // Track current question being spoken to ensure sync
+  const [currentSpokenQuestion, setCurrentSpokenQuestion] = useState<string | null>(null);
+
   // Check if OpenAI API key is configured
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
                       import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
@@ -176,7 +179,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       if (session) {
         setSession({ ...session, isActive: true });
         if (session.questions.length > 0 && isVoiceMode) {
-          await playQuestion(session.questions[0].text);
+          const firstQuestion = session.questions[0];
+          setCurrentSpokenQuestion(firstQuestion.id);
+          await playQuestion(firstQuestion.text);
         }
       }
       
@@ -430,8 +435,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         currentQuestionIndex: nextIndex
       });
       
-      // Play the new question only in voice mode
+      // Play the new question only in voice mode and ensure sync
       if (isVoiceMode) {
+        setCurrentSpokenQuestion(nextQuestion.id);
         await playQuestion(nextQuestion.text);
       }
       
@@ -938,7 +944,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             {hasStartedInterview && currentQuestion && isVoiceMode && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
-                  onClick={() => playQuestion(currentQuestion.text)}
+                  onClick={() => {
+                    setCurrentSpokenQuestion(currentQuestion.id);
+                    playQuestion(currentQuestion.text);
+                  }}
                   disabled={isPlaying || !audioEnabled}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-3"
                 >
