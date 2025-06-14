@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Video, VideoOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
 import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics } from '../../utils/openai';
-import { saveSpeechAnalysisCache } from '../../utils/supabase-interview';
+import { saveSpeechAnalysisCache, createInitialInterviewSession } from '../../utils/supabase-interview';
 import AIInterviewer from '../AIInterviewer';
 
 interface InterviewSessionProps {
@@ -175,6 +175,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       setHasStartedInterview(true);
       if (session) {
         setSession({ ...session, isActive: true });
+        
+        // Create the initial interview session record in the database
+        try {
+          await createInitialInterviewSession(session.id, setup);
+        } catch (error) {
+          console.error('Error creating initial session record:', error);
+          // Continue with the interview even if database creation fails
+        }
         
         // CRITICAL FIX: Only play the first question in voice mode after session is active
         if (session.questions.length > 0 && isVoiceMode && hasOpenAIKey) {

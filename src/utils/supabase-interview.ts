@@ -11,6 +11,43 @@ export interface SavedInterviewSetup {
   updated_at: string;
 }
 
+export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping initial session creation');
+    return;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('interview_sessions')
+      .insert({
+        id: sessionId,
+        user_id: user.id,
+        setup: setup,
+        responses: [],
+        overall_score: 0,
+        duration: 0,
+        questions_answered: 0,
+        status: 'incomplete',
+        speech_metrics: {},
+        audio_data: {}
+      });
+
+    if (error) {
+      console.error('Error creating initial interview session:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to create initial interview session:', error);
+    throw error;
+  }
+};
+
 export const saveInterviewSession = async (sessionData: any): Promise<void> => {
   if (!isSupabaseConfigured()) {
     console.log('Supabase not configured, skipping save');
@@ -27,11 +64,10 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
     const speechMetrics = sessionData.speechMetrics || {};
     const audioData = sessionData.audioData || {};
 
+    // Update the existing session record instead of inserting
     const { error } = await supabase
       .from('interview_sessions')
-      .insert({
-        user_id: user.id,
-        setup: sessionData.setup,
+      .update({
         responses: sessionData.responses,
         overall_score: sessionData.overallScore,
         duration: sessionData.duration,
@@ -39,10 +75,11 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
         status: 'completed',
         speech_metrics: speechMetrics,
         audio_data: audioData
-      });
+      })
+      .eq('id', sessionData.id);
 
     if (error) {
-      console.error('Error saving interview session:', error);
+      console.error('Error updating interview session:', error);
       throw error;
     }
 
