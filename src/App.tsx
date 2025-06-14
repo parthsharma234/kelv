@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useScrollToTop } from './hooks/useScrollToTop';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -51,9 +52,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-function AppContent() {
+const ScrollToTopWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useScrollToTop();
+  return <>{children}</>;
+};
+
+const AppRoutes = () => {
   return (
-    <Router>
+    <ScrollToTopWrapper>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -77,15 +83,17 @@ function AppContent() {
           } 
         />
       </Routes>
-    </Router>
+    </ScrollToTopWrapper>
   );
-}
+};
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </Router>
   );
 }
 

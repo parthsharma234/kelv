@@ -262,11 +262,6 @@ BEGIN
             <p class="footer-text">
                 <a href="https://kelvai.com" class="footer-link">kelvai.com</a>
             </p>
-            <div class="social-links">
-                <a href="https://kelvai.com/unsubscribe" class="social-link">Unsubscribe</a>
-                <span style="color: #4a5568;">•</span>
-                <a href="https://kelvai.com/privacy" class="social-link">Privacy Policy</a>
-            </div>
         </div>
     </div>
 </body>
@@ -292,32 +287,28 @@ Here''s a sneak peek at what''s coming:
 Thanks for joining — we can''t wait to help you land that offer.
 
 — Team Kelv AI
-kelvai.com
+kelvai.com';
 
----
-Unsubscribe: https://kelvai.com/unsubscribe
-Privacy Policy: https://kelvai.com/privacy';
+  -- Send the email using Supabase's built-in email functionality
+  PERFORM
+    extensions.http_post(
+      url := current_setting('app.smtp_url', true),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.smtp_password', true)
+      ),
+      body := jsonb_build_object(
+        'from', 'Kelv AI <team@kelvai.com>',
+        'to', ARRAY[user_email],
+        'subject', email_subject,
+        'html', email_html,
+        'text', email_text
+      )
+    );
 
-  -- Send the email using Supabase Edge Functions or external service
-  -- Note: This requires setting up email service integration
-  PERFORM net.http_post(
-    url := 'https://api.resend.com/emails',
-    headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || current_setting('app.resend_api_key', true),
-      'Content-Type', 'application/json'
-    ),
-    body := jsonb_build_object(
-      'from', 'Team Kelv AI <welcome@kelvai.com>',
-      'to', ARRAY[user_email],
-      'subject', email_subject,
-      'html', email_html,
-      'text', email_text,
-      'tags', ARRAY[
-        jsonb_build_object('name', 'category', 'value', 'welcome'),
-        jsonb_build_object('name', 'user_type', 'value', 'waitlist')
-      ]
-    )
-  );
+  -- Log successful email send
+  INSERT INTO public.email_logs (user_id, email_type, status, sent_at, created_at)
+  VALUES (NEW.id, 'welcome', 'sent', NOW(), NOW());
 
   RETURN NEW;
 EXCEPTION
@@ -325,6 +316,9 @@ EXCEPTION
     -- Log error but don't fail the signup process
     INSERT INTO public.email_logs (user_id, email_type, status, error_message, created_at)
     VALUES (NEW.id, 'welcome', 'failed', SQLERRM, NOW());
+    
+    -- Log the error to Supabase logs for debugging
+    RAISE LOG 'Error sending welcome email to %: %', user_email, SQLERRM;
     
     RETURN NEW;
 END;

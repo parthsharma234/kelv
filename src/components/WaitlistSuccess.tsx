@@ -178,30 +178,9 @@ const WaitlistSuccess: React.FC = () => {
             className="flex flex-col sm:flex-row items-center justify-center gap-4 text-gray-400 mb-8"
           >
             <div className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-orange-500" />
-              <span>Welcome email sent to <strong className="text-white">{user?.email}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-orange-500" />
               <span>Joined on <strong className="text-white">{joinedDate}</strong></span>
             </div>
-          </motion.div>
-
-          {/* Email notification callout */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="bg-gradient-to-r from-orange-500/10 to-orange-400/5 rounded-xl p-4 border border-orange-500/20 mb-8 max-w-2xl mx-auto"
-          >
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <Mail className="w-5 h-5 text-orange-400" />
-              <span className="text-orange-400 font-medium">Check Your Email!</span>
-            </div>
-            <p className="text-gray-300 text-sm">
-              We've sent you a beautiful welcome email with exclusive details about what's coming next. 
-              Don't forget to check your spam folder if you don't see it in your inbox.
-            </p>
           </motion.div>
         </motion.div>
 

@@ -51,7 +51,7 @@ export default function WaitlistForm() {
           if (authError.message.includes('already registered')) {
             setStatus('success');
             setFormData({ email: '', name: '' });
-            // Navigate to waitlist success page
+            // Just navigate, let useScrollToTop handle the scroll
             setTimeout(() => {
               navigate('/waitlist-success');
             }, 1500);
@@ -60,10 +60,10 @@ export default function WaitlistForm() {
           throw authError;
         }
 
-        // Successfully signed up, navigate to waitlist success
-        // Welcome email will be sent automatically via database trigger
+        // Successfully signed up
         setStatus('success');
         setFormData({ email: '', name: '' });
+        // Just navigate, let useScrollToTop handle the scroll
         setTimeout(() => {
           navigate('/waitlist-success');
         }, 1500);
@@ -121,7 +121,7 @@ export default function WaitlistForm() {
         <CheckCircleIcon className="w-16 h-16 text-orange-500 mx-auto mb-4" />
         <h3 className="text-2xl font-semibold mb-2 text-white">Welcome aboard! 🎉</h3>
         <p className="text-gray-300 mb-4">
-          Check your email for a special welcome message with exclusive details about what's coming next.
+          You're now on the exclusive Kelv AI waitlist. Get ready to revolutionize your interview preparation.
         </p>
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
         <p className="text-gray-400 text-sm mt-2">Redirecting to your dashboard...</p>
@@ -217,11 +217,6 @@ export default function WaitlistForm() {
         
         <p className="text-sm text-gray-400 text-center pt-4">
           We respect your privacy. Unsubscribe at any time.
-          {isConfigured && (
-            <span className="block mt-1 text-orange-400">
-              ✨ You'll receive a beautiful welcome email with exclusive details!
-            </span>
-          )}
         </p>
       </form>
     </motion.div>

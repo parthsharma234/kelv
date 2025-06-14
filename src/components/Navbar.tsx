@@ -51,14 +51,7 @@ const Navbar: React.FC = () => {
     
     // If we're on a different page, navigate to home first
     if (location.pathname !== '/') {
-      navigate('/');
-      // Wait for navigation to complete, then scroll
-      setTimeout(() => {
-        const element = document.querySelector(href);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
+      navigate('/', { state: { scrollTo: href } });
     } else {
       // We're on the home page, just scroll
       const element = document.querySelector(href);
@@ -67,6 +60,22 @@ const Navbar: React.FC = () => {
       }
     }
   };
+  
+  // Add effect to handle scroll after navigation
+  useEffect(() => {
+    const state = location.state as { scrollTo?: string } | null;
+    if (state?.scrollTo) {
+      // Wait for the page to render
+      setTimeout(() => {
+        const element = document.querySelector(state.scrollTo!);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      // Clear the state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
   
   return (
     <header 
