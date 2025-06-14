@@ -252,7 +252,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     try {
       const questions = await generateInterviewQuestions(setup);
       const newSession: IInterviewSession = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         setup,
         questions,
         currentQuestionIndex: 0,
