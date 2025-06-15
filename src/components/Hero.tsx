@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle, Bot, User, ChevronRight } from 'lucide-react';
+import { ArrowRight, CheckCircle, User, ChevronRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PerformanceAnalytics from './PerformanceAnalytics';
+import AIInterviewer from './AIInterviewer';
+import RedPandaLogo from './RedPandaLogo';
 
 const Hero: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
@@ -9,22 +11,29 @@ const Hero: React.FC = () => {
   const [currentMessage, setCurrentMessage] = useState(-1);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAnalyticsButton, setShowAnalyticsButton] = useState(false);
-  
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+
   const messages = [
     {
       role: 'kelv',
-      text: "Alright, just one final question. How do you typically handle conflict within a team setting?",
-      delay: 1000
+      text: "Alright, last question! Can you tell me about a time you failed and what you learned from it?",
+      delay: 2000,
+      state: 'speaking'
     },
     {
       role: 'user',
-      text: "I usually approach conflict by first seeking to understand the other person's perspective. Then I try to find a collaborative solution that addresses everyone's concerns.",
-      delay: 1000
+      text: "Certainly. There was a project where I misjudged the complexity of a task, leading to delays. I learned the importance of thorough planning and seeking input from team members early on.",
+      delay: 2000,
+      state: 'listening'
     },
     {
       role: 'kelv',
-      text: "Excellent response! Your detailed performance analysis is now ready to view.",
-      delay: 1000
+      text: "Great answer! Your comprehensive performance analysis is now ready to view.",
+      delay: 1000,
+      state: 'processing'
     }
   ];
 
@@ -35,7 +44,7 @@ const Hero: React.FC = () => {
           if (entry.isIntersecting) {
             entry.target.classList.add('opacity-100');
             entry.target.classList.remove('opacity-0', 'translate-y-10');
-            // Start the conversation when the section is visible
+            setIsActive(true);
             setTimeout(() => {
               setIsTyping(true);
               setCurrentMessage(0);
@@ -58,17 +67,24 @@ const Hero: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isTyping && currentMessage >= 0 && currentMessage < messages.length - 1) {
-      const timer = setTimeout(() => {
-        setCurrentMessage(prev => prev + 1);
-      }, messages[currentMessage].delay);
-      return () => clearTimeout(timer);
-    } else if (currentMessage === messages.length - 1) {
-      // Show analytics button after the last message
-      const timer = setTimeout(() => {
-        setShowAnalyticsButton(true);
-      }, 500);
-      return () => clearTimeout(timer);
+    if (isTyping && currentMessage >= 0 && currentMessage < messages.length) {
+      const currentMsg = messages[currentMessage];
+      
+      setIsListening(currentMsg.state === 'listening');
+      setIsSpeaking(currentMsg.state === 'speaking');
+      setIsProcessing(currentMsg.state === 'processing');
+      
+      if (currentMessage < messages.length - 1) {
+        const timer = setTimeout(() => {
+          setCurrentMessage(prev => prev + 1);
+        }, currentMsg.delay);
+        return () => clearTimeout(timer);
+      } else {
+        const timer = setTimeout(() => {
+          setShowAnalyticsButton(true);
+        }, currentMsg.delay);
+        return () => clearTimeout(timer);
+      }
     }
   }, [isTyping, currentMessage, messages]);
 
@@ -85,7 +101,7 @@ const Hero: React.FC = () => {
           </h1>
           
           <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto">
-            Kelv AI uses advanced artificial intelligence to analyze your performance, provide personalized feedback, and help you land your dream job with confidence.
+            Experience realistic interview simulations with Kelv AI. Our advanced AI analyzes your responses, provides personalized feedback, and helps you improve your interview skills.
           </p>
           
           <div className="flex flex-wrap justify-center gap-4 pt-4">
@@ -101,105 +117,185 @@ const Hero: React.FC = () => {
           <div className="pt-6 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-gray-400">
             <div className="flex items-center">
               <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
+              <span>Real-time AI Analysis</span>
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
+              <span>Adaptive Questions</span>
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
               <span>Personalized Feedback</span>
-            </div>
-            <div className="flex items-center">
-              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
-              <span>AI-Powered Analysis</span>
-            </div>
-            <div className="flex items-center">
-              <CheckCircle className="w-4 h-4 mr-2 text-orange-500" />
-              <span>Practice Like Real Interviews</span>
             </div>
           </div>
         </div>
         
         <div className="relative z-10 mt-12">
           <div className="rounded-xl overflow-hidden border border-gray-700 group relative transition-shadow duration-300 hover:shadow-2xl hover:shadow-orange-500/30">
-            <div className="bg-dark-800 relative z-10 flex">
-              {/* Chat Section */}
-              <motion.div 
-                className={`transition-all duration-700 ease-in-out ${
-                  showAnalytics ? 'w-1/2' : 'w-full'
-                } p-6`}
-                layout
-              >
-                <div className="flex items-center justify-center">
-                  <div className="w-full max-w-xl bg-dark-800 relative p-5 rounded-lg">
-                    <div className="relative z-10 space-y-4">
-                      <AnimatePresence mode="popLayout">
-                        {messages.slice(0, currentMessage + 1).map((message, index) => (
-                          <motion.div
-                            key={index}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            transition={{ duration: 0.2 }}
-                            className={`flex items-start gap-4 ${
-                              message.role === 'kelv' ? 'group hover:bg-dark-700/50 p-2 rounded-lg transition-colors' : ''
-                            }`}
-                          >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              message.role === 'kelv' 
-                                ? 'bg-gradient-to-br from-orange-500 to-orange-400 text-white group-hover:scale-105 transition-transform shadow-lg overflow-hidden'
-                                : 'bg-gray-600'
-                            }`}>
-                              {message.role === 'kelv' ? (
-                                <img 
-                                  src="/logo.png" 
-                                  alt="Kelv AI" 
-                                  className="w-full h-full object-cover rounded-full"
-                                />
-                              ) : (
-                                <User className="w-5 h-5" />
-                              )}
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium mb-1 text-gray-300">
-                                {message.role === 'kelv' ? 'Kelv AI' : 'You'}
-                              </div>
-                              <div className="text-gray-300">
-                                {message.text}
-                                {index === currentMessage && isTyping && (
-                                  <motion.span
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ repeat: Infinity, duration: 0.5 }}
-                                    className="inline-block w-2 h-4 bg-orange-500 ml-1"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </div>
-
-                <AnimatePresence>
-                  {showAnalyticsButton && !showAnalytics && (
-                    <motion.button
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      onClick={() => setShowAnalytics(true)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/30 group"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+            <div className="bg-dark-800 relative z-10 flex min-h-[800px]"> 
+              {/* Interview Demo Wrapper - conditionally hide/show */}
+              <AnimatePresence>
+                {!showAnalytics && (
+                  <motion.div
+                    key="interview-demo"
+                    initial={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-grow"
+                  >
+                    {/* Left Panel - Chat Interaction */}
+                    <motion.div 
+                      className={`w-1/2 p-6 flex flex-col justify-between`}
+                      layout
                     >
-                      <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform" />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+                      <div className="bg-dark-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800/50 flex-grow relative overflow-hidden">
+                        {/* Interview Question Header (as seen in screenshot) */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="p-3 bg-orange-600 rounded-lg">
+                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-white">Interview Question</h3>
+                        </div>
+                        <div className="flex gap-2 mb-6">
+                          <span className="px-3 py-1 bg-gray-700 rounded-full text-xs text-gray-300">Small talk</span>
+                          <span className="px-3 py-1 bg-green-700 rounded-full text-xs text-green-300">easy</span>
+                        </div>
 
-              {/* Analytics Panel */}
-              <PerformanceAnalytics 
-                isOpen={showAnalytics} 
-                onClose={() => setShowAnalytics(false)} 
-              />
+                        {/* Chat Content Display with Icons */}
+                        <div className="relative z-10 flex-grow space-y-4 overflow-y-auto mb-4"> 
+                          <AnimatePresence mode="wait">
+                            {currentMessage >= 0 && (
+                              <motion.div
+                                key={currentMessage} 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.3 }}
+                                className="flex items-start gap-4" 
+                              >
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  messages[currentMessage].role === 'kelv' 
+                                    ? 'bg-gradient-to-br from-orange-500 to-orange-400 text-white shadow-lg overflow-hidden'
+                                    : 'bg-gray-600'
+                                }`}>
+                                  {messages[currentMessage].role === 'kelv' ? (
+                                    <RedPandaLogo size="sm" animate={false} className="w-full h-full" />
+                                  ) : (
+                                    <User className="w-5 h-5" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium mb-1 opacity-75">
+                                    {messages[currentMessage].role === 'kelv' ? 'Kelv AI' : 'You'}
+                                  </div>
+                                  <p className="text-gray-300 text-lg">
+                                    {messages[currentMessage].text}
+                                    {isTyping && messages[currentMessage].role === 'kelv' && (
+                                      <motion.span
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ repeat: Infinity, duration: 0.5 }}
+                                        className="inline-block w-2 h-4 bg-orange-500 ml-1 align-middle"
+                                      />
+                                    )}
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+
+                        {/* Playing button */}
+                        <button className="btn btn-secondary w-full opacity-50 cursor-not-allowed">
+                          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v10m4-10v10m4-10v10" />
+                          </svg>
+                          Playing
+                        </button>
+                      </div>
+                    </motion.div>
+
+                    {/* Right Panel - AI Video & User Cam */}
+                    <motion.div 
+                      className="w-1/2 p-6 flex flex-col items-center justify-center bg-dark-900 relative"
+                      layout
+                    >
+                      {/* AI Interviewer Component */}
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <AIInterviewer 
+                          isActive={isActive}
+                          isSpeaking={isSpeaking} 
+                          isListening={isListening} 
+                          isProcessing={isProcessing} 
+                          size="xl" 
+                          showStatus={true}
+                        />
+
+                        {/* User Camera Feed */}
+                        <motion.div 
+                          className="absolute bottom-6 right-6 w-32 h-32 bg-gray-700 rounded-lg overflow-hidden border border-gray-600 flex items-center justify-center"
+                          animate={isListening ? { scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] } : { scale: 1, opacity: 1 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                          <User className="w-16 h-16 text-gray-400" />
+                        </motion.div>
+                      </div>
+
+                      {/* Video Call Controls */}
+                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-dark-800/80 backdrop-blur-sm px-6 py-3 rounded-full border border-gray-800/50">
+                        <button className="p-2 text-gray-400 hover:text-white transition-colors opacity-50 cursor-not-allowed">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                          </svg>
+                        </button>
+                        <button className="p-2 text-red-500 hover:text-red-400 transition-colors opacity-50 cursor-not-allowed"> 
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Analytics Panel (slides in) */}
+              <AnimatePresence>
+                {showAnalytics && (
+                  <motion.div
+                    key="analytics-panel"
+                    initial={{ opacity: 0, x: 100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 100 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0 bg-dark-800 p-6 flex flex-col"
+                  >
+                    <PerformanceAnalytics 
+                      isOpen={showAnalytics} 
+                      onClose={() => setShowAnalytics(false)} 
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* View Analytics Button (on the main demo interface) */}
+              <AnimatePresence>
+                {!showAnalytics && showAnalyticsButton && (
+                  <motion.button
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    onClick={() => setShowAnalytics(true)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/30 group"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
