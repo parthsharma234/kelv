@@ -225,11 +225,9 @@ export const generateInterviewQuestions = async (setup: InterviewSetup): Promise
   try {
     const prompt = `You are an expert ${setup.industry} hiring manager conducting a professional interview for a ${setup.experienceLevel} ${setup.jobType} position.
 
-Create exactly 2 initial interview questions that will start a natural, engaging conversation:
+Create exactly an initial interview question that will start a natural, engaging conversation:
 
 1. OPENING QUESTION: A warm, professional greeting that helps the candidate feel comfortable while gathering relevant information about their background and motivation for this specific ${setup.jobType} role in ${setup.industry}.
-
-2. CORE QUESTION: A behavioral or experience-based question that explores their relevant skills and past experiences for this ${setup.jobType} position.
 
 REQUIREMENTS:
 - Questions must sound like they come from a real ${setup.industry} hiring manager
@@ -253,12 +251,6 @@ Return ONLY a JSON array with this exact format:
     "type": "small_talk",
     "difficulty": "easy"
   },
-  {
-    "id": "q2", 
-    "text": "Your core question here - should explore relevant experience",
-    "type": "behavioral",
-    "difficulty": "medium"
-  }
 ]
 
 No additional text, explanations, or formatting - just the JSON array.`;
@@ -292,8 +284,8 @@ No additional text, explanations, or formatting - just the JSON array.`;
     
     try {
       const questions = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(questions) || questions.length !== 2) {
-        throw new Error('AI did not return exactly 2 questions');
+      if (!Array.isArray(questions) || questions.length !== 1) {
+        throw new Error('AI did not return exactly 1 questions');
       }
       
       // Store questions globally for reference
@@ -301,6 +293,7 @@ No additional text, explanations, or formatting - just the JSON array.`;
       
       return questions;
     } catch (parseError) {
+      console.log(jsonMatch[0]);
       console.error('Failed to parse AI response:', questionsText);
       throw new Error('Failed to parse AI-generated questions');
     }

@@ -350,7 +350,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     }
   };
 
-  const stopRecording = async () => {
+  const stopRecording = async () => { // Actions that occur after each user response submission
     if (!audioRecorderRef.current || !isVoiceMode) return;
     
     setIsRecording(false);
@@ -399,7 +399,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     setIsProcessingVoice(false);
   };
 
-  const handleSubmitResponse = async () => {
+  const handleSubmitResponse = async () => { // Actions that occur after each user response submission
     if (!session || !userResponse.trim() || !canUserRespond) return;
 
     setIsAnalyzing(true);
@@ -801,7 +801,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     );
   }
 
-  const currentQuestion = session.questions[session.currentQuestionIndex];
+  const currentQuestion = session.questions[session.currentQuestionIndex]; // Root of the error
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col pt-20">
