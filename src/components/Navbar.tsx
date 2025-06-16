@@ -3,6 +3,7 @@ import { Menu, X, User, LogOut, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import RedPandaLogo from './RedPandaLogo';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -124,8 +125,15 @@ const Navbar: React.FC = () => {
                   <span className="text-sm font-medium">{user.user_metadata?.full_name || user.email}</span>
                 </button>
                 
+                <AnimatePresence>
                 {showUserMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-dark-700 rounded-xl shadow-xl overflow-hidden">
+                  <motion.div
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-dark-700 rounded-xl shadow-xl overflow-hidden"
+                  >
                     <div className="p-4 border-b border-dark-700">
                       <p className="text-sm text-gray-400">Signed in as</p>
                       <p className="font-medium truncate">{user.email}</p>
@@ -155,8 +163,9 @@ const Navbar: React.FC = () => {
                       <LogOut className="w-4 h-4" />
                       Sign Out
                     </button>
-                  </div>
+                  </motion.div>
                 )}
+                </AnimatePresence>
               </div>
             ) : (
               <>

@@ -13,6 +13,7 @@ import WaitlistSuccess from './components/WaitlistSuccess';
 import PlatformContainer from './components/Platform/PlatformContainer';
 import PlatformProtectedRoute from './components/PlatformProtectedRoute';
 import AccessDenied from './components/AccessDenied';
+import ForgotPasswordPage from './components/Auth/ForgotPasswordPage';
 
 const HomePage: React.FC = () => {
   useEffect(() => {
@@ -85,6 +86,7 @@ const AppRoutes = () => {
           }
         />
         <Route path="/access-denied" element={<AccessDenied />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Routes>
     </ScrollToTopWrapper>
   );

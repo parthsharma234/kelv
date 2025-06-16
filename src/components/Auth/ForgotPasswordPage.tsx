@@ -1,70 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Lock, ArrowLeft, CheckCircle, AlertCircle, Eye, EyeOff, Key, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Sparkles, Brain, Target, ArrowRight, Zap, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import RedPandaLogo from '../RedPandaLogo';
 
-const LoginPage: React.FC = () => {
-  const [isSignUp, setIsSignUp] = useState(false);
+const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
   const [focusedField, setFocusedField] = useState('');
-
-  const { signUp, signIn, user, isConfigured } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (user) {
-      navigate('/waitlist-success');
-    }
-  }, [user, navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!isConfigured) {
-      setError('Database connection not configured. Please contact support.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      if (isSignUp) {
-        const { error } = await signUp(email, password, fullName);
-        if (error) throw error;
-        // User will be redirected by useEffect when user state updates
-      } else {
-        const { error } = await signIn(email, password);
-        if (error) throw error;
-        // User will be redirected by useEffect when user state updates
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setEmail('');
-    setPassword('');
-    setFullName('');
-    setError('');
-    setShowPassword(false);
-    setFocusedField('');
-  };
-
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
-    resetForm();
-  };
+  const { isConfigured } = useAuth();
 
   // Floating particles for background animation
   const particles = Array.from({ length: 15 }, (_, i) => (
@@ -86,6 +38,66 @@ const LoginPage: React.FC = () => {
       }}
     />
   ));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('loading');
+    setMessage('');
+
+    if (!email || !email.includes('@')) {
+      setMessage('Please enter a valid email address.');
+      setStatus('error');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setMessage('Password must be at least 6 characters long.');
+      setStatus('error');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setMessage('Passwords do not match.');
+      setStatus('error');
+      return;
+    }
+
+    if (!isConfigured) {
+      setMessage('Supabase is not configured. Password reset is unavailable.');
+      setStatus('error');
+      return;
+    }
+
+    try {
+      // First, sign in with the email to verify the user exists
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: 'temporary-password-for-verification', // This will fail, but that's okay
+      });
+
+      // If the error is about invalid credentials, that means the user exists
+      if (signInError && signInError.message.includes('Invalid login credentials')) {
+        // Now update the password
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: password,
+        });
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        setMessage('Password has been successfully updated! Redirecting to login...');
+        setStatus('success');
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        setMessage('No account found with this email address.');
+        setStatus('error');
+      }
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to update password. Please try again.');
+      setStatus('error');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -122,14 +134,10 @@ const LoginPage: React.FC = () => {
         {/* Form Panel */}
         <motion.div 
           className="w-1/2 p-12 flex flex-col justify-center relative"
-          animate={{ 
-            x: isSignUp ? 0 : 0,
-          }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
         >
           <AnimatePresence mode="wait">
             <motion.div
-              key={isSignUp ? 'signup' : 'signin'}
+              key="reset-password"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
@@ -143,7 +151,7 @@ const LoginPage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                  {isSignUp ? 'Join the Waitlist' : 'Welcome Back'}
+                  Reset Password
                 </motion.h1>
                 <motion.p 
                   className="text-gray-400"
@@ -151,51 +159,11 @@ const LoginPage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  {isSignUp ? 'Get early access to AI-powered interview preparation' : 'Continue to your waitlist status'}
+                  Enter your email and new password below to reset your account.
                 </motion.p>
-                {!isSignUp && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="text-gray-500 text-sm mt-4 italic"
-                  >
-                    If you joined the waitlist, you might not have set a password yet. Please use "Forgot your password?" to set one.
-                  </motion.p>
-                )}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <AnimatePresence mode="wait">
-                  {isSignUp && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0, y: -20 }}
-                      animate={{ opacity: 1, height: 'auto', y: 0 }}
-                      exit={{ opacity: 0, height: 0, y: -20 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="mb-6"
-                    >
-                      <div className="relative group">
-                        <input
-                          type="text"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          onFocus={() => setFocusedField('fullName')}
-                          onBlur={() => setFocusedField('')}
-                          className="w-full px-6 py-4 bg-dark-700/50 border border-dark-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all duration-300"
-                          placeholder="Full Name"
-                          required
-                        />
-                        <motion.div
-                          className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/20 to-orange-400/20 opacity-0 pointer-events-none"
-                          animate={{ opacity: focusedField === 'fullName' ? 1 : 0 }}
-                          transition={{ duration: 0.3 }}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
                 <motion.div
                   className="relative group"
                   initial={{ opacity: 0, y: 20 }}
@@ -232,7 +200,7 @@ const LoginPage: React.FC = () => {
                     onFocus={() => setFocusedField('password')}
                     onBlur={() => setFocusedField('')}
                     className="w-full px-6 py-4 pr-14 bg-dark-700/50 border border-dark-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all duration-300"
-                    placeholder="Password"
+                    placeholder="New Password"
                     required
                   />
                   <motion.div
@@ -251,36 +219,52 @@ const LoginPage: React.FC = () => {
                   </motion.button>
                 </motion.div>
 
-                {!isSignUp && (
-                  <motion.div 
-                    className="text-right mt-2"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <Link to="/forgot-password" className="text-gray-400 hover:text-orange-400 text-sm transition-colors">
-                      Forgot your password?
-                    </Link>
-                  </motion.div>
-                )}
+                <motion.div
+                  className="relative group"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onFocus={() => setFocusedField('confirmPassword')}
+                    onBlur={() => setFocusedField('')}
+                    className="w-full px-6 py-4 pr-14 bg-dark-700/50 border border-dark-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all duration-300"
+                    placeholder="Confirm New Password"
+                    required
+                  />
+                  <motion.div
+                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/20 to-orange-400/20 opacity-0 pointer-events-none"
+                    animate={{ opacity: focusedField === 'confirmPassword' ? 1 : 0 }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.div>
 
                 <AnimatePresence>
-                  {error && (
+                  {status !== 'idle' && (
                     <motion.div
                       initial={{ opacity: 0, y: -10, scale: 0.9 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.9 }}
-                      className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-2"
+                      className={`flex items-center gap-2 p-4 rounded-xl text-sm ${
+                        status === 'error' ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-green-500/10 border border-green-500/20 text-green-400'
+                      }`}
                     >
-                      <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                      {error}
+                      {status === 'error' ? (
+                        <AlertCircle className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      {message}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 <motion.button
                   type="submit"
-                  disabled={loading}
+                  disabled={status === 'loading'}
                   className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/25 relative overflow-hidden group mt-8"
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
@@ -289,25 +273,40 @@ const LoginPage: React.FC = () => {
                   transition={{ delay: 0.6 }}
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    {loading ? (
+                    {status === 'loading' ? (
                       <>
                         <motion.div 
                           className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         />
-                        {isSignUp ? 'Joining Waitlist...' : 'Signing In...'}
+                        Updating Password...
                       </>
                     ) : (
                       <>
-                        {isSignUp ? 'Join Waitlist' : 'Sign In'}
-                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        Update Password
+                        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                       </>
                     )}
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-300 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </motion.button>
               </form>
+
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.7 }}
+                className="mt-8 flex items-center justify-center"
+              >
+                <Link
+                  to="/login"
+                  className="text-gray-400 hover:text-orange-400 transition-colors duration-300 flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Login
+                </Link>
+              </motion.div>
             </motion.div>
           </AnimatePresence>
         </motion.div>
@@ -315,10 +314,6 @@ const LoginPage: React.FC = () => {
         {/* Welcome Panel */}
         <motion.div
           className="w-1/2 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-12 flex flex-col justify-center items-center text-white relative overflow-hidden"
-          animate={{ 
-            x: isSignUp ? 0 : 0,
-          }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
         >
           {/* Animated background elements */}
           <div className="absolute inset-0">
@@ -330,7 +325,7 @@ const LoginPage: React.FC = () => {
 
           <AnimatePresence mode="wait">
             <motion.div
-              key={isSignUp ? 'welcome-signin' : 'welcome-signup'}
+              key="welcome-reset"
               initial={{ opacity: 0, y: 30, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -30, scale: 0.9 }}
@@ -344,11 +339,7 @@ const LoginPage: React.FC = () => {
                 transition={{ delay: 0.2 }}
               >
                 <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                  {isSignUp ? (
-                    <Brain className="w-10 h-10 text-white" />
-                  ) : (
-                    <Sparkles className="w-10 h-10 text-white" />
-                  )}
+                  <Shield className="w-10 h-10 text-white" />
                 </div>
               </motion.div>
 
@@ -358,7 +349,7 @@ const LoginPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                {isSignUp ? 'Welcome Back!' : 'Join the Revolution!'}
+                Secure Your Account
               </motion.h2>
               
               <motion.p 
@@ -367,10 +358,7 @@ const LoginPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
               >
-                {isSignUp 
-                  ? 'Ready to check your waitlist status and get the latest updates?'
-                  : 'Be among the first to experience the future of AI-powered interview preparation'
-                }
+                Reset your password to ensure your account remains secure and protected
               </motion.p>
 
               {/* Feature highlights */}
@@ -381,30 +369,18 @@ const LoginPage: React.FC = () => {
                 transition={{ delay: 0.5 }}
               >
                 <div className="flex items-center gap-3 text-sm opacity-80">
-                  <Target className="w-4 h-4" />
-                  <span>{isSignUp ? 'Waitlist Status Updates' : 'Early Access Benefits'}</span>
+                  <Key className="w-4 h-4" />
+                  <span>Strong Password Protection</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm opacity-80">
-                  <Zap className="w-4 h-4" />
-                  <span>{isSignUp ? 'Member Dashboard' : 'Exclusive Member Pricing'}</span>
+                  <Shield className="w-4 h-4" />
+                  <span>Secure Account Access</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm opacity-80">
-                  <Brain className="w-4 h-4" />
-                  <span>{isSignUp ? 'Latest News & Updates' : 'Priority Support & Updates'}</span>
+                  <Lock className="w-4 h-4" />
+                  <span>Protected Personal Data</span>
                 </div>
               </motion.div>
-              
-              <motion.button
-                onClick={toggleMode}
-                className="px-8 py-3 border-2 border-white/80 text-white rounded-full font-semibold hover:bg-white hover:text-orange-600 transition-all duration-300 backdrop-blur-sm"
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                {isSignUp ? 'SIGN IN' : 'JOIN WAITLIST'}
-              </motion.button>
             </motion.div>
           </AnimatePresence>
         </motion.div>
@@ -413,4 +389,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export default ForgotPasswordPage; 
