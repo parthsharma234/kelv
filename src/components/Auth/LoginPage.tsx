@@ -151,18 +151,8 @@ const LoginPage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  {isSignUp ? 'Get early access to AI-powered interview preparation' : 'Continue to your waitlist status'}
+                  {isSignUp ? 'Get early access to AI-powered interview preparation' : 'Sign in to access your account'}
                 </motion.p>
-                {!isSignUp && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="text-gray-500 text-sm mt-4 italic"
-                  >
-                    If you joined the waitlist, you might not have set a password yet. Please use "Forgot your password?" to set one.
-                  </motion.p>
-                )}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -250,19 +240,6 @@ const LoginPage: React.FC = () => {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </motion.button>
                 </motion.div>
-
-                {!isSignUp && (
-                  <motion.div 
-                    className="text-right mt-2"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <Link to="/forgot-password" className="text-gray-400 hover:text-orange-400 text-sm transition-colors">
-                      Forgot your password?
-                    </Link>
-                  </motion.div>
-                )}
 
                 <AnimatePresence>
                   {error && (

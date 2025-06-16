@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle, User, ChevronRight, X } from 'lucide-react';
+import { ArrowRight, CheckCircle, User, ChevronRight, X, Mic, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PerformanceAnalytics from './PerformanceAnalytics';
 import AIInterviewer from './AIInterviewer';
@@ -20,19 +20,19 @@ const Hero: React.FC = () => {
     {
       role: 'kelv',
       text: "Alright, last question! Can you tell me about a time you failed and what you learned from it?",
-      delay: 2000,
+      delay: 4000,
       state: 'speaking'
     },
     {
       role: 'user',
       text: "Certainly. There was a project where I misjudged the complexity of a task, leading to delays. I learned the importance of thorough planning and seeking input from team members early on.",
-      delay: 2000,
+      delay: 4000,
       state: 'listening'
     },
     {
       role: 'kelv',
       text: "Great answer! Your comprehensive performance analysis is now ready to view.",
-      delay: 1000,
+      delay: 3000,
       state: 'processing'
     }
   ];
@@ -48,7 +48,7 @@ const Hero: React.FC = () => {
             setTimeout(() => {
               setIsTyping(true);
               setCurrentMessage(0);
-            }, 400);
+            }, 800);
           }
         });
       },
@@ -104,7 +104,7 @@ const Hero: React.FC = () => {
             Experience realistic interview simulations with Kelv AI. Our advanced AI analyzes your responses, provides personalized feedback, and helps you improve your interview skills.
           </p>
           
-          <div className="flex flex-wrap justify-center gap-4 pt-4">
+          <div className="button-container justify-center pt-4">
             <a href="#waitlist" className="btn btn-primary">
               Join Waitlist
               <ArrowRight className="ml-2 w-5 h-5" />
@@ -132,7 +132,7 @@ const Hero: React.FC = () => {
         
         <div className="relative z-10 mt-12">
           <div className="rounded-xl overflow-hidden border border-gray-700 group relative transition-shadow duration-300 hover:shadow-2xl hover:shadow-orange-500/30">
-            <div className="bg-dark-800 relative z-10 flex min-h-[800px]"> 
+            <div className="bg-dark-800 relative z-10 flex min-h-[600px] md:min-h-[500px]"> 
               {/* Interview Demo Wrapper - conditionally hide/show */}
               <AnimatePresence>
                 {!showAnalytics && (
@@ -172,7 +172,7 @@ const Hero: React.FC = () => {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.3 }}
+                                transition={{ duration: 0.6 }}
                                 className="flex items-start gap-4" 
                               >
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -235,26 +235,12 @@ const Hero: React.FC = () => {
 
                         {/* User Camera Feed */}
                         <motion.div 
-                          className="absolute bottom-6 right-6 w-32 h-32 bg-gray-700 rounded-lg overflow-hidden border border-gray-600 flex items-center justify-center"
+                          className="absolute bottom-4 right-4 md:bottom-6 md:right-6 w-24 h-24 md:w-32 md:h-32 bg-gray-700 rounded-lg overflow-hidden border border-gray-600 flex items-center justify-center"
                           animate={isListening ? { scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] } : { scale: 1, opacity: 1 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
                         >
-                          <User className="w-16 h-16 text-gray-400" />
+                          <User className="w-12 h-12 md:w-16 md:h-16 text-gray-400" />
                         </motion.div>
-                      </div>
-
-                      {/* Video Call Controls */}
-                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-dark-800/80 backdrop-blur-sm px-6 py-3 rounded-full border border-gray-800/50">
-                        <button className="p-2 text-gray-400 hover:text-white transition-colors opacity-50 cursor-not-allowed">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                          </svg>
-                        </button>
-                        <button className="p-2 text-red-500 hover:text-red-400 transition-colors opacity-50 cursor-not-allowed"> 
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
                       </div>
                     </motion.div>
                   </motion.div>

@@ -28,6 +28,9 @@ const AccessDenied: React.FC = () => {
         <p className="text-gray-300 text-lg mb-8 leading-relaxed">
           Unfortunately, your account does not currently have access to the full platform. We're working hard to onboard users!
         </p>
+        <p className="text-gray-400 text-sm mb-8 leading-relaxed italic">
+          If you are a beta user and believe this is an error, please try logging out and logging back in.
+        </p>
 
         <div className="space-y-4">
           <Link

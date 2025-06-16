@@ -5,16 +5,19 @@ import { motion } from 'framer-motion';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { EyeOff, Eye } from 'lucide-react';
 
 interface FormData {
   email: string;
   name: string;
+  password: string;
 }
 
 export default function WaitlistForm() {
-  const [formData, setFormData] = useState<FormData>({ email: '', name: '' });
+  const [formData, setFormData] = useState<FormData>({ email: '', name: '', password: '' });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const { signUp, isConfigured } = useAuth();
   const navigate = useNavigate();
@@ -36,13 +39,19 @@ export default function WaitlistForm() {
       return;
     }
 
+    if (!formData.password || formData.password.length < 6) {
+      setError('Please enter a password (at least 6 characters)');
+      setStatus('error');
+      return;
+    }
+
     try {
       if (isConfigured) {
         // Use Supabase authentication for waitlist signup
         // The welcome email will be automatically triggered by the database trigger
         const { error: authError } = await signUp(
           formData.email, 
-          'waitlist-temp-password-' + Math.random().toString(36).substring(7), // Temporary password
+          formData.password, // Use the actual password instead of temporary one
           formData.name
         );
 
@@ -50,7 +59,7 @@ export default function WaitlistForm() {
           // If user already exists, that's okay for waitlist
           if (authError.message.includes('already registered')) {
             setStatus('success');
-            setFormData({ email: '', name: '' });
+            setFormData({ email: '', name: '', password: '' });
             // Just navigate, let useScrollToTop handle the scroll
             setTimeout(() => {
               navigate('/waitlist-success');
@@ -62,7 +71,7 @@ export default function WaitlistForm() {
 
         // Successfully signed up
         setStatus('success');
-        setFormData({ email: '', name: '' });
+        setFormData({ email: '', name: '', password: '' });
         // Just navigate, let useScrollToTop handle the scroll
         setTimeout(() => {
           navigate('/waitlist-success');
@@ -81,7 +90,7 @@ export default function WaitlistForm() {
         }
 
         setStatus('success');
-        setFormData({ email: '', name: '' });
+        setFormData({ email: '', name: '', password: '' });
         // For non-Supabase users, show success message but don't navigate
       }
     } catch (err: any) {
@@ -174,6 +183,39 @@ export default function WaitlistForm() {
             placeholder="you@example.com"
             required
           />
+        </div>
+        
+        <div className="mb-8">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-3 py-3 bg-dark-800 border border-dark-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 text-white placeholder-gray-500 pr-12"
+              placeholder="Create a password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+            >
+              {showPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+          <p className="mt-2 text-sm text-gray-400">
+            This password will be used to access your account once you're approved from the waitlist. 
+            You won't be able to sign in until your account is approved.
+          </p>
         </div>
         
         {error && (

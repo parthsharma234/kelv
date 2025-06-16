@@ -9,6 +9,7 @@ const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   
   const { user, signOut, isPlatformEnabled } = useAuth();
   const navigate = useNavigate();
@@ -28,8 +29,10 @@ const Navbar: React.FC = () => {
   }, []);
 
   const handleSignOut = async () => {
+    setIsSigningOut(true);
     await signOut();
     setShowUserMenu(false);
+    setIsSigningOut(false);
     navigate('/');
   };
 
@@ -95,19 +98,19 @@ const Navbar: React.FC = () => {
           <div className="hidden md:flex items-center space-x-8">
             <button 
               onClick={() => handleNavClick('#features')}
-              className="text-gray-300 hover:text-orange-400 transition-colors duration-300"
+              className="text-gray-300 hover:text-orange-400 transition-colors duration-300 whitespace-nowrap"
             >
               Features
             </button>
             <button 
               onClick={() => handleNavClick('#how-it-works')}
-              className="text-gray-300 hover:text-orange-400 transition-colors duration-300"
+              className="text-gray-300 hover:text-orange-400 transition-colors duration-300 whitespace-nowrap"
             >
               How It Works
             </button>
             <button
               onClick={handlePlatformClick}
-              className="flex items-center gap-2 text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium"
+              className="flex items-center gap-2 text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium whitespace-nowrap"
             >
               <Brain className="w-4 h-4" />
               Platform
@@ -117,12 +120,12 @@ const Navbar: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-dark-700 transition-colors bg-dark-800 border border-dark-700"
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-dark-700 transition-colors bg-dark-800 border border-dark-700 whitespace-nowrap"
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-400 rounded-lg flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-sm font-medium">{user.user_metadata?.full_name || user.email}</span>
+                  <span className="text-sm font-medium whitespace-nowrap">{user.user_metadata?.full_name || user.email}</span>
                 </button>
                 
                 <AnimatePresence>
@@ -140,7 +143,7 @@ const Navbar: React.FC = () => {
                     </div>
                     <Link
                       to="/waitlist-success"
-                      className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3"
+                      className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
                       onClick={() => setShowUserMenu(false)}
                     >
                       <RedPandaLogo size="sm" animate={false} />
@@ -149,7 +152,7 @@ const Navbar: React.FC = () => {
                     {isPlatformEnabled && (
                       <Link
                         to="/platform"
-                        className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3"
+                        className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
                         onClick={() => setShowUserMenu(false)}
                       >
                         <Brain className="w-4 h-4 text-orange-400" />
@@ -159,9 +162,14 @@ const Navbar: React.FC = () => {
                     <button
                       onClick={handleSignOut}
                       className="w-full text-left px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 text-red-400"
+                      disabled={isSigningOut}
                     >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
+                      {isSigningOut ? (
+                        <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-2" />
+                      ) : (
+                        <LogOut className="w-4 h-4" />
+                      )}
+                      {isSigningOut ? 'Signing Out...' : 'Sign Out'}
                     </button>
                   </motion.div>
                 )}
@@ -171,13 +179,13 @@ const Navbar: React.FC = () => {
               <>
                 <Link
                   to="/login"
-                  className="text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium"
+                  className="text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium px-4 py-2 md:px-6 md:py-3 whitespace-nowrap"
                 >
                   Sign In
                 </Link>
                 <button 
                   onClick={() => handleNavClick('#waitlist')}
-                  className="btn btn-primary"
+                  className="btn btn-primary whitespace-nowrap"
                 >
                   Join Waitlist
                 </button>
@@ -233,8 +241,14 @@ const Navbar: React.FC = () => {
                       setIsOpen(false);
                     }}
                     className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
+                    disabled={isSigningOut}
                   >
-                    Sign Out
+                    {isSigningOut ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
+                    ) : (
+                      <LogOut className="w-4 h-4" />
+                    )}
+                    {isSigningOut ? 'Signing Out...' : 'Sign Out'}
                   </button>
                 </>
               ) : (

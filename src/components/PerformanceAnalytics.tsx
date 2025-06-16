@@ -15,7 +15,8 @@ import {
   Volume2,
   Mic,
   Gauge,
-  X
+  X,
+  User
 } from 'lucide-react';
 
 interface AnalyticsProps {
@@ -47,6 +48,22 @@ const voiceMetrics = [
     color: "from-pink-500 to-pink-400",
     improvement: "+10%",
     description: "Variation in pitch and tone to maintain engagement."
+  },
+  {
+    name: "Pacing and Flow",
+    score: 78,
+    icon: Clock,
+    color: "from-orange-500 to-orange-400",
+    improvement: "+9%",
+    description: "Smoothness and speed of your delivery."
+  },
+  {
+    name: "Filler Word Usage",
+    score: 90,
+    icon: Mic,
+    color: "from-red-500 to-red-400",
+    improvement: "-5%",
+    description: "Minimizing 'umms' and 'uhhs'."
   }
 ];
 
@@ -74,6 +91,30 @@ const contentMetrics = [
     color: "from-violet-500 to-violet-400",
     improvement: "+8%",
     description: "Analysis and evaluation of complex situations."
+  },
+  {
+    name: "Relevance to Question",
+    score: 91,
+    icon: Target,
+    color: "from-green-500 to-green-400",
+    improvement: "+6%",
+    description: "How well your answer addressed the interviewer's question."
+  },
+  {
+    name: "Behavioral Insight",
+    score: 88,
+    icon: User,
+    color: "from-blue-500 to-blue-400",
+    improvement: "+10%",
+    description: "Ability to articulate experiences and lessons learned."
+  },
+  {
+    name: "Problem-Solving Approach",
+    score: 89,
+    icon: Zap,
+    color: "from-yellow-500 to-yellow-400",
+    improvement: "+7%",
+    description: "Clarity and effectiveness of your problem-solving steps."
   }
 ];
 
@@ -122,7 +163,7 @@ const PerformanceAnalytics: React.FC<AnalyticsProps> = ({ isOpen, onClose }) => 
             </motion.div>
 
             {/* Content */}
-            <div className="flex-1 p-4 lg:p-6 space-y-4">
+            <div className="flex-1 p-4 lg:p-6 space-y-4 overflow-y-auto analytics-scroll">
               {/* Overall Score */}
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
