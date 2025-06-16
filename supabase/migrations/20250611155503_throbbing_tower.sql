@@ -81,8 +81,8 @@ CREATE POLICY "Users can manage own speech profiles"
   ON user_speech_profiles
   FOR ALL
   TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  USING (auth.uid() = user_id AND (SELECT (raw_user_meta_data->>'is_platform_enabled')::boolean FROM auth.users WHERE id = auth.uid()) = true)
+  WITH CHECK (auth.uid() = user_id AND (SELECT (raw_user_meta_data->>'is_platform_enabled')::boolean FROM auth.users WHERE id = auth.uid()) = true);
 
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS speech_analysis_cache_user_id_idx ON speech_analysis_cache(user_id);

@@ -9,7 +9,7 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   
-  const { user, signOut } = useAuth();
+  const { user, signOut, isPlatformEnabled } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -138,14 +138,16 @@ const Navbar: React.FC = () => {
                       <RedPandaLogo size="sm" animate={false} />
                       Waitlist Status
                     </Link>
-                    <Link
-                      to="/platform"
-                      className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <Brain className="w-4 h-4 text-orange-400" />
-                      Interview Platform
-                    </Link>
+                    {isPlatformEnabled && (
+                      <Link
+                        to="/platform"
+                        className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Brain className="w-4 h-4 text-orange-400" />
+                        Interview Platform
+                      </Link>
+                    )}
                     <button
                       onClick={handleSignOut}
                       className="w-full text-left px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 text-red-400"

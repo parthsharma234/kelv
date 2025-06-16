@@ -11,6 +11,8 @@ import Footer from './components/Footer';
 import LoginPage from './components/Auth/LoginPage';
 import WaitlistSuccess from './components/WaitlistSuccess';
 import PlatformContainer from './components/Platform/PlatformContainer';
+import PlatformProtectedRoute from './components/PlatformProtectedRoute';
+import AccessDenied from './components/AccessDenied';
 
 const HomePage: React.FC = () => {
   useEffect(() => {
@@ -63,25 +65,26 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route 
-          path="/platform" 
+        <Route
+          path="/platform"
           element={
-            <ProtectedRoute>
+            <PlatformProtectedRoute>
               <div className="min-h-screen bg-dark-900 text-white">
                 <Navbar />
                 <PlatformContainer />
               </div>
-            </ProtectedRoute>
-          } 
+            </PlatformProtectedRoute>
+          }
         />
-        <Route 
-          path="/waitlist-success" 
+        <Route
+          path="/waitlist-success"
           element={
             <ProtectedRoute>
               <WaitlistSuccess />
             </ProtectedRoute>
-          } 
+          }
         />
+        <Route path="/access-denied" element={<AccessDenied />} />
       </Routes>
     </ScrollToTopWrapper>
   );

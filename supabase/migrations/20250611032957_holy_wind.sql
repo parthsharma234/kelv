@@ -39,8 +39,8 @@ CREATE POLICY "Users can manage own interview sessions"
   ON interview_sessions
   FOR ALL
   TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  USING (auth.uid() = user_id AND (SELECT (raw_user_meta_data->>'is_platform_enabled')::boolean FROM auth.users WHERE id = auth.uid()) = true)
+  WITH CHECK (auth.uid() = user_id AND (SELECT (raw_user_meta_data->>'is_platform_enabled')::boolean FROM auth.users WHERE id = auth.uid()) = true);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

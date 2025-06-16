@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
   isConfigured: boolean;
+  isPlatformEnabled: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,7 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           data: {
             full_name: fullName,
             waitlist_joined_at: new Date().toISOString(),
-            user_type: 'waitlist'
+            user_type: 'waitlist',
+            is_platform_enabled: false,
           },
         },
       });
@@ -121,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signOut,
     isConfigured,
+    isPlatformEnabled: user?.user_metadata?.is_platform_enabled === true,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
