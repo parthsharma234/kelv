@@ -206,20 +206,28 @@ export class SpeechAnalyzer {
     const words = transcription.toLowerCase().split(/\s+/).filter(word => word.length > 0);
     const wordCount = words.length;
     
-    // Calculate speech rate
-    const speechRate = (wordCount / duration) * 60; // words per minute
+    // Calculate speech rate with improved logic
+    // Account for pauses, hesitations, and natural speech patterns
+    const effectiveDuration = Math.max(duration * 0.85, duration - 2); // Account for natural pauses
+    const speechRate = Number(((wordCount / effectiveDuration) * 60).toFixed(2)); // Limit to 2 decimal places
     
-    // Detect filler words
-    const fillerWords = ['um', 'uh', 'like', 'you know', 'so', 'well', 'actually', 'basically'];
-    const fillerCount = words.filter(word => fillerWords.includes(word.replace(/[.,!?]/g, ''))).length;
+    // Enhanced filler word detection with context
+    const fillerWords = [
+      'um', 'uh', 'like', 'you know', 'so', 'well', 'actually', 'basically', 'literally', 'right',
+      'kind of', 'sort of', 'i mean', 'you see', 'i guess', 'i think', 'i feel', 'i believe'
+    ];
+    const fillerCount = words.filter(word => 
+      fillerWords.includes(word.replace(/[.,!?]/g, '')) ||
+      fillerWords.includes(word.replace(/[.,!?]/g, '') + ' ' + (words[words.indexOf(word) + 1] || ''))
+    ).length;
     
-    // Detect repetitions
+    // Enhanced repetition detection with phrase repetition
     const repetitions = this.countRepetitions(words);
     
-    // Detect hesitations (based on audio features and text patterns)
+    // Enhanced hesitation detection
     const hesitations = this.detectHesitations(transcription, audioFeatures);
     
-    // Calculate fluency score
+    // Calculate improved fluency score
     const fluencyScore = this.calculateFluencyScore(wordCount, fillerCount, repetitions, hesitations, speechRate);
     
     // Calculate confidence metrics
@@ -238,23 +246,41 @@ export class SpeechAnalyzer {
 
   private static countRepetitions(words: string[]): number {
     let repetitions = 0;
+    
+    // Check for word repetitions
     for (let i = 1; i < words.length; i++) {
       if (words[i] === words[i - 1]) {
         repetitions++;
       }
     }
-    return repetitions;
+    
+    // Check for phrase repetitions (2-3 word phrases)
+    for (let i = 2; i < words.length - 1; i++) {
+      const phrase1 = words.slice(i - 2, i).join(' ');
+      const phrase2 = words.slice(i, i + 2).join(' ');
+      if (phrase1 === phrase2) {
+        repetitions += 0.5;
+      }
+    }
+    
+    return Math.round(repetitions);
   }
 
   private static detectHesitations(transcription: string, audioFeatures: AudioFeatures): number {
-    // Look for patterns that indicate hesitation
-    const hesitationPatterns = /\b(well|um|uh|er|ah)\b/gi;
+    // Enhanced hesitation patterns
+    const hesitationPatterns = /\b(well|um|uh|er|ah|hmm|you know|i mean)\b/gi;
     const matches = transcription.match(hesitationPatterns);
     
-    // Also consider low energy periods as potential hesitations
-    const energyBasedHesitations = audioFeatures.energy < 0.1 ? 1 : 0;
+    // Consider audio features for hesitation detection
+    const energyBasedHesitations = audioFeatures.energy < 0.15 ? 1 : 0;
+    const pitchBasedHesitations = audioFeatures.pitch < 100 || audioFeatures.pitch > 400 ? 0.5 : 0;
     
-    return (matches ? matches.length : 0) + energyBasedHesitations;
+    // Look for long pauses in speech (indicated by punctuation patterns)
+    const pausePatterns = /[.!?]\s+[.!?]/g;
+    const pauseMatches = transcription.match(pausePatterns);
+    const pauseHesitations = pauseMatches ? pauseMatches.length * 0.3 : 0;
+    
+    return Math.round((matches ? matches.length : 0) + energyBasedHesitations + pitchBasedHesitations + pauseHesitations);
   }
 
   private static calculateFluencyScore(
@@ -264,27 +290,53 @@ export class SpeechAnalyzer {
     hesitations: number,
     speechRate: number
   ): number {
-    // Optimal speech rate is around 150-160 WPM
-    const optimalRate = 155;
-    const rateScore = Math.max(0, 100 - Math.abs(speechRate - optimalRate) * 2);
+    // Improved optimal speech rate range (130-170 WPM is more realistic)
+    const optimalRateMin = 130;
+    const optimalRateMax = 170;
+    const optimalRate = 150;
     
-    // Penalize for disfluencies
-    const fillerPenalty = Math.min(50, fillerCount * 10);
-    const repetitionPenalty = Math.min(30, repetitions * 15);
-    const hesitationPenalty = Math.min(20, hesitations * 10);
+    // Rate score with better curve
+    let rateScore;
+    if (speechRate >= optimalRateMin && speechRate <= optimalRateMax) {
+      rateScore = 100; // Perfect score for optimal range
+    } else if (speechRate < optimalRateMin) {
+      rateScore = Math.max(0, 100 - (optimalRateMin - speechRate) * 1.5);
+    } else {
+      rateScore = Math.max(0, 100 - (speechRate - optimalRateMax) * 1.2);
+    }
     
-    const fluencyScore = Math.max(0, rateScore - fillerPenalty - repetitionPenalty - hesitationPenalty);
+    // Improved penalty calculations
+    const fillerPenalty = Math.min(40, (fillerCount / Math.max(1, wordCount)) * 1000);
+    const repetitionPenalty = Math.min(25, repetitions * 8);
+    const hesitationPenalty = Math.min(20, hesitations * 6);
+    
+    // Bonus for good speech rate
+    const rateBonus = speechRate >= optimalRateMin && speechRate <= optimalRateMax ? 5 : 0;
+    
+    const fluencyScore = Math.max(0, rateScore - fillerPenalty - repetitionPenalty - hesitationPenalty + rateBonus);
     
     return Math.round(fluencyScore);
   }
 
   private static calculateVoiceConfidence(audioFeatures: AudioFeatures, speechRate: number): number {
-    // Higher RMS and stable pitch indicate confidence
-    const energyScore = Math.min(100, audioFeatures.rms * 1000);
-    const pitchStability = audioFeatures.pitch > 0 ? Math.min(100, audioFeatures.pitch / 5) : 50;
-    const rateConfidence = speechRate > 100 && speechRate < 200 ? 100 : 70;
+    // Enhanced confidence calculation
+    const energyScore = Math.min(100, audioFeatures.rms * 1200);
+    const pitchStability = audioFeatures.pitch > 0 ? Math.min(100, Math.max(0, 100 - Math.abs(audioFeatures.pitch - 200) / 2)) : 50;
     
-    return Math.round((energyScore + pitchStability + rateConfidence) / 3);
+    // Improved rate confidence with better range
+    let rateConfidence;
+    if (speechRate >= 120 && speechRate <= 180) {
+      rateConfidence = 100;
+    } else if (speechRate >= 100 && speechRate <= 200) {
+      rateConfidence = 80;
+    } else {
+      rateConfidence = 60;
+    }
+    
+    // Add spectral features for better confidence assessment
+    const spectralScore = Math.min(100, (audioFeatures.spectralCentroid / 2000) * 100);
+    
+    return Math.round((energyScore + pitchStability + rateConfidence + spectralScore) / 4);
   }
 }
 

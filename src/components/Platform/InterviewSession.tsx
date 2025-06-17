@@ -433,63 +433,44 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   };
 
   const moveToNextQuestion = async (currentResponses: InterviewResponse[]) => {
-    if (!session) return;
-
-    // Check if we should complete the interview (8-12 questions)
-    if (currentResponses.length >= 8) {
-      // Complete the interview and show comprehensive feedback
-      await completeInterview(currentResponses);
-      return;
-    }
-
     setIsGeneratingQuestion(true);
     
     try {
-      // For real-time analysis, we'll analyze the last response to determine next question type
-      const lastResponse = currentResponses[currentResponses.length - 1];
-      const currentQuestion = session.questions[session.currentQuestionIndex];
+      // Generate next question with interview start time for time-based conclusion
+      const nextQuestion = await generateNextQuestion(
+        setup, 
+        currentResponses, 
+        aiState,
+        undefined, // suggestedType
+        session?.startTime // Pass interview start time
+      );
       
-      // Quick analysis for next question generation (not shown to user)
-      const analysisResult = await analyzeResponse(currentQuestion, lastResponse.response, setup, currentResponses.slice(0, -1));
+      // Update session with new question
+      setSession(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          questions: [...prev.questions, nextQuestion],
+          currentQuestionIndex: prev.questions.length
+        };
+      });
       
-      // Generate next question dynamically based on performance
-      const nextQuestion = await generateNextQuestion(setup, currentResponses, aiState, analysisResult?.nextQuestionType);
-      
-      const updatedQuestions = [...session.questions, nextQuestion];
-      const nextIndex = session.currentQuestionIndex + 1;
-      
-      // Update session state first, then play the question
-      const updatedSession = {
-        ...session,
-        questions: updatedQuestions,
-        currentQuestionIndex: nextIndex
-      };
-      
-      setSession(updatedSession);
-      
-      // Update global questions with the new question
-      updateGlobalQuestions(updatedQuestions);
-      
-      // Play the question AFTER state is updated and ensure it's the correct question
+      // Play the question if in voice mode
       if (isVoiceMode && hasOpenAIKey) {
-        console.log('Playing next question:', nextQuestion.text);
-        // Small delay to ensure state is updated
-        setTimeout(() => {
-          playQuestion(nextQuestion.text);
-        }, 100);
-      } else {
-        // For text mode, user can respond immediately
-        setCanUserRespond(true);
+        await playQuestion(nextQuestion.text);
       }
       
     } catch (error) {
       console.error('Error generating next question:', error);
-      // If question generation fails or signals completion, complete the interview
+      
       if (error instanceof Error && error.message === 'INTERVIEW_COMPLETE') {
+        // Interview is complete - move to completion
         await completeInterview(currentResponses);
-      } else {
-        await completeInterview(currentResponses);
+        return;
       }
+      
+      // Handle other errors
+      setLoadingError('Failed to generate next question. Please try again.');
     } finally {
       setIsGeneratingQuestion(false);
     }
@@ -831,12 +812,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 <Clock className="w-4 h-4 text-[#FF5722]" />
                 <span className="text-white font-medium">{formatTime(timeElapsed)}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <MessageSquare className="w-4 h-4 text-orange-400" />
-                <span className="text-sm text-gray-400">
-                  {responses.length + 1} of 8-12 questions
-                </span>
-              </div>
               {isVoiceMode && (
                 <button
                   onClick={toggleAudio}
@@ -969,19 +944,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     </>
                   )}
                 </button>
-
-                {/* Progress indicator */}
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">
-                    Question {responses.length + 1} • Comprehensive feedback at completion
-                  </p>
-                  <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(((responses.length + 1) / 10) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
               </div>
             )}
 
@@ -1005,7 +967,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                     <li>• Fully generated questions tailored to your role</li>
                     <li>• Dynamic question flow based on your responses</li>
                     <li>• {isVoiceMode ? 'Voice interaction with speech analysis' : 'Text-based professional interview'}</li>
-                    <li>• 8-12 adaptive questions with natural conversation flow</li>
+                    <li>• Adaptive questions with natural conversation flow</li>
                     <li>• Comprehensive performance analysis at completion</li>
                   </ul>
                 </div>

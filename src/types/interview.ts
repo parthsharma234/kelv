@@ -8,7 +8,7 @@ export interface InterviewSetup {
 export interface Question {
   id: string;
   text: string;
-  type: 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up';
+  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit';
   category?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   followUp?: string;
@@ -101,7 +101,12 @@ export interface InterviewResponse {
       specificExamples: boolean;
       structuredAnswer: boolean;
       enthusiasm: number; // 1-10
+      quantifiableResults: boolean;
     };
+    nextQuestionType?: string;
+    performanceTrend?: string;
+    roleAlignment?: string;
+    culturalFit?: string;
   };
   timestamp: Date;
 }

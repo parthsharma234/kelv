@@ -90,7 +90,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
       avgSpeechMetrics = {
         voiceConfidence: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / metrics.length),
         fluencyScore: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / metrics.length),
-        speechRate: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / metrics.length),
+        speechRate: Number((metrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / metrics.length).toFixed(2)),
         clarity: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / metrics.length),
         delivery: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / metrics.length),
         fillerWordCount: Math.round(metrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / metrics.length),
@@ -351,7 +351,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                               <div className="text-gray-400">Fluency</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-lg font-bold text-white">{speechMetric.metrics.speechRate}</div>
+                              <div className="text-lg font-bold text-white">{Number(speechMetric.metrics.speechRate).toFixed(2)}</div>
                               <div className="text-gray-400">WPM</div>
                             </div>
                             <div className="text-center">
@@ -457,7 +457,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 bg-dark-700/30 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-400">{avgSpeechMetrics.speechRate}</div>
+                      <div className="text-2xl font-bold text-purple-400">{Number(avgSpeechMetrics.speechRate).toFixed(2)}</div>
                       <div className="text-xs text-gray-400">Words/Min</div>
                     </div>
                     <div className="text-center p-3 bg-dark-700/30 rounded-lg">

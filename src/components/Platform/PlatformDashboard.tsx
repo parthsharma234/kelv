@@ -10,22 +10,31 @@ import {
   Calendar,
   Award,
   ChevronRight,
-  Plus
+  Plus,
+  CheckCircle,
+  AlertCircle,
+  Star
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
-import { getInterviewHistory, getInterviewStats } from '../../utils/supabase-interview';
+import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
 
 interface PlatformDashboardProps {
   onStartInterview: () => void;
+  onStartFocusedInterview: () => void;
 }
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview }) => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview }) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
   const [stats, setStats] = useState({
     totalInterviews: 0,
     averageScore: 0,
     totalHours: 0,
     improvement: 0
+  });
+  const [strengthsAndWeaknesses, setStrengthsAndWeaknesses] = useState({
+    strengths: [] as string[],
+    weaknesses: [] as string[],
+    categories: {} as { [key: string]: number }
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,13 +44,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
     
     const loadData = async () => {
       try {
-        const [history, statsData] = await Promise.all([
+        const [history, statsData, swData] = await Promise.all([
           getInterviewHistory(),
-          getInterviewStats()
+          getInterviewStats(),
+          getUserStrengthsAndWeaknesses()
         ]);
         
         setInterviewHistory(history);
         setStats(statsData);
+        setStrengthsAndWeaknesses(swData);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -134,6 +145,70 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
           </div>
         </motion.div>
 
+        {/* Strengths and Weaknesses */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12"
+        >
+          {/* Strengths */}
+          <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-2xl p-6 border border-green-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-green-500/20 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Your Strengths</h3>
+            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse"></div>
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-3/4"></div>
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-1/2"></div>
+              </div>
+            ) : strengthsAndWeaknesses.strengths.length > 0 ? (
+              <div className="space-y-3">
+                {strengthsAndWeaknesses.strengths.map((strength, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-gray-300 text-sm">{strength}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm">Complete more interviews to see your strengths</p>
+            )}
+          </div>
+
+          {/* Areas for Improvement */}
+          <div className="bg-gradient-to-br from-orange-500/10 to-red-500/5 rounded-2xl p-6 border border-orange-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-orange-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Areas for Improvement</h3>
+            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse"></div>
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-3/4"></div>
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-1/2"></div>
+              </div>
+            ) : strengthsAndWeaknesses.weaknesses.length > 0 ? (
+              <div className="space-y-3">
+                {strengthsAndWeaknesses.weaknesses.map((weakness, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-gray-300 text-sm">{weakness}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm">Great job! Keep practicing to maintain your skills</p>
+            )}
+          </div>
+        </motion.div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Start Interview Section */}
           <motion.div
@@ -174,6 +249,51 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview 
               >
                 <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 Start Interview
+                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+
+            {/* Focused Practice Section */}
+            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-8 border border-blue-500/20 mb-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl">
+                  <Target className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Focused Practice</h2>
+                  <p className="text-gray-300">Quick 3-5 minute sessions targeting specific interview skills</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">💻</div>
+                  <h4 className="font-medium text-white mb-1">Technical</h4>
+                  <p className="text-xs text-gray-400">5 min • 4 questions</p>
+                </div>
+                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">🎯</div>
+                  <h4 className="font-medium text-white mb-1">Behavioral</h4>
+                  <p className="text-xs text-gray-400">4 min • 3 questions</p>
+                </div>
+                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">🧩</div>
+                  <h4 className="font-medium text-white mb-1">Situational</h4>
+                  <p className="text-xs text-gray-400">4 min • 3 questions</p>
+                </div>
+                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">👑</div>
+                  <h4 className="font-medium text-white mb-1">Leadership</h4>
+                  <p className="text-xs text-gray-400">5 min • 4 questions</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={onStartFocusedInterview}
+                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-400 hover:to-cyan-400 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-3 group"
+              >
+                <Target className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                Start Focused Practice
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>

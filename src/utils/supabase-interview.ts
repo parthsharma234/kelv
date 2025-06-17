@@ -421,7 +421,7 @@ export const getInterviewStats = async () => {
   try {
     const { data, error } = await supabase
       .from('interview_sessions')
-      .select('overall_score, duration, created_at, speech_metrics')
+      .select('overall_score, duration, created_at, speech_metrics, responses')
       .eq('status', 'completed')
       .order('created_at', { ascending: true });
 
@@ -463,7 +463,7 @@ export const getInterviewStats = async () => {
       speechMetrics = {
         averageConfidence: Math.round(avgConfidence),
         averageFluency: Math.round(avgFluency),
-        averageSpeechRate: Math.round(avgSpeechRate),
+        averageSpeechRate: Number(avgSpeechRate.toFixed(2)),
         averageVoiceStability: Math.round(avgVoiceStability),
         voiceSessionCount: sessionsWithSpeech.length
       };
@@ -480,5 +480,109 @@ export const getInterviewStats = async () => {
   } catch (error) {
     console.error('Failed to fetch interview stats:', error);
     return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0, speechMetrics: null };
+  }
+};
+
+export const getUserStrengthsAndWeaknesses = async () => {
+  if (!isSupabaseConfigured()) {
+    return { strengths: [], weaknesses: [], categories: {} };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('interview_sessions')
+      .select('responses, overall_score, created_at')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(20); // Analyze last 20 interviews
+
+    if (error) {
+      console.error('Error fetching interview data for analysis:', error);
+      return { strengths: [], weaknesses: [], categories: {} };
+    }
+
+    // Analyze responses for patterns
+    const allResponses = data.flatMap(session => session.responses || []);
+    const categoryScores: { [key: string]: number[] } = {};
+    const strengths: string[] = [];
+    const weaknesses: string[] = [];
+
+    // Group responses by question type/category
+    allResponses.forEach(response => {
+      if (response.analysis) {
+        const questionType = response.questionType || 'general';
+        if (!categoryScores[questionType]) {
+          categoryScores[questionType] = [];
+        }
+        categoryScores[questionType].push(response.analysis.score);
+      }
+    });
+
+    // Calculate average scores per category
+    const categoryAverages: { [key: string]: number } = {};
+    Object.keys(categoryScores).forEach(category => {
+      const scores = categoryScores[category];
+      categoryAverages[category] = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    });
+
+    // Determine strengths and weaknesses based on scores
+    Object.entries(categoryAverages).forEach(([category, averageScore]) => {
+      if (averageScore >= 8) {
+        strengths.push(`${category.charAt(0).toUpperCase() + category.slice(1)} questions`);
+      } else if (averageScore <= 5) {
+        weaknesses.push(`${category.charAt(0).toUpperCase() + category.slice(1)} questions`);
+      }
+    });
+
+    // Analyze speech metrics if available
+    const speechSessions = data.filter(session => 
+      session.responses?.some((r: any) => r.speechMetrics)
+    );
+
+    if (speechSessions.length > 0) {
+      const avgConfidence = speechSessions.reduce((sum, session) => {
+        const sessionConfidence = session.responses?.reduce((s: number, r: any) => 
+          s + (r.speechMetrics?.confidence?.overallConfidence || 0), 0) / (session.responses?.length || 1);
+        return sum + sessionConfidence;
+      }, 0) / speechSessions.length;
+
+      if (avgConfidence >= 7) {
+        strengths.push('Voice confidence and clarity');
+      } else if (avgConfidence <= 4) {
+        weaknesses.push('Voice confidence and clarity');
+      }
+    }
+
+    // Add general strengths/weaknesses based on overall performance
+    const recentScores = data.slice(0, 5).map(session => session.overall_score);
+    const recentAverage = recentScores.reduce((sum, score) => sum + score, 0) / recentScores.length;
+
+    if (recentAverage >= 80) {
+      strengths.push('Strong overall interview performance');
+    } else if (recentAverage <= 60) {
+      weaknesses.push('Overall interview performance needs improvement');
+    }
+
+    // Add default strengths/weaknesses if none found
+    if (strengths.length === 0) {
+      strengths.push('Consistent participation in practice sessions');
+    }
+    if (weaknesses.length === 0) {
+      weaknesses.push('Continue practicing to identify specific areas for improvement');
+    }
+
+    return {
+      strengths: strengths.slice(0, 3), // Limit to top 3
+      weaknesses: weaknesses.slice(0, 3), // Limit to top 3
+      categories: categoryAverages
+    };
+
+  } catch (error) {
+    console.error('Failed to analyze strengths and weaknesses:', error);
+    return { 
+      strengths: ['Consistent participation in practice sessions'], 
+      weaknesses: ['Continue practicing to identify specific areas for improvement'],
+      categories: {}
+    };
   }
 };
