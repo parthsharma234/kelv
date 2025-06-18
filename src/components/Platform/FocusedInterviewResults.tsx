@@ -12,7 +12,8 @@ import {
   Play,
   BarChart3,
   Star,
-  Zap
+  Zap,
+  Mic
 } from 'lucide-react';
 
 interface FocusedInterviewResultsProps {
@@ -310,7 +311,7 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Questions Completed:</span>
-                  <span className="text-white">{sessionData.questionsAnswered}/{sessionData.config.maxQuestions}</span>
+                  <span className="text-white">{sessionData.questionsAnswered}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Session Type:</span>
@@ -322,6 +323,56 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Voice Metrics */}
+            {sessionData.setup.interviewMode === 'voice' && (
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Mic className="w-5 h-5 text-blue-400" />
+                  Voice Metrics
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {sessionData.voiceMetrics?.speechRate ? Number(sessionData.voiceMetrics.speechRate).toFixed(1) : 'N/A'}
+                      </div>
+                      <div className="text-xs text-gray-400">Words/Min</div>
+                      <div className="text-xs text-gray-500 mt-1">Speech Rate</div>
+                    </div>
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-green-400">
+                        {sessionData.voiceMetrics?.fluencyScore || 'N/A'}
+                      </div>
+                      <div className="text-xs text-gray-400">/10</div>
+                      <div className="text-xs text-gray-500 mt-1">Fluency</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-400">
+                        {sessionData.voiceMetrics?.voiceConfidence || 'N/A'}
+                      </div>
+                      <div className="text-xs text-gray-400">/10</div>
+                      <div className="text-xs text-gray-500 mt-1">Confidence</div>
+                    </div>
+                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-400">
+                        {sessionData.voiceMetrics?.fillerWordCount || 'N/A'}
+                      </div>
+                      <div className="text-xs text-gray-400">count</div>
+                      <div className="text-xs text-gray-500 mt-1">Filler Words</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <p><strong>Speech Rate:</strong> Words spoken per minute - ideal range: 120-160 WPM</p>
+                    <p><strong>Fluency:</strong> Smoothness and flow of speech without hesitations</p>
+                    <p><strong>Confidence:</strong> Voice tone and delivery confidence level</p>
+                    <p><strong>Filler Words:</strong> "Um", "uh", "like" - fewer is better</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Back to Dashboard */}
             <button

@@ -409,11 +409,28 @@ export const getInterviewStats = async () => {
       improvement = ((recent - initial) / initial) * 100;
     }
     
+    // Calculate focused interview stats
+    const focusedInterviews = history.filter((interview: any) => interview.interviewType).length;
+    const focusedScores = history.filter((interview: any) => interview.interviewType).map((interview: any) => interview.overallScore);
+    const focusedAverageScore = focusedScores.length > 0 ? focusedScores.reduce((sum: number, score: number) => sum + score, 0) / focusedScores.length : 0;
+    
+    // Find most practiced type
+    const typeCounts: { [key: string]: number } = {};
+    history.forEach((interview: any) => {
+      if (interview.interviewType) {
+        typeCounts[interview.interviewType] = (typeCounts[interview.interviewType] || 0) + 1;
+      }
+    });
+    const mostPracticedType = Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
+    
     return {
       totalInterviews,
       averageScore: Math.round(averageScore),
       totalHours: Math.round(totalHours * 10) / 10,
       improvement: Math.round(improvement),
+      focusedInterviews,
+      focusedAverageScore: Math.round(focusedAverageScore),
+      mostPracticedType,
       speechMetrics: null
     };
   }
@@ -421,13 +438,22 @@ export const getInterviewStats = async () => {
   try {
     const { data, error } = await supabase
       .from('interview_sessions')
-      .select('overall_score, duration, created_at, speech_metrics, responses')
+      .select('overall_score, duration, created_at, speech_metrics, responses, interview_type')
       .eq('status', 'completed')
       .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching interview stats:', error);
-      return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0, speechMetrics: null };
+      return { 
+        totalInterviews: 0, 
+        averageScore: 0, 
+        totalHours: 0, 
+        improvement: 0, 
+        focusedInterviews: 0,
+        focusedAverageScore: 0,
+        mostPracticedType: '',
+        speechMetrics: null 
+      };
     }
 
     const totalInterviews = data.length;
@@ -440,6 +466,22 @@ export const getInterviewStats = async () => {
       const initial = data.slice(0, 3).reduce((sum, session) => sum + session.overall_score, 0) / 3;
       improvement = ((recent - initial) / initial) * 100;
     }
+
+    // Calculate focused interview stats
+    const focusedSessions = data.filter(session => session.interview_type);
+    const focusedInterviews = focusedSessions.length;
+    const focusedAverageScore = focusedSessions.length > 0 
+      ? focusedSessions.reduce((sum, session) => sum + session.overall_score, 0) / focusedSessions.length 
+      : 0;
+    
+    // Find most practiced type
+    const typeCounts: { [key: string]: number } = {};
+    focusedSessions.forEach(session => {
+      if (session.interview_type) {
+        typeCounts[session.interview_type] = (typeCounts[session.interview_type] || 0) + 1;
+      }
+    });
+    const mostPracticedType = Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
 
     // Calculate speech metrics averages
     const sessionsWithSpeech = data.filter(session => 
@@ -474,12 +516,24 @@ export const getInterviewStats = async () => {
       averageScore: Math.round(averageScore),
       totalHours: Math.round(totalHours * 10) / 10,
       improvement: Math.round(improvement),
+      focusedInterviews,
+      focusedAverageScore: Math.round(focusedAverageScore),
+      mostPracticedType,
       speechMetrics
     };
 
   } catch (error) {
     console.error('Failed to fetch interview stats:', error);
-    return { totalInterviews: 0, averageScore: 0, totalHours: 0, improvement: 0, speechMetrics: null };
+    return { 
+      totalInterviews: 0, 
+      averageScore: 0, 
+      totalHours: 0, 
+      improvement: 0, 
+      focusedInterviews: 0,
+      focusedAverageScore: 0,
+      mostPracticedType: '',
+      speechMetrics: null 
+    };
   }
 };
 

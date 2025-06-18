@@ -29,7 +29,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
     totalInterviews: 0,
     averageScore: 0,
     totalHours: 0,
-    improvement: 0
+    improvement: 0,
+    focusedInterviews: 0,
+    focusedAverageScore: 0,
+    mostPracticedType: ''
   });
   const [strengthsAndWeaknesses, setStrengthsAndWeaknesses] = useState({
     strengths: [] as string[],
@@ -144,6 +147,46 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
             </div>
           </div>
         </motion.div>
+
+        {/* Focused Interview Stats */}
+        {stats.focusedInterviews > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mb-12"
+          >
+            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <Target className="w-5 h-5 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Focused Practice Stats</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-400 mb-2">
+                    {stats.focusedInterviews}
+                  </div>
+                  <p className="text-gray-400 text-sm">Focused Sessions</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-400 mb-2">
+                    {stats.focusedAverageScore}%
+                  </div>
+                  <p className="text-gray-400 text-sm">Average Score</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-purple-400 mb-2 capitalize">
+                    {stats.mostPracticedType || 'None'}
+                  </div>
+                  <p className="text-gray-400 text-sm">Most Practiced</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Strengths and Weaknesses */}
         <motion.div
@@ -269,22 +312,22 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                 <div className="bg-dark-800/30 rounded-lg p-4 text-center">
                   <div className="text-2xl mb-2">💻</div>
                   <h4 className="font-medium text-white mb-1">Technical</h4>
-                  <p className="text-xs text-gray-400">5 min • 4 questions</p>
+                  <p className="text-xs text-gray-400">5 min</p>
                 </div>
                 <div className="bg-dark-800/30 rounded-lg p-4 text-center">
                   <div className="text-2xl mb-2">🎯</div>
                   <h4 className="font-medium text-white mb-1">Behavioral</h4>
-                  <p className="text-xs text-gray-400">4 min • 3 questions</p>
+                  <p className="text-xs text-gray-400">4 min</p>
                 </div>
                 <div className="bg-dark-800/30 rounded-lg p-4 text-center">
                   <div className="text-2xl mb-2">🧩</div>
                   <h4 className="font-medium text-white mb-1">Situational</h4>
-                  <p className="text-xs text-gray-400">4 min • 3 questions</p>
+                  <p className="text-xs text-gray-400">4 min</p>
                 </div>
                 <div className="bg-dark-800/30 rounded-lg p-4 text-center">
                   <div className="text-2xl mb-2">👑</div>
                   <h4 className="font-medium text-white mb-1">Leadership</h4>
-                  <p className="text-xs text-gray-400">5 min • 4 questions</p>
+                  <p className="text-xs text-gray-400">5 min</p>
                 </div>
               </div>
               

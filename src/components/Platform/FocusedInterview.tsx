@@ -21,7 +21,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { InterviewSetup, Question, InterviewResponse } from '../../types/interview';
-import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput } from '../../utils/openai';
+import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput, generateNextQuestion } from '../../utils/openai';
 import AIInterviewer from '../AIInterviewer';
 
 interface FocusedInterviewProps {
@@ -79,56 +79,56 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       description: 'Practice coding, system design, and technical concepts',
       icon: '💻',
       duration: 5, // minutes
-      maxQuestions: 4
+      maxQuestions: null // No question limit - time-based only
     },
     behavioral: {
       title: 'Behavioral Questions',
       description: 'Master the STAR method and leadership scenarios',
       icon: '🎯',
       duration: 4,
-      maxQuestions: 3
+      maxQuestions: null
     },
     situational: {
       title: 'Situational Questions',
       description: 'Handle workplace challenges and problem-solving',
       icon: '🧩',
       duration: 4,
-      maxQuestions: 3
+      maxQuestions: null
     },
     resume: {
       title: 'Resume Questions',
       description: 'Articulate your background and experience effectively',
       icon: '📄',
       duration: 3,
-      maxQuestions: 2
+      maxQuestions: null
     },
     leadership: {
       title: 'Leadership Questions',
       description: 'Demonstrate leadership and management skills',
       icon: '👑',
       duration: 5,
-      maxQuestions: 4
+      maxQuestions: null
     },
     caseStudy: {
       title: 'Case Study Interviews',
       description: 'Practice business and technical case scenarios',
       icon: '📊',
       duration: 8,
-      maxQuestions: 3
+      maxQuestions: null
     },
     systemDesign: {
       title: 'System Design Interviews',
       description: 'Master architecture and scalability discussions',
       icon: '🏗️',
       duration: 10,
-      maxQuestions: 2
+      maxQuestions: null
     },
     leadershipAssessment: {
       title: 'Leadership Assessment',
       description: 'Advanced management and executive scenarios',
       icon: '⚡',
       duration: 8,
-      maxQuestions: 3
+      maxQuestions: null
     }
   };
 
@@ -304,8 +304,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       setUserResponse('');
       
       // Check if interview should continue
-      if (updatedResponses.length >= config.maxQuestions || 
-          (Date.now() - (startTime?.getTime() || 0)) / 1000 / 60 >= config.duration) {
+      if ((Date.now() - (startTime?.getTime() || 0)) / 1000 / 60 >= config.duration) {
         await completeInterview(updatedResponses);
       } else {
         // Move to next question
@@ -331,7 +330,40 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
         setCanUserRespond(true);
       }
     } else {
-      await completeInterview(currentResponses);
+      // Generate a follow-up question based on the last response
+      setIsGeneratingQuestion(true);
+      
+      try {
+        const lastResponse = currentResponses[currentResponses.length - 1];
+        const lastQuestion = questions[currentQuestionIndex];
+        
+        // Create a simple follow-up question
+        const followUpText = `Based on your response about "${lastQuestion.text}", can you provide more specific details or examples?`;
+        
+        const followUpQuestion: Question = {
+          id: `q${questions.length + 1}`,
+          text: followUpText,
+          type: 'follow_up',
+          difficulty: 'medium'
+        };
+        
+        // Add the follow-up question to the questions array
+        setQuestions(prev => [...prev, followUpQuestion]);
+        setCurrentQuestionIndex(questions.length);
+        
+        // Play the question if in voice mode
+        if (isVoiceMode && hasOpenAIKey) {
+          await playQuestion(followUpQuestion.text);
+        } else {
+          setCanUserRespond(true);
+        }
+      } catch (error) {
+        console.error('Error generating follow-up question:', error);
+        // If follow-up generation fails, complete the interview
+        await completeInterview(currentResponses);
+      } finally {
+        setIsGeneratingQuestion(false);
+      }
     }
   };
 
@@ -516,7 +548,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <Target className="w-4 h-4" />
-                <span>{responses.length + 1} / {config.maxQuestions}</span>
+                <span>Q{responses.length + 1}</span>
               </div>
             </div>
           </div>
@@ -626,7 +658,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
                   </h4>
                   <ul className="text-xs text-gray-400 space-y-1">
                     <li>• Duration: {config.duration} minutes</li>
-                    <li>• Questions: {config.maxQuestions} maximum</li>
+                    <li>• Questions: Time-based</li>
                     <li>• Focus: {config.description}</li>
                     <li>• {isVoiceMode ? 'Voice interaction' : 'Text-based responses'}</li>
                   </ul>

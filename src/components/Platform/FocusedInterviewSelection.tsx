@@ -11,7 +11,9 @@ import {
   Users,
   Puzzle,
   FileText,
-  Crown
+  Crown,
+  BarChart3,
+  Building2
 } from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
 
@@ -33,7 +35,6 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Practice coding, system design, and technical concepts',
       icon: '💻',
       duration: '5 min',
-      questions: '4 questions',
       color: 'from-blue-500 to-cyan-500',
       bgColor: 'from-blue-500/10 to-cyan-500/5',
       borderColor: 'border-blue-500/20',
@@ -46,12 +47,11 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Master the STAR method and leadership scenarios',
       icon: '🎯',
       duration: '4 min',
-      questions: '3 questions',
       color: 'from-green-500 to-emerald-500',
       bgColor: 'from-green-500/10 to-emerald-500/5',
       borderColor: 'border-green-500/20',
-      iconComponent: Users,
-      features: ['STAR method', 'Leadership examples', 'Teamwork scenarios', 'Problem-solving stories']
+      iconComponent: Target,
+      features: ['STAR method', 'Leadership scenarios', 'Past experiences', 'Team collaboration']
     },
     {
       id: 'situational',
@@ -59,12 +59,11 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Handle workplace challenges and problem-solving',
       icon: '🧩',
       duration: '4 min',
-      questions: '3 questions',
       color: 'from-purple-500 to-pink-500',
       bgColor: 'from-purple-500/10 to-pink-500/5',
       borderColor: 'border-purple-500/20',
       iconComponent: Puzzle,
-      features: ['Workplace scenarios', 'Conflict resolution', 'Decision-making', 'Problem-solving']
+      features: ['Problem-solving', 'Workplace scenarios', 'Decision making', 'Conflict resolution']
     },
     {
       id: 'resume',
@@ -72,12 +71,11 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Articulate your background and experience effectively',
       icon: '📄',
       duration: '3 min',
-      questions: '2 questions',
       color: 'from-orange-500 to-red-500',
       bgColor: 'from-orange-500/10 to-red-500/5',
       borderColor: 'border-orange-500/20',
       iconComponent: FileText,
-      features: ['Background discussion', 'Experience articulation', 'Achievement highlights', 'Career motivations']
+      features: ['Experience articulation', 'Background discussion', 'Achievement highlights', 'Career progression']
     },
     {
       id: 'leadership',
@@ -85,12 +83,11 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Demonstrate leadership and management skills',
       icon: '👑',
       duration: '5 min',
-      questions: '4 questions',
       color: 'from-yellow-500 to-orange-500',
       bgColor: 'from-yellow-500/10 to-orange-500/5',
       borderColor: 'border-yellow-500/20',
       iconComponent: Crown,
-      features: ['Team management', 'Strategic thinking', 'Influence scenarios', 'Organizational impact']
+      features: ['Team management', 'Strategic thinking', 'Influence skills', 'Decision making']
     },
     {
       id: 'caseStudy',
@@ -98,11 +95,10 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Practice business and technical case scenarios',
       icon: '📊',
       duration: '8 min',
-      questions: '3 questions',
       color: 'from-indigo-500 to-purple-500',
       bgColor: 'from-indigo-500/10 to-purple-500/5',
       borderColor: 'border-indigo-500/20',
-      iconComponent: Brain,
+      iconComponent: BarChart3,
       features: ['Business case scenarios', 'Technical case studies', 'Market analysis', 'Strategy development']
     },
     {
@@ -111,11 +107,10 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Master architecture and scalability discussions',
       icon: '🏗️',
       duration: '10 min',
-      questions: '2 questions',
       color: 'from-teal-500 to-cyan-500',
       bgColor: 'from-teal-500/10 to-cyan-500/5',
       borderColor: 'border-teal-500/20',
-      iconComponent: Zap,
+      iconComponent: Building2,
       features: ['Architecture design', 'Scalability discussions', 'Technical whiteboarding', 'Real-time feedback']
     },
     {
@@ -124,12 +119,11 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       description: 'Advanced management and executive scenarios',
       icon: '⚡',
       duration: '8 min',
-      questions: '3 questions',
-      color: 'from-red-500 to-pink-500',
-      bgColor: 'from-red-500/10 to-pink-500/5',
-      borderColor: 'border-red-500/20',
-      iconComponent: Target,
-      features: ['Management simulations', 'Conflict resolution', 'Strategic decisions', 'Executive presence']
+      color: 'from-violet-500 to-purple-500',
+      bgColor: 'from-violet-500/10 to-purple-500/5',
+      borderColor: 'border-violet-500/20',
+      iconComponent: Zap,
+      features: ['Management scenarios', 'Team conflict resolution', 'Strategic decision-making', 'Executive presence']
     }
   ];
 
@@ -219,10 +213,6 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
                 <div className="flex items-center gap-1 text-gray-400">
                   <Clock className="w-4 h-4" />
                   <span>{type.duration}</span>
-                </div>
-                <div className="flex items-center gap-1 text-gray-400">
-                  <Target className="w-4 h-4" />
-                  <span>{type.questions}</span>
                 </div>
               </div>
 
