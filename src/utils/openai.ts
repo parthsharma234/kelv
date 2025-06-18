@@ -1157,6 +1157,27 @@ export const generateFocusedQuestions = async (interviewType: string, setup: Int
         duration: 5,
         maxQuestions: 4,
         focus: 'team management, strategic thinking, influence, and organizational leadership'
+      },
+      caseStudy: {
+        title: 'Case Study Interviews',
+        description: 'Practice business and technical case scenarios',
+        duration: 8,
+        maxQuestions: 3,
+        focus: 'business analysis, market research, strategic thinking, and problem-solving frameworks'
+      },
+      systemDesign: {
+        title: 'System Design Interviews',
+        description: 'Master architecture and scalability discussions',
+        duration: 10,
+        maxQuestions: 2,
+        focus: 'system architecture, scalability, technical design, and trade-off analysis'
+      },
+      leadershipAssessment: {
+        title: 'Leadership Assessment',
+        description: 'Advanced management and executive scenarios',
+        duration: 8,
+        maxQuestions: 3,
+        focus: 'executive decision-making, organizational leadership, strategic management, and high-stakes scenarios'
       }
     };
 
@@ -1223,6 +1244,30 @@ LEADERSHIP QUESTION GUIDELINES:
 - Include strategic thinking scenarios
 - Ask about organizational impact
 - Probe for leadership philosophy and approach` : ''}
+
+${interviewType === 'caseStudy' ? `
+CASE STUDY QUESTION GUIDELINES:
+- Present realistic business or technical scenarios
+- Focus on analytical thinking and problem-solving
+- Include market analysis and strategic considerations
+- Ask for structured approach using frameworks (Porter, McKinsey, etc.)
+- Require quantitative analysis and recommendations` : ''}
+
+${interviewType === 'systemDesign' ? `
+SYSTEM DESIGN QUESTION GUIDELINES:
+- Focus on architecture and scalability challenges
+- Include trade-off analysis and decision-making
+- Ask for detailed technical design discussions
+- Cover performance, reliability, and scalability considerations
+- Require whiteboarding-style thinking and communication` : ''}
+
+${interviewType === 'leadershipAssessment' ? `
+LEADERSHIP ASSESSMENT GUIDELINES:
+- Present high-stakes executive scenarios
+- Focus on strategic decision-making under pressure
+- Include organizational leadership and change management
+- Ask about executive presence and influence
+- Probe for board-level thinking and stakeholder management` : ''}
 
 Return ONLY this JSON format:
 [

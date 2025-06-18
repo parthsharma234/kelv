@@ -8,7 +8,7 @@ export interface InterviewSetup {
 export interface Question {
   id: string;
   text: string;
-  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit';
+  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment';
   category?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   followUp?: string;

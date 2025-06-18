@@ -25,7 +25,7 @@ import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecor
 import AIInterviewer from '../AIInterviewer';
 
 interface FocusedInterviewProps {
-  interviewType: 'technical' | 'behavioral' | 'situational' | 'resume' | 'leadership';
+  interviewType: 'technical' | 'behavioral' | 'situational' | 'resume' | 'leadership' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment';
   setup: InterviewSetup;
   onComplete: (sessionData: any) => void;
   onBack: () => void;
@@ -108,6 +108,27 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       icon: '👑',
       duration: 5,
       maxQuestions: 4
+    },
+    caseStudy: {
+      title: 'Case Study Interviews',
+      description: 'Practice business and technical case scenarios',
+      icon: '📊',
+      duration: 8,
+      maxQuestions: 3
+    },
+    systemDesign: {
+      title: 'System Design Interviews',
+      description: 'Master architecture and scalability discussions',
+      icon: '🏗️',
+      duration: 10,
+      maxQuestions: 2
+    },
+    leadershipAssessment: {
+      title: 'Leadership Assessment',
+      description: 'Advanced management and executive scenarios',
+      icon: '⚡',
+      duration: 8,
+      maxQuestions: 3
     }
   };
 

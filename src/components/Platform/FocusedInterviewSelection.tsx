@@ -91,6 +91,45 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       borderColor: 'border-yellow-500/20',
       iconComponent: Crown,
       features: ['Team management', 'Strategic thinking', 'Influence scenarios', 'Organizational impact']
+    },
+    {
+      id: 'caseStudy',
+      title: 'Case Study Interviews',
+      description: 'Practice business and technical case scenarios',
+      icon: '📊',
+      duration: '8 min',
+      questions: '3 questions',
+      color: 'from-indigo-500 to-purple-500',
+      bgColor: 'from-indigo-500/10 to-purple-500/5',
+      borderColor: 'border-indigo-500/20',
+      iconComponent: Brain,
+      features: ['Business case scenarios', 'Technical case studies', 'Market analysis', 'Strategy development']
+    },
+    {
+      id: 'systemDesign',
+      title: 'System Design Interviews',
+      description: 'Master architecture and scalability discussions',
+      icon: '🏗️',
+      duration: '10 min',
+      questions: '2 questions',
+      color: 'from-teal-500 to-cyan-500',
+      bgColor: 'from-teal-500/10 to-cyan-500/5',
+      borderColor: 'border-teal-500/20',
+      iconComponent: Zap,
+      features: ['Architecture design', 'Scalability discussions', 'Technical whiteboarding', 'Real-time feedback']
+    },
+    {
+      id: 'leadershipAssessment',
+      title: 'Leadership Assessment',
+      description: 'Advanced management and executive scenarios',
+      icon: '⚡',
+      duration: '8 min',
+      questions: '3 questions',
+      color: 'from-red-500 to-pink-500',
+      bgColor: 'from-red-500/10 to-pink-500/5',
+      borderColor: 'border-red-500/20',
+      iconComponent: Target,
+      features: ['Management simulations', 'Conflict resolution', 'Strategic decisions', 'Executive presence']
     }
   ];
 
@@ -150,7 +189,7 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
         >
           {interviewTypes.map((type, index) => (
             <motion.div

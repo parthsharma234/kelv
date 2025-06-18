@@ -73,6 +73,21 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
         strong: ['Good leadership philosophy', 'Team management understanding', 'Strategic thinking approach'],
         improve: ['Practice complex scenarios', 'Develop influence strategies', 'Work on organizational impact'],
         tips: ['Study leadership frameworks', 'Practice influence scenarios', 'Focus on organizational impact']
+      },
+      caseStudy: {
+        strong: ['Strong analytical thinking', 'Good framework application', 'Clear problem breakdown'],
+        improve: ['Practice more complex cases', 'Work on quantitative analysis', 'Improve recommendation clarity'],
+        tips: ['Study case frameworks (Porter, McKinsey)', 'Practice market sizing', 'Work on recommendation structure']
+      },
+      systemDesign: {
+        strong: ['Good architectural thinking', 'Clear system breakdown', 'Consideration of trade-offs'],
+        improve: ['Practice scalability discussions', 'Work on detailed design', 'Improve technical depth'],
+        tips: ['Study system design patterns', 'Practice scalability scenarios', 'Focus on trade-off analysis']
+      },
+      leadershipAssessment: {
+        strong: ['Strong executive presence', 'Good strategic thinking', 'Clear decision-making process'],
+        improve: ['Practice complex scenarios', 'Work on influence strategies', 'Improve organizational impact'],
+        tips: ['Study executive frameworks', 'Practice high-stakes decisions', 'Focus on organizational leadership']
       }
     };
 
@@ -85,7 +100,10 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
       behavioral: score >= 80 ? 'Practice complex leadership scenarios' : 'Work on STAR method structure',
       situational: score >= 80 ? 'Try strategic decision-making scenarios' : 'Practice basic problem-solving',
       resume: score >= 80 ? 'Practice advanced career questions' : 'Work on achievement quantification',
-      leadership: score >= 80 ? 'Try executive-level scenarios' : 'Focus on team management basics'
+      leadership: score >= 80 ? 'Try executive-level scenarios' : 'Focus on team management basics',
+      caseStudy: score >= 80 ? 'Try complex business scenarios' : 'Focus on case framework fundamentals',
+      systemDesign: score >= 80 ? 'Try large-scale architecture challenges' : 'Focus on basic system components',
+      leadershipAssessment: score >= 80 ? 'Try board-level scenarios' : 'Focus on management fundamentals'
     };
 
     return recommendations[interviewType as keyof typeof recommendations] || 'Continue practicing';
@@ -100,7 +118,10 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
     behavioral: { icon: '🎯', title: 'Behavioral Questions', color: 'from-green-500 to-emerald-500' },
     situational: { icon: '🧩', title: 'Situational Questions', color: 'from-purple-500 to-pink-500' },
     resume: { icon: '📄', title: 'Resume Questions', color: 'from-orange-500 to-red-500' },
-    leadership: { icon: '👑', title: 'Leadership Questions', color: 'from-yellow-500 to-orange-500' }
+    leadership: { icon: '👑', title: 'Leadership Questions', color: 'from-yellow-500 to-orange-500' },
+    caseStudy: { icon: '📊', title: 'Case Study Interviews', color: 'from-indigo-500 to-purple-500' },
+    systemDesign: { icon: '🏗️', title: 'System Design Interviews', color: 'from-teal-500 to-cyan-500' },
+    leadershipAssessment: { icon: '⚡', title: 'Leadership Assessment', color: 'from-red-500 to-pink-500' }
   };
 
   const config = interviewTypeConfig[sessionData.interviewType as keyof typeof interviewTypeConfig];
