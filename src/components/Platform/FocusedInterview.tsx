@@ -469,7 +469,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header */}
-      <div className="sticky top-0 bg-dark-900/95 backdrop-blur-sm border-b border-dark-700 z-20">
+      <div className="sticky top-16 bg-dark-900/95 backdrop-blur-sm border-b border-dark-700 z-30">
         <div className="container max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
