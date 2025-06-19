@@ -109,6 +109,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
             <div className="text-3xl font-bold text-white">
               {isLoading ? '...' : stats.totalInterviews}
             </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? `${Math.round(stats.totalHours * 60)} minutes practiced` : 'Ready to start your journey!'}
+            </div>
           </div>
 
           <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
@@ -119,7 +122,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
               <span className="text-gray-400 text-sm">Average Score</span>
             </div>
             <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : `${stats.averageScore}%`}
+              {isLoading ? '...' : stats.totalInterviews > 0 ? `${stats.averageScore}%` : '--'}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? 
+                (stats.averageScore >= 80 ? 'Excellent performance!' : 
+                 stats.averageScore >= 60 ? 'Good progress, keep practicing!' : 
+                 'Keep practicing to improve') : 
+                'Your first interview awaits'}
             </div>
           </div>
 
@@ -131,7 +141,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
               <span className="text-gray-400 text-sm">Practice Hours</span>
             </div>
             <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : `${stats.totalHours}h`}
+              {isLoading ? '...' : stats.totalInterviews > 0 ? `${stats.totalHours}h` : '0h'}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? 
+                (stats.totalHours > 10 ? 'Dedicated practice time!' : 
+                 stats.totalHours > 5 ? 'Building momentum' : 
+                 'Consistent practice pays off') : 
+                'Begin your practice today'}
             </div>
           </div>
 
@@ -143,50 +160,70 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
               <span className="text-gray-400 text-sm">Improvement</span>
             </div>
             <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : `${stats.improvement > 0 ? '+' : ''}${stats.improvement}%`}
+              {isLoading ? '...' : stats.totalInterviews > 0 ? `${stats.improvement > 0 ? '+' : ''}${stats.improvement}%` : '--'}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? 
+                (stats.improvement > 10 ? 'Outstanding growth!' : 
+                 stats.improvement > 0 ? 'Steady improvement' : 
+                 'Focus on consistent practice') : 
+                'Start practicing to see growth'}
             </div>
           </div>
         </motion.div>
 
         {/* Focused Interview Stats */}
-        {stats.focusedInterviews > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="mb-12"
-          >
-            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Target className="w-5 h-5 text-blue-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-white">Focused Practice Stats</h3>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+        >
+          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/30 transition-all">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Target className="w-5 h-5 text-blue-400" />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-400 mb-2">
-                    {stats.focusedInterviews}
-                  </div>
-                  <p className="text-gray-400 text-sm">Focused Sessions</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-400 mb-2">
-                    {stats.focusedAverageScore}%
-                  </div>
-                  <p className="text-gray-400 text-sm">Average Score</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-400 mb-2 capitalize">
-                    {stats.mostPracticedType || 'None'}
-                  </div>
-                  <p className="text-gray-400 text-sm">Most Practiced</p>
-                </div>
-              </div>
+              <span className="text-gray-400 text-sm">Focused Sessions</span>
             </div>
-          </motion.div>
-        )}
+            <div className="text-3xl font-bold text-white">
+              {stats.focusedInterviews}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {stats.focusedInterviews > 0 ? 'Targeted practice completed' : 'Try focused practice sessions'}
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/30 transition-all">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Award className="w-5 h-5 text-blue-400" />
+              </div>
+              <span className="text-gray-400 text-sm">Focused Score</span>
+            </div>
+            <div className="text-3xl font-bold text-white">
+              {stats.focusedInterviews > 0 ? `${stats.focusedAverageScore}%` : '--'}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {stats.focusedInterviews > 0 ? 'Average focused practice score' : 'Complete focused sessions to see score'}
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/30 transition-all">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+              </div>
+              <span className="text-gray-400 text-sm">Most Practiced</span>
+            </div>
+            <div className="text-3xl font-bold text-white capitalize">
+              {stats.focusedInterviews > 0 ? (stats.mostPracticedType || 'None') : '--'}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {stats.focusedInterviews > 0 ? 'Your preferred practice type' : 'Explore different practice types'}
+            </div>
+          </div>
+        </motion.div>
 
         {/* Strengths and Weaknesses */}
         <motion.div

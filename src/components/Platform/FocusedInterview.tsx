@@ -20,7 +20,7 @@ import {
   Award,
   TrendingUp
 } from 'lucide-react';
-import { InterviewSetup, Question, InterviewResponse } from '../../types/interview';
+import { InterviewSetup, Question, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput, generateNextQuestion } from '../../utils/openai';
 import AIInterviewer from '../AIInterviewer';
 
@@ -67,6 +67,12 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const [canUserRespond, setCanUserRespond] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const [aiState] = useState<AIInterviewerState>({
+    currentPersonality: 'friendly',
+    adaptationLevel: 5,
+    questionFlow: 'adaptive',
+    focusAreas: []
+  });
 
   const isVoiceMode = setup.interviewMode === 'voice';
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
@@ -330,28 +336,19 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
         setCanUserRespond(true);
       }
     } else {
-      // Generate a follow-up question based on the last response
+      // Generate a follow-up question using AI
       setIsGeneratingQuestion(true);
-      
       try {
-        const lastResponse = currentResponses[currentResponses.length - 1];
-        const lastQuestion = questions[currentQuestionIndex];
-        
-        // Create a simple follow-up question
-        const followUpText = `Based on your response about "${lastQuestion.text}", can you provide more specific details or examples?`;
-        
+        // Use the AI-powered generateNextQuestion function
+        const aiFollowUp = await generateNextQuestion(setup, currentResponses, aiState, 'follow_up', startTime ?? undefined);
         const followUpQuestion: Question = {
-          id: `q${questions.length + 1}`,
-          text: followUpText,
-          type: 'follow_up',
-          difficulty: 'medium'
+          id: aiFollowUp.id || `q${questions.length + 1}`,
+          text: aiFollowUp.text,
+          type: aiFollowUp.type || 'follow_up',
+          difficulty: aiFollowUp.difficulty || 'medium'
         };
-        
-        // Add the follow-up question to the questions array
         setQuestions(prev => [...prev, followUpQuestion]);
         setCurrentQuestionIndex(questions.length);
-        
-        // Play the question if in voice mode
         if (isVoiceMode && hasOpenAIKey) {
           await playQuestion(followUpQuestion.text);
         } else {

@@ -617,14 +617,6 @@ export const getUserStrengthsAndWeaknesses = async () => {
       weaknesses.push('Overall interview performance needs improvement');
     }
 
-    // Add default strengths/weaknesses if none found
-    if (strengths.length === 0) {
-      strengths.push('Consistent participation in practice sessions');
-    }
-    if (weaknesses.length === 0) {
-      weaknesses.push('Continue practicing to identify specific areas for improvement');
-    }
-
     return {
       strengths: strengths.slice(0, 3), // Limit to top 3
       weaknesses: weaknesses.slice(0, 3), // Limit to top 3
@@ -634,9 +626,55 @@ export const getUserStrengthsAndWeaknesses = async () => {
   } catch (error) {
     console.error('Failed to analyze strengths and weaknesses:', error);
     return { 
-      strengths: ['Consistent participation in practice sessions'], 
-      weaknesses: ['Continue practicing to identify specific areas for improvement'],
+      strengths: [], 
+      weaknesses: [],
       categories: {}
     };
+  }
+};
+
+export const getInterviewById = async (interviewId: string) => {
+  if (!isSupabaseConfigured()) {
+    // Return localStorage data as fallback
+    const localHistory = localStorage.getItem('kelv-interview-history');
+    const history = localHistory ? JSON.parse(localHistory) : [];
+    return history.find((interview: any) => interview.id === interviewId) || null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('interview_sessions')
+      .select('*')
+      .eq('id', interviewId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching interview by ID:', error);
+      return null;
+    }
+
+    // Transform Supabase data to InterviewHistory format
+    return {
+      id: data.id,
+      date: new Date(data.created_at),
+      setup: data.setup,
+      overallScore: data.overall_score,
+      duration: data.duration,
+      questionsAnswered: data.questions_answered,
+      status: data.status as 'completed' | 'incomplete',
+      responses: data.responses,
+      interviewType: data.interview_type,
+      speechMetrics: data.speech_metrics,
+      speechMetricsAverage: data.speech_metrics ? {
+        overallConfidence: data.speech_metrics.confidence?.overallConfidence || 0,
+        fluencyScore: data.speech_metrics.fluency?.fluencyScore || 0,
+        speechRate: data.speech_metrics.timing?.speechRate || 0,
+        voiceStability: data.speech_metrics.voice?.voiceStability || 0
+      } : undefined
+    };
+
+  } catch (error) {
+    console.error('Failed to fetch interview by ID:', error);
+    return null;
   }
 };

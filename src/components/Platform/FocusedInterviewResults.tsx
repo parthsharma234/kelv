@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Brain, 
@@ -15,6 +15,7 @@ import {
   Zap,
   Mic
 } from 'lucide-react';
+import { saveInterviewSession } from '../../utils/supabase-interview';
 
 interface FocusedInterviewResultsProps {
   sessionData: any;
@@ -114,6 +115,9 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   const insights = getCategoryInsights(sessionData.interviewType, sessionData.overallScore);
   const nextPractice = getNextPracticeRecommendations(sessionData.interviewType, sessionData.overallScore);
 
+  // Check if all responses are empty
+  const allResponsesEmpty = sessionData.responses.every((r: any) => !r.response || r.response.trim() === '');
+
   const interviewTypeConfig = {
     technical: { icon: '💻', title: 'Technical Questions', color: 'from-blue-500 to-cyan-500' },
     behavioral: { icon: '🎯', title: 'Behavioral Questions', color: 'from-green-500 to-emerald-500' },
@@ -126,6 +130,18 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   };
 
   const config = interviewTypeConfig[sessionData.interviewType as keyof typeof interviewTypeConfig];
+
+  useEffect(() => {
+    // Save session to Supabase when component mounts
+    const saveSession = async () => {
+      try {
+        await saveInterviewSession(sessionData);
+      } catch (error) {
+        console.error('Failed to save focused session to Supabase:', error);
+      }
+    };
+    saveSession();
+  }, [sessionData]);
 
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
@@ -200,53 +216,63 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
             transition={{ delay: 0.2 }}
             className="lg:col-span-2 space-y-6"
           >
-            {/* Strengths */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                Your Strengths
-              </h3>
-              <div className="space-y-3">
-                {insights.strong.map((strength, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300">{strength}</p>
-                  </div>
-                ))}
+            {allResponsesEmpty ? (
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 text-center">
+                <p className="text-gray-400 text-base py-8">
+                  No responses were recorded for this session. Please answer the questions to receive personalized feedback and tips.
+                </p>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Strengths */}
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    Your Strengths
+                  </h3>
+                  <div className="space-y-3">
+                    {insights.strong.map((strength, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p className="text-gray-300">{strength}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Areas for Improvement */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-orange-400" />
-                Areas for Improvement
-              </h3>
-              <div className="space-y-3">
-                {insights.improve.map((area, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300">{area}</p>
+                {/* Areas for Improvement */}
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-orange-400" />
+                    Areas for Improvement
+                  </h3>
+                  <div className="space-y-3">
+                    {insights.improve.map((area, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p className="text-gray-300">{area}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Practice Tips */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-400" />
-                Practice Tips
-              </h3>
-              <div className="space-y-3">
-                {insights.tips.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300">{tip}</p>
+                {/* Practice Tips */}
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Star className="w-5 h-5 text-yellow-400" />
+                    Practice Tips
+                  </h3>
+                  <div className="space-y-3">
+                    {insights.tips.map((tip, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p className="text-gray-300">{tip}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </motion.div>
 
           {/* Quick Actions */}

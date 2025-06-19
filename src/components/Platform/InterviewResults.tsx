@@ -156,6 +156,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     });
   }
 
+  // Check if all responses are empty
+  const allResponsesEmpty = sessionData.responses.every((r: any) => !r.response || r.response.trim() === '');
+
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">
@@ -435,199 +438,209 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             transition={{ delay: 0.3 }}
             className="space-y-6"
           >
-            {/* Speech Metrics Summary */}
-            {avgSpeechMetrics && (
-              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-green-400" />
-                  Speech Performance
-                </h3>
-                
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
-                      <div className="text-2xl font-bold text-green-400">{avgSpeechMetrics.voiceConfidence}%</div>
-                      <div className="text-xs text-gray-400">Voice Confidence</div>
-                    </div>
-                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-400">{avgSpeechMetrics.fluencyScore}%</div>
-                      <div className="text-xs text-gray-400">Fluency Score</div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-400">{Number(avgSpeechMetrics.speechRate).toFixed(2)}</div>
-                      <div className="text-xs text-gray-400">Words/Min</div>
-                    </div>
-                    <div className="text-center p-3 bg-dark-700/30 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-400">{avgSpeechMetrics.clarity}%</div>
-                      <div className="text-xs text-gray-400">Clarity</div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-dark-700/30 rounded-lg">
-                    <h4 className="font-medium text-white mb-2">Speech Insights</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Delivery Score:</span>
-                        <span className="text-white">{avgSpeechMetrics.delivery}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Avg Filler Words:</span>
-                        <span className={avgSpeechMetrics.fillerWordCount > 3 ? 'text-yellow-400' : 'text-green-400'}>
-                          {avgSpeechMetrics.fillerWordCount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Voice Volume:</span>
-                        <span className="text-white">{avgSpeechMetrics.averageVolume}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            {allResponsesEmpty ? (
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 text-center">
+                <p className="text-gray-400 text-base py-8">
+                  No responses were recorded for this session. Please answer the questions to receive personalized feedback and tips.
+                </p>
               </div>
-            )}
-
-            {/* Performance Analysis */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Brain className="w-5 h-5 text-orange-400" />
-                Analysis
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-orange-400" />
-                    Adaptive Performance
-                  </h4>
-                  <p className="text-sm text-gray-400">
-                    {sessionData.overallScore >= 80 
-                      ? "Excellent! The system recognized your strong performance and provided appropriately challenging questions."
-                      : sessionData.overallScore >= 60
-                      ? "Good progress! The system adapted to help you improve throughout the interview."
-                      : "The system provided supportive questions to help build your confidence. Keep practicing!"
-                    }
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Question Flow</h4>
-                  <div className="space-y-2">
-                    {Object.entries(questionTypes).map(([type, count]) => (
-                      <div key={type} className="flex justify-between text-sm">
-                        <span className="text-gray-400 capitalize">{type.replace('_', ' ')}:</span>
-                        <span className="text-white">{count as number}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Communication Style</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Avg Confidence:</span>
-                      <span className="text-white">{Math.round(avgConfidence)}/10</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Used Examples:</span>
-                      <span className={hasSpecificExamples ? 'text-green-400' : 'text-orange-400'}>
-                        {hasSpecificExamples ? 'Yes' : 'Improve'}
-                      </span>
-                    </div>
-                    {avgSpeechMetrics && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Speech Quality:</span>
-                        <span className={avgSpeechMetrics.voiceConfidence >= 70 ? 'text-green-400' : 'text-orange-400'}>
-                          {avgSpeechMetrics.voiceConfidence >= 70 ? 'Strong' : 'Developing'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4">What's Next?</h3>
-              
-              <div className="space-y-3">
-                <button
-                  onClick={onStartNewInterview}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-medium hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
-                >
-                  <Brain className="w-5 h-5" />
-                  New Interview
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-                
-                <button
-                  onClick={onBackToDashboard}
-                  className="w-full px-6 py-3 bg-dark-700 text-white rounded-xl font-medium hover:bg-dark-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <BarChart3 className="w-5 h-5" />
-                  View Dashboard
-                </button>
-              </div>
-            </div>
-
-            {/* Interview Details */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Session Details</h3>
-              
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Industry:</span>
-                  <span className="text-white">{sessionData.setup.industry}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Role:</span>
-                  <span className="text-white">{sessionData.setup.jobType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Experience:</span>
-                  <span className="text-white">{sessionData.setup.experienceLevel}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Mode:</span>
-                  <span className="text-white flex items-center gap-1">
-                    {sessionData.setup.interviewMode === 'voice' ? (
-                      <>
-                        <Mic className="w-3 h-3" />
-                        Voice Interview
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="w-3 h-3" />
-                        Text Interview
-                      </>
-                    )}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Date:</span>
-                  <span className="text-white">
-                    {new Date(sessionData.startTime).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Model:</span>
-                  <span className="text-white">GPT-4o Dynamic</span>
-                </div>
+            ) : (
+              <>
+                {/* Speech Metrics Summary */}
                 {avgSpeechMetrics && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Speech Analysis:</span>
-                    <span className="text-green-400 flex items-center gap-1">
-                      <Zap className="w-3 h-3" />
-                      Enabled
-                    </span>
+                  <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-green-400" />
+                      Speech Performance
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                          <div className="text-2xl font-bold text-green-400">{avgSpeechMetrics.voiceConfidence}%</div>
+                          <div className="text-xs text-gray-400">Voice Confidence</div>
+                        </div>
+                        <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-400">{avgSpeechMetrics.fluencyScore}%</div>
+                          <div className="text-xs text-gray-400">Fluency Score</div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                          <div className="text-2xl font-bold text-purple-400">{Number(avgSpeechMetrics.speechRate).toFixed(2)}</div>
+                          <div className="text-xs text-gray-400">Words/Min</div>
+                        </div>
+                        <div className="text-center p-3 bg-dark-700/30 rounded-lg">
+                          <div className="text-2xl font-bold text-orange-400">{avgSpeechMetrics.clarity}%</div>
+                          <div className="text-xs text-gray-400">Clarity</div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 bg-dark-700/30 rounded-lg">
+                        <h4 className="font-medium text-white mb-2">Speech Insights</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Delivery Score:</span>
+                            <span className="text-white">{avgSpeechMetrics.delivery}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Avg Filler Words:</span>
+                            <span className={avgSpeechMetrics.fillerWordCount > 3 ? 'text-yellow-400' : 'text-green-400'}>
+                              {avgSpeechMetrics.fillerWordCount}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Voice Volume:</span>
+                            <span className="text-white">{avgSpeechMetrics.averageVolume}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
+
+                {/* Performance Analysis */}
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-orange-400" />
+                    Analysis
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="p-4 bg-dark-700/30 rounded-lg">
+                      <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-orange-400" />
+                        Adaptive Performance
+                      </h4>
+                      <p className="text-sm text-gray-400">
+                        {sessionData.overallScore >= 80 
+                          ? "Excellent! The system recognized your strong performance and provided appropriately challenging questions."
+                          : sessionData.overallScore >= 60
+                          ? "Good progress! The system adapted to help you improve throughout the interview."
+                          : "The system provided supportive questions to help build your confidence. Keep practicing!"
+                        }
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-dark-700/30 rounded-lg">
+                      <h4 className="font-medium text-white mb-2">Question Flow</h4>
+                      <div className="space-y-2">
+                        {Object.entries(questionTypes).map(([type, count]) => (
+                          <div key={type} className="flex justify-between text-sm">
+                            <span className="text-gray-400 capitalize">{type.replace('_', ' ')}:</span>
+                            <span className="text-white">{count as number}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-dark-700/30 rounded-lg">
+                      <h4 className="font-medium text-white mb-2">Communication Style</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-400">Avg Confidence:</span>
+                          <span className="text-white">{Math.round(avgConfidence)}/10</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-400">Used Examples:</span>
+                          <span className={hasSpecificExamples ? 'text-green-400' : 'text-orange-400'}>
+                            {hasSpecificExamples ? 'Yes' : 'Improve'}
+                          </span>
+                        </div>
+                        {avgSpeechMetrics && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Speech Quality:</span>
+                            <span className={avgSpeechMetrics.voiceConfidence >= 70 ? 'text-green-400' : 'text-orange-400'}>
+                              {avgSpeechMetrics.voiceConfidence >= 70 ? 'Strong' : 'Developing'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">What's Next?</h3>
+                  
+                  <div className="space-y-3">
+                    <button
+                      onClick={onStartNewInterview}
+                      className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-medium hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
+                    >
+                      <Brain className="w-5 h-5" />
+                      New Interview
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                    
+                    <button
+                      onClick={onBackToDashboard}
+                      className="w-full px-6 py-3 bg-dark-700 text-white rounded-xl font-medium hover:bg-dark-600 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <BarChart3 className="w-5 h-5" />
+                      View Dashboard
+                    </button>
+                  </div>
+                </div>
+
+                {/* Interview Details */}
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">Session Details</h3>
+                  
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Industry:</span>
+                      <span className="text-white">{sessionData.setup.industry}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Role:</span>
+                      <span className="text-white">{sessionData.setup.jobType}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Experience:</span>
+                      <span className="text-white">{sessionData.setup.experienceLevel}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Mode:</span>
+                      <span className="text-white flex items-center gap-1">
+                        {sessionData.setup.interviewMode === 'voice' ? (
+                          <>
+                            <Mic className="w-3 h-3" />
+                            Voice Interview
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-3 h-3" />
+                            Text Interview
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Date:</span>
+                      <span className="text-white">
+                        {new Date(sessionData.startTime).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Model:</span>
+                      <span className="text-white">GPT-4o Dynamic</span>
+                    </div>
+                    {avgSpeechMetrics && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Speech Analysis:</span>
+                        <span className="text-green-400 flex items-center gap-1">
+                          <Zap className="w-3 h-3" />
+                          Enabled
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </motion.div>
         </div>
       </div>

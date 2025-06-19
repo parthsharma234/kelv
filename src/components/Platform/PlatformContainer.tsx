@@ -10,7 +10,7 @@ import FocusedInterview from './FocusedInterview';
 import FocusedInterviewResults from './FocusedInterviewResults';
 import { InterviewSetup } from '../../types/interview';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results';
 
 const PlatformContainer: React.FC = () => {
   const { user, loading } = useAuth();
@@ -19,6 +19,7 @@ const PlatformContainer: React.FC = () => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
+  const [viewingInterviewId, setViewingInterviewId] = useState<string>('');
 
   if (loading) {
     return (
@@ -98,12 +99,18 @@ const PlatformContainer: React.FC = () => {
     setCurrentState('focused-interview');
   };
 
+  const handleViewInterviewResults = (interviewId: string) => {
+    setViewingInterviewId(interviewId);
+    setCurrentState('view-results');
+  };
+
   return (
     <>
       {currentState === 'dashboard' && (
         <PlatformDashboard 
           onStartInterview={handleStartInterview}
           onStartFocusedInterview={handleStartFocusedInterview}
+          onViewInterviewResults={handleViewInterviewResults}
         />
       )}
       
@@ -152,6 +159,14 @@ const PlatformContainer: React.FC = () => {
           sessionData={sessionData}
           onBackToDashboard={handleBackToDashboard}
           onStartNewFocusedInterview={handleStartNewFocusedInterview}
+        />
+      )}
+
+      {currentState === 'view-results' && viewingInterviewId && (
+        <InterviewResults 
+          sessionData={{ id: viewingInterviewId }}
+          onBackToDashboard={handleBackToDashboard}
+          onStartNewInterview={handleStartNewInterview}
         />
       )}
     </>
