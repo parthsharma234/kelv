@@ -11,7 +11,7 @@ export interface SavedInterviewSetup {
   updated_at: string;
 }
 
-export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup): Promise<void> => {
+export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup, interviewType?: string): Promise<void> => {
   if (!isSupabaseConfigured()) {
     console.log('Supabase not configured, skipping initial session creation');
     return;
@@ -35,7 +35,8 @@ export const createInitialInterviewSession = async (sessionId: string, setup: In
         questions_answered: 0,
         status: 'incomplete',
         speech_metrics: {},
-        audio_data: {}
+        audio_data: {},
+        interview_type: interviewType
       });
 
     if (error) {
@@ -62,19 +63,19 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
 
     // Prepare speech metrics for storage
     const speechMetrics = sessionData.speechMetrics || {};
-    const audioData = sessionData.audioData || {};
-
-    // Update the existing session record instead of inserting
+    const audioData = sessionData.audioData || {};    // Update the existing session record instead of inserting
     const { error } = await supabase
       .from('interview_sessions')
       .update({
         responses: sessionData.responses,
+        questions: sessionData.questions, // Also save questions array
         overall_score: sessionData.overallScore,
         duration: sessionData.duration,
         questions_answered: sessionData.responses.length,
         status: 'completed',
         speech_metrics: speechMetrics,
-        audio_data: audioData
+        audio_data: audioData,
+        interview_type: sessionData.interviewType // Add interview type to database
       })
       .eq('id', sessionData.id);
 
@@ -381,7 +382,8 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
         fluencyScore: session.speech_metrics.fluency?.fluencyScore || 0,
         speechRate: session.speech_metrics.timing?.speechRate || 0,
         voiceStability: session.speech_metrics.voice?.voiceStability || 0
-      } : undefined
+      } : undefined,
+      interviewType: session.interview_type // Add this line
     }));
 
   } catch (error) {
@@ -633,12 +635,31 @@ export const getUserStrengthsAndWeaknesses = async () => {
   }
 };
 
-export const getInterviewById = async (interviewId: string) => {
-  if (!isSupabaseConfigured()) {
+export const getInterviewById = async (interviewId: string) => {  if (!isSupabaseConfigured()) {
     // Return localStorage data as fallback
     const localHistory = localStorage.getItem('kelv-interview-history');
     const history = localHistory ? JSON.parse(localHistory) : [];
-    return history.find((interview: any) => interview.id === interviewId) || null;
+    const interview = history.find((interview: any) => interview.id === interviewId);
+    
+    if (!interview) return null;
+    
+    // Transform localStorage data to sessionData format if needed
+    return {
+      id: interview.id,
+      setup: interview.setup,
+      overallScore: interview.overallScore,
+      duration: interview.duration,
+      questionsAnswered: interview.questionsAnswered,
+      status: interview.status,
+      responses: interview.responses || [],
+      questions: interview.questions || [],
+      interviewType: interview.interviewType,
+      speechMetrics: interview.speechMetrics ? [interview.speechMetrics] : [],
+      date: new Date(interview.date),
+      startTime: interview.startTime ? new Date(interview.startTime) : new Date(interview.date),
+      endTime: interview.endTime ? new Date(interview.endTime) : undefined,
+      speechMetricsAverage: interview.speechMetricsAverage
+    };
   }
 
   try {
@@ -653,18 +674,21 @@ export const getInterviewById = async (interviewId: string) => {
       return null;
     }
 
-    // Transform Supabase data to InterviewHistory format
+    // Transform Supabase data to sessionData format expected by results components
     return {
       id: data.id,
-      date: new Date(data.created_at),
       setup: data.setup,
       overallScore: data.overall_score,
       duration: data.duration,
       questionsAnswered: data.questions_answered,
       status: data.status as 'completed' | 'incomplete',
-      responses: data.responses,
+      responses: data.responses || [],
+      questions: data.questions || [],
       interviewType: data.interview_type,
-      speechMetrics: data.speech_metrics,
+      speechMetrics: data.speech_metrics ? [data.speech_metrics] : [],
+      date: new Date(data.created_at),
+      startTime: new Date(data.created_at),
+      endTime: data.created_at ? new Date(new Date(data.created_at).getTime() + data.duration * 1000) : undefined,
       speechMetricsAverage: data.speech_metrics ? {
         overallConfidence: data.speech_metrics.confidence?.overallConfidence || 0,
         fluencyScore: data.speech_metrics.fluency?.fluencyScore || 0,

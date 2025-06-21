@@ -8,7 +8,7 @@ export interface InterviewSetup {
 export interface Question {
   id: string;
   text: string;
-  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment';
+  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment' | 'closing'; // Added 'closing' type
   category?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   followUp?: string;
@@ -125,6 +125,7 @@ export interface InterviewHistory {
     speechRate: number;
     voiceStability: number;
   };
+  interviewType?: string; // 'technical', 'behavioral', etc. for focused interviews
 }
 
 export interface AIInterviewerState {

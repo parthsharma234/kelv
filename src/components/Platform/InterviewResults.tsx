@@ -3,12 +3,10 @@ import { motion } from 'framer-motion';
 import { 
   CheckCircle, 
   TrendingUp, 
-  Clock, 
   Target, 
   Brain,
   ArrowRight,
   BarChart3,
-  Award,
   MessageSquare,
   Sparkles,
   Mic,
@@ -17,6 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import { saveInterviewSession } from '../../utils/supabase-interview';
+import { InterviewTimeline } from './InterviewTimeline';
 
 interface InterviewResultsProps {
   sessionData: any;
@@ -158,6 +157,57 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
   // Check if all responses are empty
   const allResponsesEmpty = sessionData.responses.every((r: any) => !r.response || r.response.trim() === '');
+  // Build timeline events from responses with better fallback handling
+  const timelineEvents = sessionData.responses
+    .filter((r: any) => r && (r.response?.trim() || r.analysis)) // Only include valid responses
+    .map((r: any, idx: number) => {
+      // Better time calculation: try multiple sources
+      const time = r.speechMetrics?.timing?.speechDuration || 
+                  r.speechMetrics?.timing?.totalDuration ||
+                  (idx * 60) + Math.random() * 30; // Add variation to make timeline more interesting
+      
+      // Better label generation with more fallback options
+      let label = '';
+      if (sessionData.questions && sessionData.questions.length > 0) {
+        const question = sessionData.questions.find((q: any) => q.id === r.questionId);
+        label = question?.text || `Question ${idx + 1}`;
+      } else {
+        // Generate meaningful labels based on response content or question type
+        if (r.response) {
+          const responseWords = r.response.split(' ').slice(0, 5).join(' ');
+          label = `Response: "${responseWords}..."`;
+        } else {
+          label = `Interview Question ${idx + 1}`;
+        }
+      }
+      
+      // Ensure we have a valid score
+      const value = Math.max(1, Math.min(10, r.analysis?.score ?? 5));
+      
+      // Build comprehensive details
+      let details = '';
+      if (r.analysis) {
+        const detailParts = [
+          r.analysis.strengths?.length ? `✓ Strengths: ${r.analysis.strengths.join(', ')}` : '',
+          r.analysis.areasForImprovement?.length ? `⚠ Areas to improve: ${r.analysis.areasForImprovement.join(', ')}` : '',
+          r.analysis.confidenceIndicators?.enthusiasm ? `📊 Enthusiasm: ${r.analysis.confidenceIndicators.enthusiasm}/10` : ''
+        ].filter(Boolean);
+        details = detailParts.join('\n\n');
+      }
+      
+      // If no analysis details, show response length info
+      if (!details && r.response) {
+        const wordCount = r.response.split(' ').length;
+        details = `Response: ${wordCount} words\nScore: ${value}/10`;
+      }
+      
+      return {
+        time: time + (idx * 2), // spread out a bit
+        label,
+        value,
+        details
+      };
+    });
 
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
@@ -210,6 +260,21 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               </p>
             </div>
           </div>
+        </motion.div>
+
+        {/* Timeline Visualization */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-12"
+        >
+          <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-orange-400" />
+            Interview Performance Timeline
+          </h3>
+          <InterviewTimeline duration={sessionData.duration} events={timelineEvents} />
+          <div className="text-xs text-gray-400 mt-2">Hover over the wave to see your performance and feedback at each moment.</div>
         </motion.div>
 
         {/* Skill Breakdown Section */}
@@ -335,6 +400,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       <div className="bg-dark-700/30 rounded-lg p-4 mb-4">
                         <h5 className="text-sm font-medium text-gray-400 mb-2">Your Response</h5>
                         <p className="text-gray-300 text-sm">{response.response}</p>
+                        {response.audioBlob && (
+                          <audio controls className="mt-2 w-full">
+                            <source src={typeof response.audioBlob === 'string' ? response.audioBlob : URL.createObjectURL(response.audioBlob)} type="audio/webm" />
+                            Your browser does not support the audio element.
+                          </audio>
+                        )}
                       </div>
                       
                       {/* Speech Metrics for this question */}

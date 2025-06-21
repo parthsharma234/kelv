@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, MessageSquare, CheckCircle, Play, Pause, Mic, MicOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Sparkles, Send, Volume2, VolumeX } from 'lucide-react';
-import { InterviewSetup, Question, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
+import { Clock, MessageSquare, Play, Pause, Mic, MicOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Send, Volume2, VolumeX } from 'lucide-react';
+import { InterviewSetup, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics, updateGlobalQuestions } from '../../utils/openai';
 import { saveSpeechAnalysisCache, createInitialInterviewSession } from '../../utils/supabase-interview';
 import AIInterviewer from '../AIInterviewer';
@@ -33,12 +33,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [userResponse, setUserResponse] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
-  const [aiState, setAiState] = useState<AIInterviewerState>({
-    currentPersonality: 'friendly',
-    adaptationLevel: 5,
-    questionFlow: 'adaptive',
-    focusAreas: []
-  });
   const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
   const [isInterviewComplete, setIsInterviewComplete] = useState(false);
   
@@ -51,6 +45,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   // NEW: Track if AI is currently speaking to prevent user input
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [canUserRespond, setCanUserRespond] = useState(false);
+
+  // Add AI state for adaptive interview
+  const [aiState, setAiState] = useState<AIInterviewerState>({
+    currentPersonality: 'friendly',
+    adaptationLevel: 5,
+    questionFlow: 'adaptive',
+    focusAreas: []
+  });
 
   // Check if OpenAI API key is configured
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
@@ -178,11 +180,9 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       
       setHasStartedInterview(true);
       if (session) {
-        setSession({ ...session, isActive: true });
-        
-        // Create the initial interview session record in the database
+        setSession({ ...session, isActive: true });        // Create the initial interview session record in the database
         try {
-          await createInitialInterviewSession(session.id, setup);
+          await createInitialInterviewSession(session.id, setup, undefined); // Regular interview (not focused)
         } catch (error) {
           console.error('Error creating initial session record:', error);
           // Continue with the interview even if database creation fails
@@ -440,9 +440,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       const nextQuestion = await generateNextQuestion(
         setup, 
         currentResponses, 
-        aiState,
-        undefined, // suggestedType
-        session?.startTime // Pass interview start time
+        aiState, // Pass the current AI state
+        session?.startTime ? session.startTime.toISOString() : undefined // Pass as ISO string
       );
       
       // Update session with new question
@@ -676,7 +675,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           )}
           
           <p className="text-xs text-gray-500 mt-4">
-            Your privacy is important. We don't record or store any video or audio.
+            {/* Privacy message removed as audio is now stored */}
           </p>
 
           <button

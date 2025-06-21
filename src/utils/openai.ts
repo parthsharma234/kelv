@@ -311,7 +311,7 @@ const getPerformanceTrend = (scores: number[]): string => {
 };
 
 // Technical question database for different industries and roles
-const getTechnicalQuestions = (jobType: string, industry: string, experienceLevel: string): string[] => {
+const getTechnicalQuestions = (jobType: string, industry: string, _experienceLevel: string): string[] => {
   const questions: { [key: string]: { [key: string]: string[] } } = {
     'Software Engineer': {
       'Technology': [
@@ -515,7 +515,7 @@ const getTechnicalQuestions = (jobType: string, industry: string, experienceLeve
 };
 
 // Resume-based question templates
-const getResumeBasedQuestions = (jobType: string, industry: string, experienceLevel: string): string[] => {
+const getResumeBasedQuestions = (_jobType: string, _industry: string, _experienceLevel: string): string[] => {
   const templates = [
     "I see you have experience in [specific area]. Can you walk me through your most relevant project in that field?",
     "Your background shows [specific skill/technology]. How did you develop that expertise?",
@@ -538,14 +538,14 @@ export const generateInterviewQuestions = async (setup: InterviewSetup): Promise
   }
 
   try {
-    const prompt = `You are a senior ${setup.industry} hiring manager with 15+ years of experience conducting interviews for ${setup.jobType} positions. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
+    const prompt = `You are a seasoned ${setup.industry} hiring manager with 15+ years of experience interviewing for ${setup.jobType} roles. You know how to put candidates at ease and create a welcoming, conversational atmosphere.
 
 INTERVIEW PERSONA:
-- You're conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} role at a competitive ${setup.industry} company
-- You're genuinely interested in finding the right candidate and want to give them every opportunity to succeed
-- You have a warm but professional demeanor - you want candidates to feel comfortable while maintaining high standards
-- You ask follow-up questions naturally and probe deeper when answers are interesting
-- You're looking for specific examples, quantifiable results, and genuine enthusiasm for the role
+- You're conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} role at a leading ${setup.industry} company
+- You genuinely want to get to know the candidate and help them show their best
+- Your tone is warm, friendly, and professional—think of this as a two-way conversation, not an interrogation
+- You ask thoughtful follow-ups and show curiosity about the candidate's journey
+- You're looking for real stories, practical examples, and authentic enthusiasm
 
 INDUSTRY CONTEXT FOR ${setup.industry}:
 ${getIndustryContext(setup.industry)}
@@ -556,16 +556,16 @@ ${getRoleContext(setup.jobType, setup.industry)}
 EXPERIENCE LEVEL EXPECTATIONS:
 ${getExperienceLevelContext(setup.experienceLevel)}
 
-TASK: Create an opening question that feels like a real hiring manager starting an interview.
+TASK: Start the interview with a warm, authentic opening question that invites the candidate to share their background, experience, or skills.
 
 REQUIREMENTS:
-1. RESUME-FOCUSED: Start with a question about their background, experience, or specific skills
-2. AUTHENTIC GREETING: Include a warm, professional greeting that puts the candidate at ease
-3. CONTEXTUAL OPENING: Reference the specific role and company/industry context
-4. NATURAL FLOW: The question should feel conversational, not scripted
-5. ROLE-SPECIFIC: Tailored to ${setup.jobType} responsibilities and ${setup.industry} challenges
-6. EXPERIENCE-APPROPRIATE: Matches expectations for ${setup.experienceLevel} candidates
-7. CONVERSATION STARTER: Designed to encourage detailed, story-based responses
+1. RESUME-FOCUSED: Ask about their background, experience, or a specific skill
+2. FRIENDLY GREETING: Begin with a welcoming, human introduction
+3. CONTEXTUAL OPENING: Reference the specific role and industry
+4. NATURAL FLOW: The question should feel like a real conversation starter
+5. ROLE-SPECIFIC: Tailored to ${setup.jobType} and ${setup.industry}
+6. EXPERIENCE-APPROPRIATE: Matches ${setup.experienceLevel} expectations
+7. ENCOURAGING: Designed to help the candidate open up and feel comfortable
 
 RESUME-BASED QUESTION EXAMPLES:
 ${getResumeBasedQuestions(setup.jobType, setup.industry, setup.experienceLevel).slice(0, 3).map(q => `- "${q}"`).join('\n')}
@@ -647,8 +647,8 @@ No additional text - just the JSON array.`;
 export const generateNextQuestion = async (
   setup: InterviewSetup,
   responses: InterviewResponse[],
-  aiState: AIInterviewerState,
-  suggestedType?: string,
+  _aiState: AIInterviewerState,
+  _suggestedType?: string,
   interviewStartTime?: Date
 ): Promise<Question> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
@@ -658,13 +658,19 @@ export const generateNextQuestion = async (
   // Time-based interview conclusion (approximately 15 minutes)
   const interviewDuration = interviewStartTime ? 
     (Date.now() - interviewStartTime.getTime()) / 1000 / 60 : 0; // minutes
-  
-  // Natural conclusion after 15-20 minutes, or if candidate is clearly struggling
-  const shouldEnd = interviewDuration >= 15 || 
+
+  // Instead of abrupt ending, encourage a natural wrap-up after 15 minutes
+  const shouldWrapUp = interviewDuration >= 15 || 
     (interviewDuration >= 10 && getAverageScore(responses) <= 4);
 
-  if (shouldEnd) {
-    throw new Error('INTERVIEW_COMPLETE');
+  if (shouldWrapUp) {
+    // Use an allowed type (e.g., 'behavioral') for the closing question
+    return {
+      id: `q${responses.length + 1}`,
+      text: `We've had a great conversation so far. Before we wrap up, is there anything else you'd like to share about your experience, or do you have any questions for me about the role or company?`,
+      type: 'closing', // Now using the new allowed type
+      difficulty: 'easy'
+    };
   }
 
   try {
@@ -688,7 +694,6 @@ A${questionNum + 1}: ${r.response}`;
     const overallPerformance = getAverageScore(responses);
     const isStruggling = overallPerformance <= 4;
     const isPerformingWell = overallPerformance >= 7;
-    const isModerate = overallPerformance > 4 && overallPerformance < 7;
 
     // Determine if we should ask a technical question
     const questionTypesAsked = responses.map(r => {
@@ -702,17 +707,17 @@ A${questionNum + 1}: ${r.response}`;
     // Get technical questions for this role/industry
     const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);
 
-    const prompt = `You are a senior ${setup.industry} hiring manager continuing a real interview for a ${setup.experienceLevel} ${setup.jobType} position. You've been interviewing this candidate and want to dig deeper into their experience and capabilities.
+    const prompt = `You are a seasoned ${setup.industry} hiring manager continuing a real interview for a ${setup.experienceLevel} ${setup.jobType} position. Your goal is to keep the conversation flowing naturally, building on what the candidate has shared so far.
 
 INTERVIEW CONTEXT:
-- Question #${currentQuestionNumber} (no fixed limit - natural conversation flow)
+- Question #${currentQuestionNumber} (no fixed limit—let the conversation flow naturally)
 - Interview duration: ${interviewDuration.toFixed(1)} minutes
 - Experience level: ${setup.experienceLevel}
 - Role: ${setup.jobType}
 - Industry: ${setup.industry}
 - Recent performance: ${averageRecentScore.toFixed(1)}/10 average on last 2 questions
 - Overall performance: ${overallPerformance.toFixed(1)}/10
-- Candidate status: ${isStruggling ? 'Struggling - needs simpler questions' : isPerformingWell ? 'Performing well - can handle complex questions' : 'Moderate performance - standard questions'}
+- Candidate status: ${isStruggling ? 'Struggling—consider gentler questions' : isPerformingWell ? 'Performing well—feel free to go deeper' : 'Moderate—keep a balanced approach'}
 - Technical questions asked: ${hasAskedTechnical ? 'Yes' : 'No'}
 
 RECENT CONVERSATION:
@@ -723,41 +728,15 @@ CANDIDATE ANALYSIS:
 - Areas of interest mentioned: ${extractKeyTopics(areasOfInterest)}
 - Performance trend: ${getPerformanceTrend(recentScores)}
 
-ADAPTIVE INTELLIGENCE STRATEGY:
+ADAPTIVE STRATEGY:
 ${isStruggling ? 
-  'The candidate is struggling with complex questions. Simplify your approach:' :
+  'The candidate could use some encouragement. Ask clear, simple questions and help them feel comfortable.' :
   isPerformingWell ?
-  'The candidate is performing well. You can ask more challenging questions:' :
-  'The candidate is performing moderately. Use standard difficulty questions:'
+  'The candidate is doing great! Feel free to ask more challenging or thought-provoking questions.' :
+  'Keep the questions balanced and engaging.'
 }
 
-${isStruggling ? `
-- Ask basic, straightforward questions
-- Focus on fundamental concepts and simple scenarios
-- Use clear, simple language
-- Avoid complex technical or strategic questions
-- Build confidence with easier questions first
-- If they continue to struggle, consider ending the interview early
-- Focus on basic behavioral questions and simple situational scenarios` :
-isPerformingWell ? `
-- Ask more complex, challenging questions
-- Probe deeper into technical knowledge
-- Explore strategic thinking and leadership scenarios
-- Challenge them with difficult hypothetical situations
-- Test their problem-solving abilities with complex scenarios
-- Include advanced technical questions and complex behavioral scenarios` :
-`
-- Use standard interview questions
-- Mix easy and moderate difficulty
-- Focus on role-specific competencies
-- Balance technical and behavioral questions
-- Maintain engagement with varied question types
-- Include some technical questions but keep them accessible`
-}
-
-TECHNICAL QUESTION OPPORTUNITY:
-${shouldAskTechnical ? 
-  `It's time to ask a technical question. Here are some real technical questions for ${setup.jobType} in ${setup.industry}:
+${shouldAskTechnical ? `It's a good time to ask a technical question. Here are some examples for ${setup.jobType} in ${setup.industry}:
 ${technicalQuestions.slice(0, 5).map(q => `- "${q}"`).join('\n')}
 
 Choose one of these or create a similar technical question that:
@@ -765,30 +744,28 @@ Choose one of these or create a similar technical question that:
 - Relates to the role requirements
 - Can be answered in 2-3 minutes
 - Tests practical knowledge, not just memorization` :
-  'Continue with behavioral, situational, or follow-up questions based on the conversation flow.'
+  'Continue with behavioral, situational, or follow-up questions based on the conversation.'
 }
 
 INTERVIEW STRATEGY:
-Based on the conversation so far, you should:
-1. Build on interesting points from their previous answers
-2. Probe deeper into areas where they showed enthusiasm or expertise
-3. Explore competencies not yet thoroughly covered
-4. Maintain natural conversation flow - don't jump to unrelated topics
-5. Show genuine interest in their experiences and insights
-6. Adapt question complexity based on their performance level
-${shouldAskTechnical ? '7. Include a technical question to assess role-specific knowledge' : ''}
+- Build on interesting points from their previous answers
+- Show curiosity and encourage them to elaborate
+- Explore areas where they showed enthusiasm or expertise
+- Keep the conversation natural and engaging
+- Adapt question complexity to their performance
+${shouldAskTechnical ? '- Include a technical question to assess role-specific knowledge' : ''}
 
 QUESTION TYPES TO CONSIDER:
 - behavioral: "Tell me about a time when..." (STAR method)
 - technical: Role-specific skills, tools, or knowledge for ${setup.jobType}
 - situational: "How would you handle..." (hypothetical scenarios)
-- follow_up: "You mentioned [specific detail] - can you elaborate on..."
+- follow_up: "You mentioned [specific detail]—can you elaborate on..."
 - problem_solving: "Walk me through how you would approach..."
 - leadership: Team management, influence, or strategic thinking
 - cultural_fit: Values, work style, and team collaboration
 
 DIFFICULTY ADAPTATION:
-- If struggling (score < 5): Ask very basic, simple questions
+- If struggling (score < 5): Ask very basic, supportive questions
 - If moderate (score 5-7): Ask standard questions with some challenge
 - If performing well (score > 7): Ask complex, strategic questions
 
@@ -805,7 +782,7 @@ ${getIndustryContext(setup.industry)}
 ROLE-SPECIFIC KNOWLEDGE:
 ${getRoleContext(setup.jobType, setup.industry)}
 
-TASK: Generate the next question that feels like a natural continuation of the conversation.
+TASK: Generate the next question that feels like a natural continuation of the conversation. If the interview is nearing its end (around 15 minutes), help wrap up with a friendly closing question or reflection, thanking the candidate and inviting any final thoughts or questions.
 
 REQUIREMENTS:
 1. NATURAL FLOW: Should connect logically to their previous answers
@@ -814,21 +791,23 @@ REQUIREMENTS:
 4. ROLE RELEVANCE: Relevant to ${setup.jobType} responsibilities
 5. EXPERIENCE APPROPRIATE: Matches ${setup.experienceLevel} expectations
 6. CONVERSATION BUILDING: Designed to encourage detailed, engaging responses
-7. ADAPTIVE DIFFICULTY: ${isStruggling ? 'Keep it simple and basic' : isPerformingWell ? 'Make it challenging and complex' : 'Use standard difficulty'}
+7. ADAPTIVE DIFFICULTY: ${isStruggling ? 'Keep it simple and supportive' : isPerformingWell ? 'Make it challenging and thought-provoking' : 'Use standard difficulty'}
 ${shouldAskTechnical ? '8. TECHNICAL FOCUS: Include a real technical question from the domain' : ''}
 
 EXAMPLE STYLES:
-- "You mentioned [specific project/achievement] - that sounds really interesting. Walk me through how you approached that challenge and what you learned from it?"
+- "You mentioned [specific project/achievement]—that sounds really interesting. Walk me through how you approached that challenge and what you learned from it?"
 - "I'm curious about your experience with [specific skill/tool]. How have you used that in your previous roles, and what kind of results did you see?"
 - "That's a great point about [specific detail]. How do you think that experience would translate to the challenges we face here in [industry/role]?"
 - "You seem really passionate about [specific area]. What draws you to that, and how do you stay current with developments in that field?"
 ${shouldAskTechnical ? `- "${technicalQuestions[0]}"` : ''}
 
+If the interview is wrapping up, offer a friendly closing question, thank the candidate for their time, and invite any final thoughts or questions.
+
 Return ONLY this JSON format:
 {
   "id": "q${currentQuestionNumber}",
-  "text": "Your natural, conversational question that builds on the conversation",
-  "type": "behavioral|technical|situational|follow_up|problem_solving|leadership|cultural_fit",
+  "text": "Your natural, conversational question that builds on the conversation (or a friendly closing if wrapping up)",
+  "type": "behavioral|technical|situational|follow_up|problem_solving|leadership|cultural_fit|closing",
   "difficulty": "easy|medium|hard"
 }
 
@@ -968,22 +947,22 @@ ${getIndustryContext(setup.industry)}
 ROLE-SPECIFIC EVALUATION:
 ${getRoleContext(setup.jobType, setup.industry)}
 
-TASK: Provide a comprehensive, realistic evaluation as a hiring manager would give.
+TASK: Provide a concise, actionable evaluation as a hiring manager would give.
 
 ANALYSIS REQUIREMENTS:
-1. HONEST ASSESSMENT: Be realistic about strengths and weaknesses
-2. SPECIFIC FEEDBACK: Point to exact elements in their response
-3. ACTIONABLE INSIGHTS: Provide concrete improvement suggestions
-4. ROLE RELEVANCE: Connect feedback to ${setup.jobType} requirements
-5. EXPERIENCE APPROPRIATE: Consider ${setup.experienceLevel} expectations
-6. CONSTRUCTIVE TONE: Be encouraging while honest about areas for growth
+1. CONCISE: Keep feedback focused and to the point (2-3 sentences max)
+2. ACTIONABLE: Provide specific, practical improvement suggestions
+3. BALANCED: Highlight what worked well AND what needs improvement
+4. RELEVANT: Connect feedback directly to the role and question asked
+5. ENCOURAGING: Be constructive and supportive, but also critical
+6. CAPITALIZATION: Use proper title case for all strength and improvement items (e.g., "Technical Problem Solving", "Clear Communication")
 
 Return ONLY this JSON format:
 {
   "score": 1-10,
-  "feedback": "Detailed, specific feedback focusing on what worked well and what could be improved",
-  "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],
-  "areasForImprovement": ["specific improvement area 1", "specific improvement area 2"],
+  "feedback": "Concise, balanced feedback (2-3 sentences) highlighting what worked well and providing 1-2 specific actionable improvements.",
+  "strengths": ["Specific Strength 1", "Specific Strength 2", "Specific Strength 3"],
+  "areasForImprovement": ["Specific Improvement Area 1", "Specific Improvement Area 2"],
   "confidenceIndicators": {
     "responseLength": ${responseLength},
     "specificExamples": ${hasSpecificExamples},
@@ -991,7 +970,7 @@ Return ONLY this JSON format:
     "enthusiasm": ${showsEnthusiasm ? 8 : 5},
     "quantifiableResults": ${hasQuantifiableResults}
   },
-  "nextQuestionType": "behavioral|technical|situational|follow_up|problem_solving|leadership|cultural_fit",
+  "nextQuestionType": "behavioral|technical|situational|follow_up|problem_solving|leadership|cultural_fit|closing",
   "performanceTrend": "${averagePreviousScore > 0 ? (averagePreviousScore > 5 ? 'improving' : 'stable') : 'new'}",
   "roleAlignment": "high|medium|low",
   "culturalFit": "high|medium|low"
@@ -1080,12 +1059,11 @@ const getFallbackAnalysis = (response: string) => {
   const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
   const hasQuantifiableResults = /(\d+%|\d+ percent|\$\d+|\d+ people|\d+ users|\d+ customers)/i.test(response);
   const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
-  
-  return {
+    return {
     score: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
     feedback: "Good response! Try to include more specific examples and quantifiable results to strengthen your answer.",
-    strengths: ["Clear communication", "Relevant experience", "Professional tone"],
-    areasForImprovement: ["Add specific examples", "Include quantifiable results", "Provide more detail"],
+    strengths: ["Clear Communication", "Relevant Experience", "Professional Tone"],
+    areasForImprovement: ["Add Specific Examples", "Include Quantifiable Results", "Provide More Detail"],
     confidenceIndicators: {
       responseLength: responseLength,
       specificExamples: hasSpecificExamples,
@@ -1178,6 +1156,41 @@ export const generateFocusedQuestions = async (interviewType: string, setup: Int
         duration: 8,
         maxQuestions: 3,
         focus: 'executive decision-making, organizational leadership, strategic management, and high-stakes scenarios'
+      },
+      culturalFit: {
+        title: 'Cultural Fit',
+        description: 'Assess values, team fit, and alignment with company mission',
+        duration: 4,
+        maxQuestions: 3,
+        focus: 'values, team fit, company mission, and workplace culture'
+      },
+      communication: {
+        title: 'Communication',
+        description: 'Practice presentation and explaining complex ideas',
+        duration: 4,
+        maxQuestions: 3,
+        focus: 'presentation skills, clarity, explaining complex ideas, and storytelling'
+      },
+      problemSolving: {
+        title: 'Problem Solving',
+        description: 'Logic puzzles, brainteasers, and structured thinking',
+        duration: 4,
+        maxQuestions: 3,
+        focus: 'logic puzzles, brainteasers, structured thinking, and analytical reasoning'
+      },
+      salaryNegotiation: {
+        title: 'Salary Negotiation',
+        description: 'Practice negotiating offers and discussing compensation',
+        duration: 3,
+        maxQuestions: 2,
+        focus: 'negotiation skills, discussing compensation, and handling offers'
+      },
+      closing: {
+        title: 'Closing/Wrap-up',
+        description: 'How to end interviews and ask questions back',
+        duration: 2,
+        maxQuestions: 2,
+        focus: 'ending interviews, asking questions to the interviewer, and next steps'
       }
     };
 
@@ -1255,11 +1268,18 @@ CASE STUDY QUESTION GUIDELINES:
 
 ${interviewType === 'systemDesign' ? `
 SYSTEM DESIGN QUESTION GUIDELINES:
-- Focus on architecture and scalability challenges
-- Include trade-off analysis and decision-making
-- Ask for detailed technical design discussions
+- Focus on architecture and scalability challenges for software systems
+- Include trade-off analysis and decision-making for technical systems
+- Ask for detailed technical design discussions (databases, APIs, microservices)
 - Cover performance, reliability, and scalability considerations
-- Require whiteboarding-style thinking and communication` : ''}
+- Require whiteboarding-style thinking and technical communication
+- Focus on building applications, systems, and infrastructure
+
+EXAMPLES OF SYSTEM DESIGN QUESTIONS:
+- "Design a URL shortening service like bit.ly"
+- "How would you design a chat system like WhatsApp?"
+- "Design a video streaming service like Netflix"
+- "How would you build a social media feed?"` : ''}
 
 ${interviewType === 'leadershipAssessment' ? `
 LEADERSHIP ASSESSMENT GUIDELINES:
@@ -1268,6 +1288,50 @@ LEADERSHIP ASSESSMENT GUIDELINES:
 - Include organizational leadership and change management
 - Ask about executive presence and influence
 - Probe for board-level thinking and stakeholder management` : ''}
+
+${interviewType === 'culturalFit' ? `
+CULTURAL FIT QUESTION GUIDELINES:
+- Focus on values, team fit, and alignment with company mission
+- Ask about preferred work environments and collaboration styles
+- Probe for adaptability and openness to feedback
+- Explore alignment with company values and mission` : ''}
+
+${interviewType === 'communication' ? `
+COMMUNICATION QUESTION GUIDELINES:
+- Ask about presenting complex ideas to different audiences
+- Probe for clarity, storytelling, and active listening
+- Include scenarios for explaining technical concepts to non-experts
+- Assess ability to tailor communication style` : ''}
+
+${interviewType === 'problemSolving' ? `
+PROBLEM SOLVING QUESTION GUIDELINES:
+- Present specific logic puzzles, riddles, or mathematical brainteasers
+- Ask classic problem-solving questions (e.g., "How many tennis balls fit in a school bus?")
+- Include step-by-step logical reasoning challenges
+- Focus on analytical thinking, NOT system architecture or technical design
+- Use puzzles that test reasoning ability, pattern recognition, and creative thinking
+- Avoid any questions about building systems, applications, or technical architecture
+
+EXAMPLES OF APPROPRIATE PROBLEM SOLVING QUESTIONS:
+- "You have 8 balls, one weighs differently. Using a balance scale only twice, how do you find the different ball?"
+- "How would you move Mount Fuji?"
+- "A man lives on the 20th floor. Every morning he takes the elevator down. When he comes home, he takes the elevator to the 10th floor and walks the rest, except on rainy days when he takes it all the way. Why?"
+- "How many piano tuners are there in Chicago?"
+- "You're shrunk to the height of a nickel and thrown in a blender. How do you escape?"` : ''}
+
+${interviewType === 'salaryNegotiation' ? `
+SALARY NEGOTIATION QUESTION GUIDELINES:
+- Ask about discussing compensation expectations
+- Probe for negotiation strategies and handling offers
+- Include scenarios for responding to counter-offers
+- Assess confidence and professionalism in negotiation` : ''}
+
+${interviewType === 'closing' ? `
+CLOSING/WRAP-UP QUESTION GUIDELINES:
+- Ask about final questions for the interviewer
+- Probe for interest in next steps and company fit
+- Include scenarios for ending interviews positively
+- Assess ability to leave a strong final impression` : ''}
 
 Return ONLY this JSON format:
 [

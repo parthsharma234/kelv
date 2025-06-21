@@ -1,21 +1,18 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Brain, 
-  Clock, 
-  Target, 
-  TrendingUp, 
-  Award, 
-  CheckCircle, 
+import {
+  CheckCircle,
   AlertCircle,
   ArrowLeft,
   Play,
   BarChart3,
   Star,
   Zap,
-  Mic
+  Mic,
+  TrendingUp
 } from 'lucide-react';
 import { saveInterviewSession } from '../../utils/supabase-interview';
+import { InterviewTimeline } from './InterviewTimeline';
 
 interface FocusedInterviewResultsProps {
   sessionData: any;
@@ -49,53 +46,6 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
     return { grade: 'C', color: 'text-red-400' };
   };
 
-  const getCategoryInsights = (interviewType: string, score: number) => {
-    const insights = {
-      technical: {
-        strong: ['Solid technical foundation', 'Good problem-solving approach', 'Clear communication of technical concepts'],
-        improve: ['Practice more complex scenarios', 'Work on system design questions', 'Improve code optimization skills'],
-        tips: ['Practice coding problems regularly', 'Study system design patterns', 'Review fundamental algorithms']
-      },
-      behavioral: {
-        strong: ['Good use of STAR method', 'Clear examples provided', 'Strong communication skills'],
-        improve: ['Add more quantifiable results', 'Provide more specific details', 'Practice leadership scenarios'],
-        tips: ['Prepare more STAR stories', 'Quantify your achievements', 'Practice leadership examples']
-      },
-      situational: {
-        strong: ['Good problem-solving approach', 'Logical thinking process', 'Consideration of multiple perspectives'],
-        improve: ['Think more strategically', 'Consider long-term implications', 'Practice conflict resolution'],
-        tips: ['Practice decision-making frameworks', 'Study conflict resolution techniques', 'Think about stakeholder impact']
-      },
-      resume: {
-        strong: ['Clear articulation of experience', 'Good career narrative', 'Relevant background presentation'],
-        improve: ['Quantify more achievements', 'Connect experience to role', 'Highlight transferable skills'],
-        tips: ['Quantify all achievements', 'Connect past experience to target role', 'Practice elevator pitch']
-      },
-      leadership: {
-        strong: ['Good leadership philosophy', 'Team management understanding', 'Strategic thinking approach'],
-        improve: ['Practice complex scenarios', 'Develop influence strategies', 'Work on organizational impact'],
-        tips: ['Study leadership frameworks', 'Practice influence scenarios', 'Focus on organizational impact']
-      },
-      caseStudy: {
-        strong: ['Strong analytical thinking', 'Good framework application', 'Clear problem breakdown'],
-        improve: ['Practice more complex cases', 'Work on quantitative analysis', 'Improve recommendation clarity'],
-        tips: ['Study case frameworks (Porter, McKinsey)', 'Practice market sizing', 'Work on recommendation structure']
-      },
-      systemDesign: {
-        strong: ['Good architectural thinking', 'Clear system breakdown', 'Consideration of trade-offs'],
-        improve: ['Practice scalability discussions', 'Work on detailed design', 'Improve technical depth'],
-        tips: ['Study system design patterns', 'Practice scalability scenarios', 'Focus on trade-off analysis']
-      },
-      leadershipAssessment: {
-        strong: ['Strong executive presence', 'Good strategic thinking', 'Clear decision-making process'],
-        improve: ['Practice complex scenarios', 'Work on influence strategies', 'Improve organizational impact'],
-        tips: ['Study executive frameworks', 'Practice high-stakes decisions', 'Focus on organizational leadership']
-      }
-    };
-
-    return insights[interviewType as keyof typeof insights] || insights.behavioral;
-  };
-
   const getNextPracticeRecommendations = (interviewType: string, score: number) => {
     const recommendations = {
       technical: score >= 80 ? 'Try advanced technical scenarios' : 'Focus on fundamental concepts',
@@ -112,12 +62,61 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   };
 
   const overallGrade = getScoreGrade(sessionData.overallScore);
-  const insights = getCategoryInsights(sessionData.interviewType, sessionData.overallScore);
   const nextPractice = getNextPracticeRecommendations(sessionData.interviewType, sessionData.overallScore);
-
   // Check if all responses are empty
   const allResponsesEmpty = sessionData.responses.every((r: any) => !r.response || r.response.trim() === '');
 
+  // Build timeline events from responses with better fallback handling
+  const timelineEvents = sessionData.responses
+    .filter((r: any) => r && (r.response?.trim() || r.analysis)) // Only include valid responses
+    .map((r: any, idx: number) => {
+      // Better time calculation: try multiple sources
+      const time = r.speechMetrics?.timing?.speechDuration || 
+                  r.speechMetrics?.timing?.totalDuration ||
+                  (idx * 45) + Math.random() * 20; // Focused interviews are shorter, so less time per question
+      
+      // Better label generation with more fallback options
+      let label = '';
+      if (sessionData.questions && sessionData.questions.length > 0) {
+        const question = sessionData.questions.find?.((q: any) => q.id === r.questionId);
+        label = question?.text || `Question ${idx + 1}`;
+      } else {
+        // Generate meaningful labels based on response content or interview type
+        if (r.response) {
+          const responseWords = r.response.split(' ').slice(0, 4).join(' ');
+          label = `"${responseWords}..." - Q${idx + 1}`;
+        } else {
+          label = `${sessionData.interviewType || 'Focused'} Question ${idx + 1}`;
+        }
+      }
+      
+      // Ensure we have a valid score
+      const value = Math.max(1, Math.min(10, r.analysis?.score ?? 5));
+      
+      // Build comprehensive details for focused interviews
+      let details = '';
+      if (r.analysis) {
+        const detailParts = [
+          r.analysis.strengths?.length ? `✓ Strengths: ${r.analysis.strengths.join(', ')}` : '',
+          r.analysis.areasForImprovement?.length ? `⚠ Areas to improve: ${r.analysis.areasForImprovement.join(', ')}` : '',
+          r.analysis.confidenceIndicators?.enthusiasm ? `📊 Enthusiasm: ${r.analysis.confidenceIndicators.enthusiasm}/10` : ''
+        ].filter(Boolean);
+        details = detailParts.join('\n\n');
+      }
+      
+      // If no analysis details, show response info for focused interview
+      if (!details && r.response) {
+        const wordCount = r.response.split(' ').length;
+        details = `${sessionData.interviewType || 'Focused'} response: ${wordCount} words\nScore: ${value}/10`;
+      }
+      
+      return {
+        time: time + (idx * 2),
+        label,
+        value,
+        details
+      };
+    });
   const interviewTypeConfig = {
     technical: { icon: '💻', title: 'Technical Questions', color: 'from-blue-500 to-cyan-500' },
     behavioral: { icon: '🎯', title: 'Behavioral Questions', color: 'from-green-500 to-emerald-500' },
@@ -126,7 +125,12 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
     leadership: { icon: '👑', title: 'Leadership Questions', color: 'from-yellow-500 to-orange-500' },
     caseStudy: { icon: '📊', title: 'Case Study Interviews', color: 'from-indigo-500 to-purple-500' },
     systemDesign: { icon: '🏗️', title: 'System Design Interviews', color: 'from-teal-500 to-cyan-500' },
-    leadershipAssessment: { icon: '⚡', title: 'Leadership Assessment', color: 'from-red-500 to-pink-500' }
+    leadershipAssessment: { icon: '⚡', title: 'Leadership Assessment', color: 'from-red-500 to-pink-500' },
+    culturalFit: { icon: '🤝', title: 'Cultural Fit', color: 'from-pink-500 to-rose-500' },
+    communication: { icon: '💬', title: 'Communication', color: 'from-cyan-500 to-blue-500' },
+    problemSolving: { icon: '🧠', title: 'Problem Solving', color: 'from-violet-500 to-purple-500' },
+    salaryNegotiation: { icon: '💰', title: 'Salary Negotiation', color: 'from-green-500 to-teal-500' },
+    closing: { icon: '🎤', title: 'Closing/Wrap-up', color: 'from-gray-500 to-slate-500' }
   };
 
   const config = interviewTypeConfig[sessionData.interviewType as keyof typeof interviewTypeConfig];
@@ -142,6 +146,29 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
     };
     saveSession();
   }, [sessionData]);
+
+  // Aggregate AI-generated strengths, areas for improvement, and feedback from all responses
+  const allStrengths: string[] = [];
+  const allImprovements: string[] = [];
+  const allFeedback: string[] = [];
+  sessionData.responses.forEach((r: any) => {
+    if (r.analysis) {
+      if (Array.isArray(r.analysis.strengths)) {
+        allStrengths.push(...r.analysis.strengths.filter(Boolean));
+      }
+      if (Array.isArray(r.analysis.areasForImprovement)) {
+        allImprovements.push(...r.analysis.areasForImprovement.filter(Boolean));
+      }
+      if (r.analysis.feedback) {
+        allFeedback.push(r.analysis.feedback);
+      }
+    }
+  });
+
+  // Remove duplicates and empty values
+  const uniqueStrengths = Array.from(new Set(allStrengths)).filter(Boolean);
+  const uniqueImprovements = Array.from(new Set(allImprovements)).filter(Boolean);
+  const uniqueFeedback = Array.from(new Set(allFeedback)).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
@@ -224,53 +251,59 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
               </div>
             ) : (
               <>
-                {/* Strengths */}
-                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-400" />
-                    Your Strengths
-                  </h3>
-                  <div className="space-y-3">
-                    {insights.strong.map((strength, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                        <p className="text-gray-300">{strength}</p>
-                      </div>
-                    ))}
+                {/* AI-Generated Strengths */}
+                {uniqueStrengths.length > 0 && (
+                  <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      Your Strengths
+                    </h3>
+                    <div className="space-y-3">
+                      {uniqueStrengths.map((strength, index) => (
+                        <div key={index} className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <p className="text-gray-300">{strength}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Areas for Improvement */}
-                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-orange-400" />
-                    Areas for Improvement
-                  </h3>
-                  <div className="space-y-3">
-                    {insights.improve.map((area, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                        <p className="text-gray-300">{area}</p>
-                      </div>
-                    ))}
+                {/* AI-Generated Areas for Improvement */}
+                {uniqueImprovements.length > 0 && (
+                  <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-orange-400" />
+                      Areas for Improvement
+                    </h3>
+                    <div className="space-y-3">
+                      {uniqueImprovements.map((area, index) => (
+                        <div key={index} className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <p className="text-gray-300">{area}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Practice Tips */}
-                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Star className="w-5 h-5 text-yellow-400" />
-                    Practice Tips
-                  </h3>
-                  <div className="space-y-3">
-                    {insights.tips.map((tip, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
-                        <p className="text-gray-300">{tip}</p>
-                      </div>
-                    ))}
+                {/* AI-Generated Feedback */}
+                {uniqueFeedback.length > 0 && (
+                  <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <Star className="w-5 h-5 text-yellow-400" />
+                      AI Feedback
+                    </h3>
+                    <div className="space-y-3">
+                      {uniqueFeedback.map((fb, index) => (
+                        <div key={index} className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <p className="text-gray-300">{fb}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
           </motion.div>
@@ -338,10 +371,17 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 <div className="flex justify-between">
                   <span className="text-gray-400">Questions Completed:</span>
                   <span className="text-white">{sessionData.questionsAnswered}</span>
-                </div>
-                <div className="flex justify-between">
+                </div>                <div className="flex justify-between">
                   <span className="text-gray-400">Session Type:</span>
-                  <span className="text-white capitalize">{sessionData.interviewType}</span>
+                  <span className="text-white">
+                    {sessionData.interviewType 
+                      ? sessionData.interviewType
+                          .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+                          .replace(/^./, (str: string) => str.toUpperCase()) // Capitalize first letter
+                          .trim() // Remove leading space
+                      : 'General Interview'
+                    }
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Mode:</span>
@@ -361,14 +401,14 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 bg-dark-700/30 rounded-lg">
                       <div className="text-2xl font-bold text-blue-400">
-                        {sessionData.voiceMetrics?.speechRate ? Number(sessionData.voiceMetrics.speechRate).toFixed(1) : 'N/A'}
+                        {typeof sessionData.voiceMetrics?.speechRate === 'number' ? Number(sessionData.voiceMetrics.speechRate).toFixed(1) : 'N/A'}
                       </div>
                       <div className="text-xs text-gray-400">Words/Min</div>
                       <div className="text-xs text-gray-500 mt-1">Speech Rate</div>
                     </div>
                     <div className="text-center p-3 bg-dark-700/30 rounded-lg">
                       <div className="text-2xl font-bold text-green-400">
-                        {sessionData.voiceMetrics?.fluencyScore || 'N/A'}
+                        {typeof sessionData.voiceMetrics?.fluencyScore === 'number' ? sessionData.voiceMetrics.fluencyScore : 'N/A'}
                       </div>
                       <div className="text-xs text-gray-400">/10</div>
                       <div className="text-xs text-gray-500 mt-1">Fluency</div>
@@ -377,14 +417,14 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 bg-dark-700/30 rounded-lg">
                       <div className="text-2xl font-bold text-purple-400">
-                        {sessionData.voiceMetrics?.voiceConfidence || 'N/A'}
+                        {typeof sessionData.voiceMetrics?.voiceConfidence === 'number' ? sessionData.voiceMetrics.voiceConfidence : 'N/A'}
                       </div>
                       <div className="text-xs text-gray-400">/10</div>
                       <div className="text-xs text-gray-500 mt-1">Confidence</div>
                     </div>
                     <div className="text-center p-3 bg-dark-700/30 rounded-lg">
                       <div className="text-2xl font-bold text-orange-400">
-                        {sessionData.voiceMetrics?.fillerWordCount || 'N/A'}
+                        {typeof sessionData.voiceMetrics?.fillerWordCount === 'number' ? sessionData.voiceMetrics.fillerWordCount : 'N/A'}
                       </div>
                       <div className="text-xs text-gray-400">count</div>
                       <div className="text-xs text-gray-500 mt-1">Filler Words</div>
@@ -398,6 +438,23 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Timeline Visualization */}
+            {!allResponsesEmpty && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
+                className="mb-12"
+              >
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-3">
+                  <Star className="w-5 h-5 text-orange-400" />
+                  Performance Timeline
+                </h3>
+                <InterviewTimeline duration={sessionData.duration} events={timelineEvents} />
+                <div className="text-xs text-gray-400 mt-2">Hover over the wave to see your performance and feedback at each moment.</div>
+              </motion.div>
             )}
 
             {/* Back to Dashboard */}

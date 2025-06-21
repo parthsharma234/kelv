@@ -12,18 +12,45 @@ import {
   ChevronRight,
   Plus,
   CheckCircle,
-  AlertCircle,
-  Star
+  AlertCircle
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
 import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
 
+// Utility function to convert camelCase to readable text
+const formatInterviewType = (type: string): string => {
+  if (!type) return 'Various';
+  
+  // Special case mappings for specific interview types
+  const typeMap: { [key: string]: string } = {
+    'salaryNegotiation': 'Salary Negotiation',
+    'culturalFit': 'Cultural Fit',
+    'problemSolving': 'Problem Solving',
+    'systemDesign': 'System Design',
+    'caseStudy': 'Case Study',
+    'leadershipAssessment': 'Leadership Assessment',
+  };
+  
+  // If we have a specific mapping, use it
+  if (typeMap[type]) {
+    return typeMap[type];
+  }
+  
+  // Otherwise, convert camelCase to readable format
+  return type
+    // Insert space before uppercase letters
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // Capitalize first letter of each word
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+};
+
 interface PlatformDashboardProps {
   onStartInterview: () => void;
   onStartFocusedInterview: () => void;
+  onViewInterviewResults: (id: string, interviewType?: string | null) => void;
 }
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview }) => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview, onViewInterviewResults }) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
   const [stats, setStats] = useState({
     totalInterviews: 0,
@@ -170,60 +197,73 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                 'Start practicing to see growth'}
             </div>
           </div>
-        </motion.div>
-
-        {/* Focused Interview Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
-        >
-          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/30 transition-all">
-            <div className="flex items-center gap-3 mb-4">
+        </motion.div>        {/* Focused Interview Stats - Only show when user has completed focused interviews */}
+        {stats.focusedInterviews > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mb-12"
+          >
+            {/* Focused Stats Header */}
+            <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Target className="w-5 h-5 text-blue-400" />
               </div>
-              <span className="text-gray-400 text-sm">Focused Sessions</span>
-            </div>
-            <div className="text-3xl font-bold text-white">
-              {stats.focusedInterviews}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {stats.focusedInterviews > 0 ? 'Targeted practice completed' : 'Try focused practice sessions'}
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/30 transition-all">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Award className="w-5 h-5 text-blue-400" />
+              <h2 className="text-xl font-semibold text-white">Focused Practice Stats</h2>
+              <div className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full border border-blue-500/30">
+                Focused
               </div>
-              <span className="text-gray-400 text-sm">Focused Score</span>
             </div>
-            <div className="text-3xl font-bold text-white">
-              {stats.focusedInterviews > 0 ? `${stats.focusedAverageScore}%` : '--'}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {stats.focusedInterviews > 0 ? 'Average focused practice score' : 'Complete focused sessions to see score'}
-            </div>
-          </div>
 
-          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/30 transition-all">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-blue-400" />
+            {/* Focused Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-gradient-to-br from-blue-900/70 to-cyan-900/40 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-500/30 rounded-lg">
+                    <Target className="w-5 h-5 text-blue-300" />
+                  </div>
+                  <span className="text-blue-200 text-sm font-medium">Focused Sessions</span>
+                </div>
+                <div className="text-3xl font-bold text-white">
+                  {stats.focusedInterviews}
+                </div>
+                <div className="text-xs text-blue-300 mt-2">
+                  Targeted practice completed
+                </div>
               </div>
-              <span className="text-gray-400 text-sm">Most Practiced</span>
+
+              <div className="bg-gradient-to-br from-blue-900/70 to-cyan-900/40 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-500/30 rounded-lg">
+                    <Award className="w-5 h-5 text-blue-300" />
+                  </div>
+                  <span className="text-blue-200 text-sm font-medium">Focused Score</span>
+                </div>
+                <div className="text-3xl font-bold text-white">
+                  {stats.focusedAverageScore}%
+                </div>
+                <div className="text-xs text-blue-300 mt-2">
+                  Average focused practice score
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-blue-900/70 to-cyan-900/40 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-500/30 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-blue-300" />
+                  </div>
+                  <span className="text-blue-200 text-sm font-medium">Most Practiced</span>
+                </div>                <div className="text-3xl font-bold text-white">
+                  {formatInterviewType(stats.mostPracticedType)}
+                </div>
+                <div className="text-xs text-blue-300 mt-2">
+                  Your preferred practice type
+                </div>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-white capitalize">
-              {stats.focusedInterviews > 0 ? (stats.mostPracticedType || 'None') : '--'}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {stats.focusedInterviews > 0 ? 'Your preferred practice type' : 'Explore different practice types'}
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
 
         {/* Strengths and Weaknesses */}
         <motion.div
@@ -405,40 +445,50 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                   <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
                   <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {interviewHistory.slice(0, 5).map((interview) => (
-                    <div
-                      key={interview.id}
-                      className="flex items-center justify-between p-4 bg-dark-700/30 rounded-xl hover:bg-dark-700/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-orange-500/20 rounded-lg">
-                          <Calendar className="w-4 h-4 text-orange-400" />
+              ) : (                <div className="space-y-4">
+                  {interviewHistory.slice(0, 5).map((interview) => {
+                    const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined;
+                    return (
+                      <div
+                        key={interview.id}
+                        className={`flex items-center justify-between p-4 rounded-xl hover:bg-dark-700/50 transition-colors cursor-pointer border ${
+                          isFocusedInterview 
+                            ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20' 
+                            : 'bg-dark-700/30 border-dark-700'
+                        }`}
+                        onClick={() => onViewInterviewResults(interview.id, isFocusedInterview ? interview.interviewType : null)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-lg ${isFocusedInterview ? 'bg-blue-500/30' : 'bg-orange-500/20'}`}> 
+                            <Calendar className={`w-4 h-4 ${isFocusedInterview ? 'text-blue-300' : 'text-orange-400'}`} />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-white flex items-center gap-2">
+                              {interview.setup.jobType} - {interview.setup.industry}
+                              {isFocusedInterview && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 text-blue-200 border border-blue-400/50" title="Targeted (Focused) Interview">Focused</span>
+                              )}
+                            </h4>
+                            <p className="text-sm text-gray-400">
+                              {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-medium text-white">
-                            {interview.setup.jobType} - {interview.setup.industry}
-                          </h4>
-                          <p className="text-sm text-gray-400">
-                            {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            interview.overallScore >= 80
+                              ? 'bg-green-500/20 text-green-400'
+                              : interview.overallScore >= 60
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {interview.overallScore}%
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-500" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          interview.overallScore >= 80
-                            ? 'bg-green-500/20 text-green-400'
-                            : interview.overallScore >= 60
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {interview.overallScore}%
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-500" />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

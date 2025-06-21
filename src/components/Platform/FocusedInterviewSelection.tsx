@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Brain, 
@@ -13,7 +13,9 @@ import {
   FileText,
   Crown,
   BarChart3,
-  Building2
+  Building2,
+  Star,
+  Mic
 } from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
 
@@ -28,6 +30,10 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
   onSelectType,
   onBack
 }) => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const interviewTypes = [
     {
       id: 'technical',
@@ -124,7 +130,68 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
       borderColor: 'border-violet-500/20',
       iconComponent: Zap,
       features: ['Management scenarios', 'Team conflict resolution', 'Strategic decision-making', 'Executive presence']
-    }
+    },
+    // Add new types below
+    {
+      id: 'culturalFit',
+      title: 'Cultural Fit',
+      description: 'Assess values, team fit, and alignment with company mission',
+      icon: '🤝',
+      duration: '4 min',
+      color: 'from-pink-500 to-yellow-500',
+      bgColor: 'from-pink-500/10 to-yellow-500/5',
+      borderColor: 'border-pink-500/20',
+      iconComponent: Users,
+      features: ['Values alignment', 'Team fit', 'Company mission', 'Workplace culture']
+    },
+    {
+      id: 'communication',
+      title: 'Communication',
+      description: 'Practice presentation and explaining complex ideas',
+      icon: '🗣️',
+      duration: '4 min',
+      color: 'from-cyan-500 to-blue-500',
+      bgColor: 'from-cyan-500/10 to-blue-500/5',
+      borderColor: 'border-cyan-500/20',
+      iconComponent: BarChart3,
+      features: ['Presentation skills', 'Clarity', 'Explaining complex ideas', 'Storytelling']
+    },
+    {
+      id: 'problemSolving',
+      title: 'Problem Solving',
+      description: 'Logic puzzles, brainteasers, and structured thinking',
+      icon: '🧠',
+      duration: '4 min',
+      color: 'from-lime-500 to-green-500',
+      bgColor: 'from-lime-500/10 to-green-500/5',
+      borderColor: 'border-lime-500/20',
+      iconComponent: Puzzle,
+      features: ['Logic puzzles', 'Brainteasers', 'Structured thinking', 'Analytical reasoning']
+    },
+    {
+      id: 'salaryNegotiation',
+      title: 'Salary Negotiation',
+      description: 'Practice negotiating offers and discussing compensation',
+      icon: '💰',
+      duration: '3 min',
+      color: 'from-yellow-500 to-orange-500',
+      bgColor: 'from-yellow-500/10 to-orange-500/5',
+      borderColor: 'border-yellow-500/20',
+      iconComponent: Star,
+      features: ['Negotiation skills', 'Discussing compensation', 'Handling offers', 'Responding to counter-offers']
+    },
+    {
+      id: 'closing',
+      title: 'Closing/Wrap-up',
+      description: 'How to end interviews and ask questions back',
+      icon: '🎤',
+      duration: '2 min',
+      color: 'from-gray-500 to-gray-700',
+      bgColor: 'from-gray-500/10 to-gray-700/5',
+      borderColor: 'border-gray-500/20',
+      iconComponent: Mic,
+      features: ['Ending interviews', 'Asking questions to interviewer', 'Next steps', 'Final impression']
+    },
   ];
 
   return (
@@ -288,4 +355,4 @@ const FocusedInterviewSelection: React.FC<FocusedInterviewSelectionProps> = ({
   );
 };
 
-export default FocusedInterviewSelection; 
+export default FocusedInterviewSelection;

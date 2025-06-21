@@ -10,7 +10,7 @@ import FocusedInterview from './FocusedInterview';
 import FocusedInterviewResults from './FocusedInterviewResults';
 import { InterviewSetup } from '../../types/interview';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results';
 
 const PlatformContainer: React.FC = () => {
   const { user, loading } = useAuth();
@@ -20,6 +20,29 @@ const PlatformContainer: React.FC = () => {
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
   const [viewingInterviewId, setViewingInterviewId] = useState<string>('');
+  
+  // State for viewing interview results - moved to top level to avoid conditional hooks
+  const [viewingSessionData, setViewingSessionData] = useState<any>(null);
+  
+  // Effect for loading interview data when viewing results - moved to top level
+  React.useEffect(() => {
+    if ((currentState === 'view-results' || currentState === 'view-focused-results') && viewingInterviewId) {
+      let isMounted = true;
+      setViewingSessionData(null); // Reset data when starting to load
+      
+      import('../../utils/supabase-interview').then(({ getInterviewById }) => {
+        getInterviewById(viewingInterviewId).then((data: any) => {
+          if (isMounted) {
+            setViewingSessionData(data);
+          }
+        });
+      });
+      
+      return () => { 
+        isMounted = false; 
+      };
+    }
+  }, [currentState, viewingInterviewId]);
 
   if (loading) {
     return (
@@ -98,11 +121,58 @@ const PlatformContainer: React.FC = () => {
     setSessionData(null);
     setCurrentState('focused-interview');
   };
-
-  const handleViewInterviewResults = (interviewId: string) => {
+  const handleViewInterviewResults = (interviewId: string, interviewType?: string | null) => {
     setViewingInterviewId(interviewId);
-    setCurrentState('view-results');
+    if (interviewType) {
+      // It's a focused interview - set the type and route to focused results
+      setFocusedInterviewType(interviewType);
+      setCurrentState('view-focused-results');
+    } else {
+      // It's a regular interview - route to regular results
+      setCurrentState('view-results');
+    }
   };
+  // Handle viewing focused interview results
+  if (currentState === 'view-focused-results' && viewingInterviewId) {
+    if (!viewingSessionData) {
+      return (
+        <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading focused interview results...</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <FocusedInterviewResults
+        sessionData={viewingSessionData}
+        onBackToDashboard={handleBackToDashboard}
+        onStartNewFocusedInterview={handleStartNewFocusedInterview}
+      />
+    );
+  }
+
+  // Handle viewing regular interview results
+  if (currentState === 'view-results' && viewingInterviewId) {
+    if (!viewingSessionData) {
+      return (
+        <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading interview results...</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <InterviewResults
+        sessionData={viewingSessionData}
+        onBackToDashboard={handleBackToDashboard}
+        onStartNewInterview={handleStartNewInterview}
+      />
+    );
+  }
 
   return (
     <>
@@ -159,14 +229,6 @@ const PlatformContainer: React.FC = () => {
           sessionData={sessionData}
           onBackToDashboard={handleBackToDashboard}
           onStartNewFocusedInterview={handleStartNewFocusedInterview}
-        />
-      )}
-
-      {currentState === 'view-results' && viewingInterviewId && (
-        <InterviewResults 
-          sessionData={{ id: viewingInterviewId }}
-          onBackToDashboard={handleBackToDashboard}
-          onStartNewInterview={handleStartNewInterview}
         />
       )}
     </>

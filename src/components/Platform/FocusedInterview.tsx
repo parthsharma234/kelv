@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { 
-  Clock, 
   MessageSquare, 
-  CheckCircle, 
   Play, 
   Pause, 
   Mic, 
@@ -13,19 +10,17 @@ import {
   ArrowLeft, 
   Brain, 
   Send, 
-  Volume2, 
-  VolumeX,
-  Target,
-  Timer,
-  Award,
-  TrendingUp
+  Target, 
+  Timer
 } from 'lucide-react';
-import { InterviewSetup, Question, InterviewResponse, AIInterviewerState } from '../../types/interview';
-import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput, generateNextQuestion } from '../../utils/openai';
+import { InterviewSetup, Question, InterviewResponse } from '../../types/interview';
+import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput } from '../../utils/openai';
 import AIInterviewer from '../AIInterviewer';
+import { createInitialInterviewSession, saveInterviewSession } from '../../utils/supabase-interview';
+import { extractSpeechMetrics } from '../../utils/openai';
 
 interface FocusedInterviewProps {
-  interviewType: 'technical' | 'behavioral' | 'situational' | 'resume' | 'leadership' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment';
+  interviewType: 'technical' | 'behavioral' | 'situational' | 'resume' | 'leadership' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment' | 'culturalFit' | 'communication' | 'problemSolving' | 'salaryNegotiation' | 'closing';
   setup: InterviewSetup;
   onComplete: (sessionData: any) => void;
   onBack: () => void;
@@ -45,34 +40,20 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [hasStartedInterview, setHasStartedInterview] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [isVideoElementReady, setIsVideoElementReady] = useState(false);
-  const [userResponse, setUserResponse] = useState('');
+  const [permissionGranted, setPermissionGranted] = useState(false);  const [userResponse, setUserResponse] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
-  const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
-  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);const [isRecording, setIsRecording] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [canUserRespond, setCanUserRespond] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(true);
   const [startTime, setStartTime] = useState<Date | null>(null);
-  const [aiState] = useState<AIInterviewerState>({
-    currentPersonality: 'friendly',
-    adaptationLevel: 5,
-    questionFlow: 'adaptive',
-    focusAreas: []
-  });
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [speechMetrics, setSpeechMetrics] = useState<any[]>([]);
 
   const isVoiceMode = setup.interviewMode === 'voice';
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
@@ -127,13 +108,47 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       description: 'Master architecture and scalability discussions',
       icon: '🏗️',
       duration: 10,
-      maxQuestions: null
-    },
+      maxQuestions: null    },
     leadershipAssessment: {
       title: 'Leadership Assessment',
       description: 'Advanced management and executive scenarios',
       icon: '⚡',
       duration: 8,
+      maxQuestions: null
+    },
+    culturalFit: {
+      title: 'Cultural Fit',
+      description: 'Assess values, team fit, and alignment with company mission',
+      icon: '🤝',
+      duration: 4,
+      maxQuestions: null
+    },
+    communication: {
+      title: 'Communication',
+      description: 'Practice presentation and explaining complex ideas',
+      icon: '💬',
+      duration: 4,
+      maxQuestions: null
+    },
+    problemSolving: {
+      title: 'Problem Solving',
+      description: 'Logic puzzles, brainteasers, and structured thinking',
+      icon: '🧠',
+      duration: 4,
+      maxQuestions: null
+    },
+    salaryNegotiation: {
+      title: 'Salary Negotiation',
+      description: 'Practice negotiating offers and discussing compensation',
+      icon: '💰',
+      duration: 3,
+      maxQuestions: null
+    },
+    closing: {
+      title: 'Closing/Wrap-up',
+      description: 'How to end interviews and ask questions back',
+      icon: '🎤',
+      duration: 2,
       maxQuestions: null
     }
   };
@@ -163,17 +178,19 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const initializeSession = async () => {
     setIsLoading(true);
     setLoadingError(null);
-    
     try {
       if (!hasOpenAIKey) {
         throw new Error('OpenAI API key is required for the interview platform. Please configure your API key to continue.');
       }
-
-      console.log('Generating focused questions for:', interviewType, setup);
       const generatedQuestions = await generateFocusedQuestions(interviewType, setup);
-      console.log('Generated focused questions:', generatedQuestions);
-      
-      setQuestions(generatedQuestions);
+      setQuestions(generatedQuestions);      // Create a unique session ID and create initial session in Supabase
+      const newSessionId = crypto.randomUUID();
+      setSessionId(newSessionId);
+      try {
+        await createInitialInterviewSession(newSessionId, setup, interviewType); // Pass interview type
+      } catch (err) {
+        console.error('Error creating initial focused interview session:', err);
+      }
     } catch (error) {
       console.error('Error initializing session:', error);
       setLoadingError(error instanceof Error ? error.message : 'Failed to initialize interview session');
@@ -183,13 +200,11 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   };
 
   const requestPermissions = async () => {
-    setIsRequestingPermission(true);
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: isVoiceMode
       });
-      setPreviewStream(mediaStream);
       setPermissionGranted(true);
       setCameraError(null);
     } catch (error) {
@@ -203,8 +218,6 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
           setCameraError(`Unable to access camera${isVoiceMode ? ' and microphone' : ''}. Please check your device settings.`);
         }
       }
-    } finally {
-      setIsRequestingPermission(false);
     }
   };
 
@@ -233,12 +246,9 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
     try {
       const audio = await synthesizeSpeech(questionText);
       if (audio) {
-        setCurrentAudio(audio);
-        
         audio.onended = () => {
           setIsAISpeaking(false);
           setCanUserRespond(true);
-          setCurrentAudio(null);
         };
         
         audio.play().catch(error => {
@@ -270,15 +280,27 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
 
   const stopRecording = async () => {
     if (!audioRecorderRef.current) return;
-    
     setIsRecording(false);
     setIsProcessingVoice(true);
-    
     try {
       const result = await audioRecorderRef.current.stopRecording();
       if (result) {
         const transcription = await processVoiceInput(result.audioBlob);
         setUserResponse(transcription);
+        // Extract and store speech metrics if in voice mode
+        if (isVoiceMode && transcription && transcription.trim().length > 0) {
+          try {
+            const metrics = await extractSpeechMetrics(result.audioBlob, transcription, result.duration);
+            if (metrics) {
+              setSpeechMetrics(prev => [...prev, {
+                questionId: questions[currentQuestionIndex]?.id,
+                metrics
+              }]);
+            }
+          } catch (err) {
+            console.error('Error extracting speech metrics:', err);
+          }
+        }
       }
     } catch (error) {
       console.error('Error processing voice input:', error);
@@ -322,7 +344,6 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       setIsAnalyzing(false);
     }
   };
-
   const moveToNextQuestion = async (currentResponses: InterviewResponse[]) => {
     const nextIndex = currentQuestionIndex + 1;
     
@@ -336,58 +357,38 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
         setCanUserRespond(true);
       }
     } else {
-      // Generate a follow-up question using AI
-      setIsGeneratingQuestion(true);
-      try {
-        // Use the AI-powered generateNextQuestion function
-        const aiFollowUp = await generateNextQuestion(setup, currentResponses, aiState, 'follow_up', startTime ?? undefined);
-        const followUpQuestion: Question = {
-          id: aiFollowUp.id || `q${questions.length + 1}`,
-          text: aiFollowUp.text,
-          type: aiFollowUp.type || 'follow_up',
-          difficulty: aiFollowUp.difficulty || 'medium'
-        };
-        setQuestions(prev => [...prev, followUpQuestion]);
-        setCurrentQuestionIndex(questions.length);
-        if (isVoiceMode && hasOpenAIKey) {
-          await playQuestion(followUpQuestion.text);
-        } else {
-          setCanUserRespond(true);
-        }
-      } catch (error) {
-        console.error('Error generating follow-up question:', error);
-        // If follow-up generation fails, complete the interview
-        await completeInterview(currentResponses);
-      } finally {
-        setIsGeneratingQuestion(false);
-      }
+      // For focused interviews, don't generate follow-up questions
+      // Complete the interview when all pre-generated questions are done
+      await completeInterview(currentResponses);
     }
   };
 
   const completeInterview = async (finalResponses: InterviewResponse[]) => {
     setIsInterviewComplete(true);
-    
-    // Calculate session data
     const endTime = new Date();
     const duration = startTime ? Math.floor((endTime.getTime() - startTime.getTime()) / 1000) : 0;
-    
     const averageScore = finalResponses.length > 0 
       ? finalResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / finalResponses.length * 10
       : 0;
-    
     const sessionData = {
-      id: crypto.randomUUID(),
-      setup: { ...setup, interviewType },
+      id: sessionId || crypto.randomUUID(),
+      setup, // Pass setup as-is
       responses: finalResponses,
       duration,
       overallScore: Math.round(averageScore),
       questionsAnswered: finalResponses.length,
-      interviewType,
+      interviewType, // Still include for dashboard/results
       startTime,
       endTime,
-      config
+      config,
+      speechMetrics
     };
-    
+    // Save session to Supabase
+    try {
+      await saveInterviewSession(sessionData);
+    } catch (err) {
+      console.error('Error saving focused interview session:', err);
+    }
     onComplete(sessionData);
   };
 
@@ -416,20 +417,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   };
 
   const toggleMute = () => {
-    if (stream && isVoiceMode) {
-      const audioTracks = stream.getAudioTracks();
-      audioTracks.forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsMuted(!isMuted);
-    }
-  };
-
-  const toggleAudio = () => {
-    setAudioEnabled(!audioEnabled);
-    if (currentAudio) {
-      currentAudio.muted = audioEnabled;
-    }
+    setIsMuted(!isMuted);
   };
 
   if (isLoading) {
@@ -614,18 +602,14 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
                     />
                   )}
                 </div>
-                
-                <button
+                  <button
                   onClick={handleSubmitResponse}
-                  disabled={!userResponse.trim() || isAnalyzing || isGeneratingQuestion || isRecording || isProcessingVoice || !canUserRespond || isAISpeaking}
+                  disabled={!userResponse.trim() || isAnalyzing || isRecording || isProcessingVoice || !canUserRespond || isAISpeaking}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
-                >
-                  {isAnalyzing || isGeneratingQuestion ? (
+                >                  {isAnalyzing ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>
-                        {isGeneratingQuestion ? 'Generating Next Question...' : 'Processing...'}
-                      </span>
+                      <span>Processing...</span>
                     </>
                   ) : (
                     <>
@@ -668,11 +652,11 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
-                  disabled={isPlaying || !audioEnabled || isAISpeaking}
+                  disabled={isProcessingVoice || !canUserRespond || isAISpeaking}
                   className="w-full px-6 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-3"
                 >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  <span>{isPlaying ? 'Playing' : 'Repeat Question'}</span>
+                  {isProcessingVoice ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  <span>{isProcessingVoice ? 'Playing' : 'Repeat Question'}</span>
                 </button>
               </div>
             )}
@@ -700,12 +684,11 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
 
           {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
-            {/* AI Interviewer */}
-            <AIInterviewer 
+            {/* AI Interviewer */}            <AIInterviewer 
               isActive={hasStartedInterview}
               isSpeaking={isAISpeaking}
               isListening={isRecording}
-              isProcessing={isProcessingVoice || isAnalyzing || isGeneratingQuestion}
+              isProcessing={isProcessingVoice || isAnalyzing}
               size="xl"
               showStatus={true}
             />
