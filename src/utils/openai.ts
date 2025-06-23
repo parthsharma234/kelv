@@ -1392,3 +1392,409 @@ Generate exactly ${config.maxQuestions} questions. No additional text - just the
     throw error;
   }
 };
+
+// College Interview System
+interface CollegeInterviewSetup {
+  schoolType: string;
+  program: string;
+  major: string;
+  interviewMode: 'voice' | 'text';
+}
+
+// Generate college interview questions with comprehensive university context
+export const generateCollegeInterviewQuestions = async (setup: CollegeInterviewSetup): Promise<Question[]> => {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key is required');
+  }
+
+  try {
+    const prompt = createCollegeInterviewPrompt(setup);
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1200,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const questionsText = data.choices[0].message.content.trim();
+    
+    // Extract JSON from response
+    const jsonMatch = questionsText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
+    
+    const questions = JSON.parse(jsonMatch[0]);
+    return questions;
+  } catch (error) {
+    console.error('Error generating college interview questions:', error);
+    throw error;
+  }
+};
+
+// Create comprehensive college interview prompt
+const createCollegeInterviewPrompt = (setup: CollegeInterviewSetup): string => {
+  const universityContext = getUniversityContext(setup.schoolType);
+  const programContext = getProgramContext(setup.program, setup.major);
+  const interviewContext = getCollegeInterviewContext();
+
+  return `You are an experienced college admissions officer conducting an undergraduate admission interview for a ${setup.schoolType} institution. You specialize in ${setup.program} programs, particularly ${setup.major}.
+
+${universityContext}
+
+${programContext}
+
+${interviewContext}
+
+CANDIDATE PROFILE:
+- Applying for undergraduate admission
+- Intended major: ${setup.major}
+- Program area: ${setup.program}
+- Institution type: ${setup.schoolType}
+- Interview format: ${setup.interviewMode === 'voice' ? 'In-person/Virtual conversation' : 'Written application interview'}
+
+INTERVIEW OBJECTIVES:
+1. Assess academic preparedness and intellectual curiosity
+2. Evaluate personal character, values, and maturity
+3. Understand motivation and "why this school/program"
+4. Gauge potential contribution to campus community
+5. Determine alignment with institutional mission and values
+
+QUESTION GENERATION REQUIREMENTS:
+Generate exactly 8-10 thoughtful college interview questions that:
+
+1. **Academic Readiness**: Test knowledge of their intended field and intellectual engagement
+2. **Personal Growth**: Explore challenges, failures, and learning experiences
+3. **School Fit**: Assess knowledge of the institution and genuine interest
+4. **Community Impact**: Understand leadership, service, and collaborative abilities
+5. **Future Vision**: Explore goals, aspirations, and post-graduation plans
+6. **Values Alignment**: Assess character, ethics, and personal values
+7. **Unique Perspective**: Uncover what makes them distinctive
+
+QUESTION TYPES TO INCLUDE:
+- Academic interest and preparation questions
+- "Why this school/program" questions
+- Personal experience and growth questions
+- Ethical/values-based scenarios
+- Future goals and vision questions
+- Community engagement questions
+- Problem-solving/critical thinking questions
+
+TONE AND STYLE:
+- Warm but professional, like a faculty member or senior admissions officer
+- Intellectually curious and genuinely interested in the student
+- Appropriately challenging without being intimidating
+- Encouraging deeper reflection and thoughtful responses
+- Authentic and conversational, not scripted
+
+FORMAT: Return as a JSON array of question objects with this structure:
+[
+  {
+    "id": "unique_id",
+    "text": "Interview question text",
+    "type": "academic|personal|school_fit|values|future_goals|community",
+    "difficulty": "moderate|challenging",
+    "expectedDuration": "2-3 minutes",
+    "followUpHints": ["potential follow-up question"]
+  }
+]
+
+Remember: This is a college ADMISSION interview, not a job interview. Focus on academic potential, personal character, school fit, and future contribution to the university community.`;
+};
+
+// Get university-specific context based on school type
+const getUniversityContext = (schoolType: string): string => {
+  const contexts = {
+    'ivy-league': `
+INSTITUTIONAL CONTEXT - IVY LEAGUE/ELITE UNIVERSITY:
+You represent one of the most prestigious universities in the world (Harvard, Yale, Princeton, Stanford, MIT, Columbia, UPenn, Dartmouth, Brown, Cornell, etc.). Your institution:
+- Has extremely selective admissions (5-10% acceptance rate)
+- Values academic excellence, leadership, and exceptional achievement
+- Seeks students who will become future leaders in their fields
+- Emphasizes both intellectual rigor and well-rounded development
+- Has a rich history, strong alumni network, and global reputation
+- Expects demonstrated excellence in academics, extracurriculars, and character
+- Looks for students who can handle rigorous coursework and contribute meaningfully to campus life
+
+ADMISSION PHILOSOPHY: "We seek students who will thrive in our challenging academic environment while contributing unique perspectives and leadership to our community."`,
+
+    'private': `
+INSTITUTIONAL CONTEXT - PRIVATE UNIVERSITY:
+You represent a high-quality private institution that:
+- Offers personalized education with smaller class sizes
+- Values close faculty-student relationships and mentorship
+- Emphasizes both academic achievement and personal development
+- Has strong alumni networks and career placement
+- Seeks students who align with institutional values and mission
+- Focuses on creating a tight-knit community of scholars
+- Balances tradition with innovation in education
+
+ADMISSION PHILOSOPHY: "We seek students who will take advantage of our personalized educational environment and contribute to our close-knit academic community."`,
+
+    'public': `
+INSTITUTIONAL CONTEXT - PUBLIC UNIVERSITY:
+You represent a respected state university that:
+- Serves a diverse student body from various backgrounds
+- Offers excellent value and accessibility in higher education
+- Has strong programs across multiple disciplines
+- Values both in-state and out-of-state contributions
+- Emphasizes practical application and real-world preparation
+- Seeks students who will succeed in a dynamic, diverse environment
+- Balances academic excellence with affordability and accessibility
+
+ADMISSION PHILOSOPHY: "We seek students who will thrive in our diverse, dynamic environment while taking advantage of our comprehensive academic offerings."`,
+
+    'liberal-arts': `
+INSTITUTIONAL CONTEXT - LIBERAL ARTS COLLEGE:
+You represent a prestigious liberal arts institution that:
+- Emphasizes critical thinking, writing, and broad intellectual exploration
+- Values small class sizes and close faculty mentorship
+- Seeks intellectually curious students who love learning for its own sake
+- Emphasizes discussion-based learning and collaborative inquiry
+- Prepares students for graduate study and leadership across fields
+- Values diversity of thought and interdisciplinary connections
+- Creates lifelong learners and thoughtful citizens
+
+ADMISSION PHILOSOPHY: "We seek intellectually curious students who embrace the liberal arts tradition of broad learning and deep thinking."`,
+
+    'community': `
+INSTITUTIONAL CONTEXT - COMMUNITY COLLEGE:
+You represent a community college that:
+- Serves students from diverse backgrounds and life stages
+- Provides accessible, affordable education and career training
+- Values practical skills alongside academic preparation
+- Supports student success through comprehensive services
+- Prepares students for transfer to four-year institutions or immediate career entry
+- Emphasizes community engagement and local partnerships
+- Welcomes students with varied educational goals
+
+ADMISSION PHILOSOPHY: "We seek students committed to their educational goals and eager to engage with our supportive learning community."`
+  };
+
+  return contexts[schoolType as keyof typeof contexts] || contexts['public'];
+};
+
+// Get program-specific context
+const getProgramContext = (program: string, major: string): string => {
+  const programContexts = {
+    'stem': `
+PROGRAM FOCUS - STEM FIELDS:
+Your program seeks students who:
+- Demonstrate strong analytical and problem-solving abilities
+- Show genuine curiosity about scientific inquiry and mathematical reasoning
+- Have experience with research, labs, or independent projects
+- Can work collaboratively on complex technical problems
+- Understand the real-world applications of STEM fields
+- Are prepared for rigorous coursework in mathematics and sciences
+- Show potential for innovation and creative thinking in technical fields
+
+MAJOR-SPECIFIC FOCUS (${major}):
+${getStemMajorContext(major)}`,
+
+    'business': `
+PROGRAM FOCUS - BUSINESS/ECONOMICS:
+Your program seeks students who:
+- Demonstrate leadership potential and entrepreneurial thinking
+- Show understanding of global markets and economic principles
+- Have experience with teamwork, communication, and project management
+- Can analyze complex problems and propose practical solutions
+- Understand the role of business in society and ethical considerations
+- Show quantitative skills and comfort with data analysis
+- Demonstrate interest in innovation and strategic thinking
+
+MAJOR-SPECIFIC FOCUS (${major}):
+${getBusinessMajorContext(major)}`,
+
+    'liberal-arts': `
+PROGRAM FOCUS - LIBERAL ARTS:
+Your program seeks students who:
+- Love reading, writing, and intellectual discussion
+- Can think critically about complex texts and ideas
+- Show curiosity about human culture, history, and society
+- Demonstrate strong communication and analytical skills
+- Can make connections across different fields of knowledge
+- Are prepared for rigorous reading and writing requirements
+- Show interest in research and independent inquiry
+
+MAJOR-SPECIFIC FOCUS (${major}):
+${getLiberalArtsMajorContext(major)}`,
+
+    'pre-med': `
+PROGRAM FOCUS - PRE-MEDICAL:
+Your program seeks students who:
+- Show genuine commitment to serving others through medicine
+- Demonstrate strong academic preparation in sciences
+- Have meaningful healthcare or service experience
+- Can handle the rigor of pre-medical coursework
+- Show resilience, empathy, and ethical reasoning
+- Understand the challenges and responsibilities of medical careers
+- Have strong interpersonal and communication skills
+
+MAJOR-SPECIFIC FOCUS (${major}):
+${getPreMedMajorContext(major)}`,
+
+    'pre-law': `
+
+PROGRAM FOCUS - PRE-LAW:
+Your program seeks students who:
+- Demonstrate strong analytical and argumentative skills
+- Show interest in justice, policy, and legal reasoning
+- Have excellent writing and communication abilities
+- Can think critically about complex social and ethical issues
+- Show leadership and advocacy experience
+- Understand the role of law in society
+- Are prepared for rigorous reading and analytical coursework
+
+MAJOR-SPECIFIC FOCUS (${major}):
+${getPreLawMajorContext(major)}`,
+
+    'arts': `
+PROGRAM FOCUS - ARTS/CREATIVE:
+Your program seeks students who:
+- Demonstrate genuine artistic talent and creative vision
+- Show commitment to their craft through sustained practice
+- Can articulate their artistic influences and aspirations
+- Are open to experimentation and creative risk-taking
+- Understand the role of arts in culture and society
+- Can balance creative work with academic rigor
+- Show potential for artistic growth and development
+
+MAJOR-SPECIFIC FOCUS (${major}):
+${getArtsMajorContext(major)}`,
+
+    'undecided': `
+PROGRAM FOCUS - EXPLORATORY/UNDECIDED:
+Your program seeks students who:
+- Show intellectual curiosity across multiple fields
+- Are comfortable with exploration and self-discovery
+- Demonstrate openness to new ideas and experiences
+- Can articulate their learning goals and interests
+- Show potential for academic success across disciplines
+- Are motivated to take advantage of diverse academic opportunities
+- Have some sense of their strengths and interests, even if uncertain about major
+
+MAJOR-SPECIFIC FOCUS (${major}):
+Perfect for students who want to explore different fields before declaring a major, with strong academic advising and support for discovery.`
+  };
+
+  return programContexts[program as keyof typeof programContexts] || programContexts['undecided'];
+};
+
+// Helper functions for major-specific contexts
+const getStemMajorContext = (major: string): string => {
+  const contexts = {
+    'computer-science': 'Coding experience, understanding of technology\'s impact, problem-solving through programming',
+    'engineering': 'Design thinking, understanding of engineering principles, interest in solving real-world problems',
+    'mathematics': 'Abstract reasoning, proof-writing experience, appreciation for mathematical beauty and applications',
+    'physics': 'Experimental curiosity, understanding of natural phenomena, comfort with mathematical modeling',
+    'chemistry': 'Laboratory experience, understanding of molecular processes, interest in chemical applications',
+    'biology': 'Understanding of living systems, research experience, interest in biological applications',
+    'data-science': 'Statistical thinking, programming skills, understanding of data\'s role in decision-making'
+  };
+  return contexts[major as keyof typeof contexts] || 'Strong analytical skills and scientific curiosity';
+};
+
+const getBusinessMajorContext = (major: string): string => {
+  const contexts = {
+    'business-admin': 'Leadership experience, understanding of organizational dynamics, strategic thinking',
+    'economics': 'Analytical thinking about markets, understanding of economic principles, quantitative skills',
+    'finance': 'Understanding of financial markets, quantitative analysis, interest in investment and risk',
+    'marketing': 'Creative communication, understanding of consumer behavior, digital media experience',
+    'accounting': 'Attention to detail, understanding of financial systems, analytical precision',
+    'entrepreneurship': 'Innovation mindset, leadership experience, understanding of business creation'
+  };
+  return contexts[major as keyof typeof contexts] || 'Strong analytical and leadership skills';
+};
+
+const getLiberalArtsMajorContext = (major: string): string => {
+  const contexts = {
+    'english': 'Love of literature, strong writing skills, critical analysis of texts',
+    'history': 'Understanding of historical processes, research skills, analytical writing',
+    'philosophy': 'Logical reasoning, ethical thinking, comfort with abstract concepts',
+    'psychology': 'Interest in human behavior, research methodology, empathy and insight',
+    'sociology': 'Understanding of social structures, research skills, interest in social justice',
+    'political-science': 'Interest in governance and policy, analytical skills, understanding of political processes'
+  };
+  return contexts[major as keyof typeof contexts] || 'Strong critical thinking and communication skills';
+};
+
+const getPreMedMajorContext = (major: string): string => {
+  const contexts = {
+    'biology-premed': 'Strong foundation in life sciences, research experience, understanding of biological systems',
+    'chemistry-premed': 'Understanding of chemical processes in biology, laboratory skills, analytical thinking',
+    'neuroscience': 'Interest in brain function, interdisciplinary thinking, research experience',
+    'biochemistry': 'Understanding of molecular biology, strong chemistry background, research orientation',
+    'public-health': 'Understanding of population health, interest in prevention and policy, community service'
+  };
+  return contexts[major as keyof typeof contexts] || 'Strong science foundation with commitment to healthcare';
+};
+
+const getPreLawMajorContext = (major: string): string => {
+  const contexts = {
+    'political-science-prelaw': 'Understanding of government and legal systems, analytical writing, policy interest',
+    'criminal-justice': 'Understanding of legal processes, interest in justice and fairness, analytical thinking',
+    'international-relations': 'Global perspective, understanding of international law, analytical skills',
+    'philosophy-prelaw': 'Logical reasoning, ethical analysis, strong argumentative skills'
+  };
+  return contexts[major as keyof typeof contexts] || 'Strong analytical and argumentative skills';
+};
+
+const getArtsMajorContext = (major: string): string => {
+  const contexts = {
+    'fine-arts': 'Artistic vision, technical skills, understanding of art history and contemporary practice',
+    'graphic-design': 'Visual communication skills, understanding of design principles, technical proficiency',
+    'music': 'Musical talent, understanding of theory and performance, artistic dedication',
+    'theater': 'Performance skills, understanding of dramatic literature, collaborative abilities',
+    'film': 'Visual storytelling, understanding of film history and technique, creative vision',
+    'creative-writing': 'Writing talent, understanding of literary forms, creative voice and vision'
+  };
+  return contexts[major as keyof typeof contexts] || 'Creative talent and artistic dedication';
+};
+
+// Get general college interview context
+const getCollegeInterviewContext = (): string => {
+  return `
+COLLEGE INTERVIEW BEST PRACTICES:
+- Create a welcoming, conversational atmosphere
+- Ask open-ended questions that encourage reflection
+- Show genuine interest in the student's experiences and perspectives
+- Allow time for thoughtful responses
+- Ask follow-up questions to dig deeper into interesting responses
+- Balance challenge with encouragement
+- Focus on growth, learning, and potential rather than just achievements
+- Remember this is also an opportunity for the student to learn about the school
+
+COMMON COLLEGE INTERVIEW TOPICS:
+1. Academic interests and intellectual curiosity
+2. Personal experiences and character development
+3. School knowledge and genuine interest ("Why us?")
+4. Leadership and community involvement
+5. Challenges overcome and lessons learned
+6. Future goals and aspirations
+7. Values and ethical reasoning
+8. What they would contribute to campus community
+
+EVALUATION CRITERIA:
+- Intellectual curiosity and academic potential
+- Personal maturity and character
+- Communication skills and articulation
+- Genuine interest in the institution
+- Potential contribution to campus community
+- Alignment with institutional values
+- Resilience and growth mindset
+- Leadership and collaborative abilities
+`;
+};

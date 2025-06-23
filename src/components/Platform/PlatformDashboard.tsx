@@ -12,10 +12,17 @@ import {
   ChevronRight,
   Plus,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  GraduationCap,
+  Users,
+  BookOpen,
+  Shield,
+  Crown,
+  Star
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
 import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
+import { UniversityLogo, prestigiousUniversities } from '../UniversityLogos';
 
 // Utility function to convert camelCase to readable text
 const formatInterviewType = (type: string): string => {
@@ -47,10 +54,11 @@ const formatInterviewType = (type: string): string => {
 interface PlatformDashboardProps {
   onStartInterview: () => void;
   onStartFocusedInterview: () => void;
+  onStartCollegeInterview: () => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
 }
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview, onViewInterviewResults }) => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview, onStartCollegeInterview, onViewInterviewResults }) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
   const [stats, setStats] = useState({
     totalInterviews: 0,
@@ -407,13 +415,117 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                   <p className="text-xs text-gray-400">5 min</p>
                 </div>
               </div>
-              
-              <button
+                <button
                 onClick={onStartFocusedInterview}
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-400 hover:to-cyan-400 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-3 group"
               >
                 <Target className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 Start Focused Practice
+                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>            {/* College Interview Section */}
+            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/5 rounded-2xl p-8 border border-purple-500/20 mb-8 relative overflow-hidden">
+              {/* Scattered University Logos - positioned away from all text */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Top right corner - clear of header text */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[0].domain} 
+                  alt={prestigiousUniversities[0].name}
+                  className="w-8 h-8 opacity-40 absolute top-2 right-4" 
+                  style={{ transform: 'rotate(15deg)', background: 'none' }}
+                />
+                
+                {/* Top left - in empty margin space */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[1].domain} 
+                  alt={prestigiousUniversities[1].name}
+                  className="w-7 h-7 opacity-35 absolute top-6 left-2" 
+                  style={{ transform: 'rotate(-20deg)', background: 'none' }}
+                />
+                
+                {/* Far left side - between header and feature cards */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[2].domain} 
+                  alt={prestigiousUniversities[2].name}
+                  className="w-9 h-9 opacity-45 absolute top-32 left-4" 
+                  style={{ transform: 'rotate(-15deg)', background: 'none' }}
+                />
+                
+                {/* Far right side - between header and feature cards */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[3].domain} 
+                  alt={prestigiousUniversities[3].name}
+                  className="w-6 h-6 opacity-38 absolute top-28 right-8" 
+                  style={{ transform: 'rotate(45deg)', background: 'none' }}
+                />
+                
+                {/* Bottom right - clear of button */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[4].domain} 
+                  alt={prestigiousUniversities[4].name}
+                  className="w-8 h-8 opacity-42 absolute bottom-2 right-12" 
+                  style={{ transform: 'rotate(-30deg)', background: 'none' }}
+                />
+                
+                {/* Bottom left - clear of feature cards */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[5].domain} 
+                  alt={prestigiousUniversities[5].name}
+                  className="w-7 h-7 opacity-36 absolute bottom-4 left-8" 
+                  style={{ transform: 'rotate(60deg)', background: 'none' }}
+                />
+                
+                {/* Middle right - in empty space */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[6].domain} 
+                  alt={prestigiousUniversities[6].name}
+                  className="w-6 h-6 opacity-40 absolute top-48 right-2" 
+                  style={{ transform: 'rotate(75deg)', background: 'none' }}
+                />
+                
+                {/* Center bottom - between feature cards and button */}
+                <UniversityLogo 
+                  domain={prestigiousUniversities[7].domain} 
+                  alt={prestigiousUniversities[7].name}
+                  className="w-8 h-8 opacity-38 absolute bottom-16 left-1/2 transform -translate-x-1/2" 
+                  style={{ transform: 'rotate(-45deg)', background: 'none' }}
+                />
+              </div>
+              
+              <div className="flex items-center gap-4 mb-6 relative z-10">
+                <div className="p-4 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-2xl">
+                  <GraduationCap className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">College Interviews</h2>
+                  <p className="text-gray-300">Practice admissions interviews for universities and scholarship applications</p>
+                  <div className="mt-2 px-3 py-1 bg-purple-500/20 text-purple-300 text-xs font-medium rounded-full border border-purple-500/30 w-fit">
+                    Testing - FBLA
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 relative z-10">
+                <div className="bg-dark-800/30 rounded-lg p-4 relative">
+                  <h4 className="font-medium text-white mb-2">📚 Academic Focus</h4>
+                  <p className="text-sm text-gray-400">Questions about your studies, interests, and goals</p>
+                </div>
+                <div className="bg-dark-800/30 rounded-lg p-4 relative">
+                  <h4 className="font-medium text-white mb-2">🎯 Personal Fit</h4>
+                  <p className="text-sm text-gray-400">Demonstrate why you're perfect for their institution</p>
+                </div>
+                <div className="bg-dark-800/30 rounded-lg p-4 relative">
+                  <h4 className="font-medium text-white mb-2">💡 Future Vision</h4>
+                  <p className="text-sm text-gray-400">Articulate your aspirations and career plans</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={onStartCollegeInterview}
+                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-semibold hover:from-purple-400 hover:to-indigo-400 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-3 group relative z-10"
+              >
+                <GraduationCap className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                Start College Interview
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>

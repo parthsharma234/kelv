@@ -8,17 +8,18 @@ import InterviewResults from './InterviewResults';
 import FocusedInterviewSelection from './FocusedInterviewSelection';
 import FocusedInterview from './FocusedInterview';
 import FocusedInterviewResults from './FocusedInterviewResults';
+import CollegeSetupFlow from './CollegeSetupFlow';
 import { InterviewSetup } from '../../types/interview';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'college-setup' | 'college-interview' | 'college-results';
 
 const PlatformContainer: React.FC = () => {
   const { user, loading } = useAuth();
-  const [currentState, setCurrentState] = useState<PlatformState>('dashboard');
-  const [interviewSetup, setInterviewSetup] = useState<InterviewSetup | null>(null);
+  const [currentState, setCurrentState] = useState<PlatformState>('dashboard');  const [interviewSetup, setInterviewSetup] = useState<InterviewSetup | null>(null);
   const [sessionData, setSessionData] = useState<any>(null);
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
+  const [isCollegeFlow, setIsCollegeFlow] = useState(false);
   const [viewingInterviewId, setViewingInterviewId] = useState<string>('');
   
   // State for viewing interview results - moved to top level to avoid conditional hooks
@@ -58,15 +59,22 @@ const PlatformContainer: React.FC = () => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
   const handleStartInterview = () => {
     setIsFocusedFlow(false);
+    setIsCollegeFlow(false);
     setCurrentState('setup');
   };
 
   const handleStartFocusedInterview = () => {
     setIsFocusedFlow(true);
+    setIsCollegeFlow(false);
     setCurrentState('setup');
+  };
+
+  const handleStartCollegeInterview = () => {
+    setIsFocusedFlow(false);
+    setIsCollegeFlow(true);
+    setCurrentState('college-setup');
   };
 
   const handleSetupComplete = (setup: InterviewSetup) => {
@@ -92,13 +100,13 @@ const PlatformContainer: React.FC = () => {
     setSessionData(data);
     setCurrentState('focused-results');
   };
-
   const handleBackToDashboard = () => {
     setCurrentState('dashboard');
     setInterviewSetup(null);
     setSessionData(null);
     setFocusedInterviewType('');
     setIsFocusedFlow(false);
+    setIsCollegeFlow(false);
   };
 
   const handleBackToSetup = () => {
@@ -108,18 +116,52 @@ const PlatformContainer: React.FC = () => {
   const handleBackToFocusedSelection = () => {
     setCurrentState('focused-selection');
   };
-
   const handleStartNewInterview = () => {
     setInterviewSetup(null);
     setSessionData(null);
     setIsFocusedFlow(false);
+    setIsCollegeFlow(false);
     setCurrentState('setup');
   };
-
   const handleStartNewFocusedInterview = (type: string) => {
     setFocusedInterviewType(type);
     setSessionData(null);
     setCurrentState('focused-interview');
+  };
+  const handleCollegeSetupComplete = (setup: any) => {
+    // For now, we'll just go back to dashboard with a comprehensive message
+    // In the future, this would navigate to the actual college interview
+    console.log('College setup completed:', setup);
+    
+    const setupDetails = `
+College Interview Setup Complete!
+
+Institution Type: ${setup.schoolType}
+Program Area: ${setup.program}
+Specific Major: ${setup.major}
+Interview Mode: ${setup.interviewMode}
+
+This feature is currently in testing phase for FBLA.
+The system has captured your detailed preferences for:
+- ${getSchoolTypeDescription(setup.schoolType)}
+- Major focus in ${setup.major}
+- Interview format: ${setup.interviewMode === 'voice' ? 'Voice-based conversation' : 'Text-based responses'}
+
+Coming soon: Personalized college admission interview practice!`;
+    
+    alert(setupDetails);
+    handleBackToDashboard();
+  };
+
+  const getSchoolTypeDescription = (schoolType: string) => {
+    const descriptions = {
+      'ivy-league': 'Ivy League/Elite University preparation',
+      'private': 'Private University admission',
+      'public': 'Public University admission',
+      'liberal-arts': 'Liberal Arts College admission',
+      'community': 'Community College admission'
+    };
+    return descriptions[schoolType as keyof typeof descriptions] || schoolType;
   };
   const handleViewInterviewResults = (interviewId: string, interviewType?: string | null) => {
     setViewingInterviewId(interviewId);
@@ -175,18 +217,24 @@ const PlatformContainer: React.FC = () => {
   }
 
   return (
-    <>
-      {currentState === 'dashboard' && (
+    <>      {currentState === 'dashboard' && (
         <PlatformDashboard 
           onStartInterview={handleStartInterview}
           onStartFocusedInterview={handleStartFocusedInterview}
+          onStartCollegeInterview={handleStartCollegeInterview}
           onViewInterviewResults={handleViewInterviewResults}
         />
       )}
-      
-      {currentState === 'setup' && (
+        {currentState === 'setup' && (
         <SetupFlow 
           onComplete={handleSetupComplete}
+          onBack={handleBackToDashboard}
+        />
+      )}
+      
+      {currentState === 'college-setup' && (
+        <CollegeSetupFlow 
+          onComplete={handleCollegeSetupComplete}
           onBack={handleBackToDashboard}
         />
       )}
