@@ -1,4 +1,5 @@
 import { InterviewSetup, Question, InterviewResponse, AIInterviewerState } from '../types/interview';
+import { synthesizeSpeechWithElevenLabs } from './elevenLabsTTS';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -536,15 +537,14 @@ export const generateInterviewQuestions = async (setup: InterviewSetup): Promise
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
     throw new Error('OpenAI API key is required for AI-generated questions. Please configure your API key to use the interview platform.');
   }
-
-  try {
-    const prompt = `You are a seasoned ${setup.industry} hiring manager with 15+ years of experience interviewing for ${setup.jobType} roles. You know how to put candidates at ease and create a welcoming, conversational atmosphere.
+    try {
+    const prompt = `You are Alex Rodriguez, a seasoned ${setup.industry} hiring manager with 15+ years of experience interviewing for ${setup.jobType} roles. You have a warm, charismatic personality - you know how to put candidates at ease and create a welcoming, conversational atmosphere while asking sharp, insightful questions.
 
 INTERVIEW PERSONA:
-- You're conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} role at a leading ${setup.industry} company
+- You're Alex Rodriguez conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} role at a leading ${setup.industry} company
 - You genuinely want to get to know the candidate and help them show their best
 - Your tone is warm, friendly, and professional—think of this as a two-way conversation, not an interrogation
-- You ask thoughtful follow-ups and show curiosity about the candidate's journey
+- You ask thoughtful follow-ups and show genuine curiosity about the candidate's journey
 - You're looking for real stories, practical examples, and authentic enthusiasm
 
 INDUSTRY CONTEXT FOR ${setup.industry}:
@@ -705,9 +705,7 @@ A${questionNum + 1}: ${r.response}`;
     const shouldAskTechnical = !hasAskedTechnical && responses.length >= 2 && !isStruggling;
     
     // Get technical questions for this role/industry
-    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);
-
-    const prompt = `You are a seasoned ${setup.industry} hiring manager continuing a real interview for a ${setup.experienceLevel} ${setup.jobType} position. Your goal is to keep the conversation flowing naturally, building on what the candidate has shared so far.
+    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);    const prompt = `You are Alex Rodriguez, a charismatic and insightful ${setup.industry} hiring manager. You're conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} position. You have a warm, engaging personality but ask sharp, insightful questions. You make candidates feel comfortable while getting to the heart of their capabilities.
 
 INTERVIEW CONTEXT:
 - Question #${currentQuestionNumber} (no fixed limit—let the conversation flow naturally)
@@ -770,11 +768,12 @@ DIFFICULTY ADAPTATION:
 - If performing well (score > 7): Ask complex, strategic questions
 
 NATURAL CONVERSATION TECHNIQUES:
+- Use Alex's warm, conversational tone: "I'm curious about...", "What's your take on...", "That's interesting - tell me more about..."
+- Keep questions concise and focused (1-2 sentences max)
 - Reference specific details from their previous answers
-- Use phrases like "That's interesting," "I'm curious about," "Walk me through"
-- Ask for specific examples when they mention general concepts
-- Probe deeper when they mention achievements or challenges
-- Connect their experiences to the role requirements
+- Ask for concrete examples when they mention general concepts
+- Probe deeper on achievements or challenges they mention
+- Connect their experiences to the role requirements naturally
 
 INDUSTRY-SPECIFIC FOCUS:
 ${getIndustryContext(setup.industry)}
@@ -785,14 +784,11 @@ ${getRoleContext(setup.jobType, setup.industry)}
 TASK: Generate the next question that feels like a natural continuation of the conversation. If the interview is nearing its end (around 15 minutes), help wrap up with a friendly closing question or reflection, thanking the candidate and inviting any final thoughts or questions.
 
 REQUIREMENTS:
-1. NATURAL FLOW: Should connect logically to their previous answers
-2. AUTHENTIC TONE: Sound like a real hiring manager, not a script
-3. SPECIFIC PROBING: Reference specific details they mentioned
-4. ROLE RELEVANCE: Relevant to ${setup.jobType} responsibilities
-5. EXPERIENCE APPROPRIATE: Matches ${setup.experienceLevel} expectations
-6. CONVERSATION BUILDING: Designed to encourage detailed, engaging responses
-7. ADAPTIVE DIFFICULTY: ${isStruggling ? 'Keep it simple and supportive' : isPerformingWell ? 'Make it challenging and thought-provoking' : 'Use standard difficulty'}
-${shouldAskTechnical ? '8. TECHNICAL FOCUS: Include a real technical question from the domain' : ''}
+1. NATURAL FLOW: Connect logically to their previous answers using Alex's conversational style
+2. CONCISE: Keep questions short and focused (1-2 sentences max)
+3. AUTHENTIC: Sound like Alex having a real conversation, not conducting an interrogation
+4. RELEVANT: Directly related to the ${setup.jobType} role
+5. ENGAGING: Use Alex's warm but sharp questioning style
 
 EXAMPLE STYLES:
 - "You mentioned [specific project/achievement]—that sounds really interesting. Walk me through how you approached that challenge and what you learned from it?"
@@ -886,7 +882,7 @@ export const analyzeResponse = async (
     const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
     const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
 
-    const prompt = `You are a senior ${setup.industry} hiring manager with 15+ years of experience evaluating candidates for ${setup.jobType} positions. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
+    const prompt = `You are Alex Rodriguez, a senior ${setup.industry} hiring manager with 15+ years of experience evaluating candidates for ${setup.jobType} positions. You have a warm, encouraging personality but provide sharp, actionable feedback. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
 
 INTERVIEW CONTEXT:
 - Position: ${setup.jobType}
@@ -1018,38 +1014,8 @@ No additional text - just the JSON object.`;
 };
 
 export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement | null> => {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return null;
-  }
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'tts-1',
-        input: text,
-        voice: 'echo', // Professional and clear voice
-        speed: 0.9, // Slightly slower for better clarity
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`TTS API error: ${response.status}`);
-    }
-
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-    
-    return audio;
-  } catch (error) {
-    console.error('Error synthesizing speech:', error);
-    return null;
-  }
+  // Use ElevenLabs TTS with Mark voice (professional male) and Flash v2.5
+  return await synthesizeSpeechWithElevenLabs(text);
 };
 
 // Helper functions
@@ -1105,249 +1071,269 @@ export const generateFocusedQuestions = async (interviewType: string, setup: Int
         title: 'Technical Questions',
         description: 'Practice coding, system design, and technical concepts',
         duration: 5,
-        maxQuestions: 4,
-        focus: 'technical skills, coding problems, system design, and role-specific technical knowledge'
+        maxQuestions: 6,
+        focus: 'advanced technical skills, system architecture, coding challenges, and deep technical knowledge'
       },
       behavioral: {
         title: 'Behavioral Questions',
         description: 'Master the STAR method and leadership scenarios',
         duration: 4,
-        maxQuestions: 3,
-        focus: 'past experiences, leadership scenarios, teamwork, and problem-solving using the STAR method'
+        maxQuestions: 5,
+        focus: 'leadership experiences, challenging situations, team dynamics, and measurable achievements'
       },
       situational: {
         title: 'Situational Questions',
         description: 'Handle workplace challenges and problem-solving',
         duration: 4,
-        maxQuestions: 3,
-        focus: 'hypothetical workplace scenarios, conflict resolution, and decision-making'
+        maxQuestions: 5,
+        focus: 'complex workplace scenarios, ethical dilemmas, crisis management, and strategic decision-making'
       },
       resume: {
         title: 'Resume Questions',
         description: 'Articulate your background and experience effectively',
         duration: 3,
-        maxQuestions: 2,
-        focus: 'background, experience, achievements, and career motivations'
+        maxQuestions: 4,
+        focus: 'career transitions, skill development, achievements quantification, and professional growth'
       },
       leadership: {
         title: 'Leadership Questions',
         description: 'Demonstrate leadership and management skills',
         duration: 5,
-        maxQuestions: 4,
-        focus: 'team management, strategic thinking, influence, and organizational leadership'
+        maxQuestions: 5,
+        focus: 'executive presence, organizational impact, change management, and strategic leadership'
       },
       caseStudy: {
         title: 'Case Study Interviews',
         description: 'Practice business and technical case scenarios',
         duration: 8,
         maxQuestions: 3,
-        focus: 'business analysis, market research, strategic thinking, and problem-solving frameworks'
+        focus: 'complex business analysis, market strategy, profitability frameworks, and data-driven decision making'
       },
       systemDesign: {
         title: 'System Design Interviews',
         description: 'Master architecture and scalability discussions',
         duration: 10,
         maxQuestions: 2,
-        focus: 'system architecture, scalability, technical design, and trade-off analysis'
+        focus: 'large-scale system architecture, performance optimization, scalability challenges, and technical trade-offs'
       },
       leadershipAssessment: {
         title: 'Leadership Assessment',
         description: 'Advanced management and executive scenarios',
         duration: 8,
-        maxQuestions: 3,
-        focus: 'executive decision-making, organizational leadership, strategic management, and high-stakes scenarios'
+        maxQuestions: 4,
+        focus: 'executive decision-making, organizational transformation, stakeholder management, and strategic vision'
       },
       culturalFit: {
         title: 'Cultural Fit',
         description: 'Assess values, team fit, and alignment with company mission',
         duration: 4,
-        maxQuestions: 3,
-        focus: 'values, team fit, company mission, and workplace culture'
+        maxQuestions: 5,
+        focus: 'value alignment, collaboration style, adaptability, and cultural integration'
       },
       communication: {
         title: 'Communication',
         description: 'Practice presentation and explaining complex ideas',
         duration: 4,
-        maxQuestions: 3,
-        focus: 'presentation skills, clarity, explaining complex ideas, and storytelling'
+        maxQuestions: 4,
+        focus: 'executive communication, complex idea explanation, stakeholder presentation, and persuasive messaging'
       },
       problemSolving: {
         title: 'Problem Solving',
         description: 'Logic puzzles, brainteasers, and structured thinking',
         duration: 4,
-        maxQuestions: 3,
-        focus: 'logic puzzles, brainteasers, structured thinking, and analytical reasoning'
+        maxQuestions: 5,
+        focus: 'analytical reasoning, creative problem-solving, logical frameworks, and innovative thinking'
       },
       salaryNegotiation: {
         title: 'Salary Negotiation',
         description: 'Practice negotiating offers and discussing compensation',
         duration: 3,
-        maxQuestions: 2,
-        focus: 'negotiation skills, discussing compensation, and handling offers'
+        maxQuestions: 4,
+        focus: 'compensation discussions, offer negotiation, value articulation, and strategic positioning'
       },
       closing: {
         title: 'Closing/Wrap-up',
         description: 'How to end interviews and ask questions back',
         duration: 2,
-        maxQuestions: 2,
-        focus: 'ending interviews, asking questions to the interviewer, and next steps'
+        maxQuestions: 3,
+        focus: 'strategic questioning, interview closure, relationship building, and next steps positioning'
       }
     };
 
     const config = interviewConfig[interviewType as keyof typeof interviewConfig];
-    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);
+    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);    const prompt = `You are Alex Rodriguez, a charismatic and insightful ${setup.industry} hiring manager with 20+ years of experience. You're known for your warm yet sharp interviewing style - you make candidates feel comfortable while asking penetrating questions that reveal their true potential. You have a slight sense of humor and genuine curiosity about people.
 
-    const prompt = `You are a senior ${setup.industry} hiring manager creating a focused ${interviewType} interview for a ${setup.experienceLevel} ${setup.jobType} position.
+INTERVIEW CONTEXT:
+- TYPE: ${config.title} (Focused Session)
+- TARGET: ${setup.experienceLevel} ${setup.jobType} in ${setup.industry}
+- FOCUS: ${config.focus}
+- DURATION: ${config.duration} minutes
+- QUESTIONS NEEDED: ${config.maxQuestions}
 
-INTERVIEW TYPE: ${config.title}
-FOCUS: ${config.focus}
-DURATION: ${config.duration} minutes
-MAX QUESTIONS: ${config.maxQuestions}
+CANDIDATE PROFILE:
+- Experience Level: ${setup.experienceLevel}
+- Role: ${setup.jobType}
+- Industry: ${setup.industry}
+- Interview Mode: ${setup.interviewMode}
 
-INDUSTRY CONTEXT:
+INDUSTRY EXPERTISE:
 ${getIndustryContext(setup.industry)}
 
-ROLE-SPECIFIC KNOWLEDGE:
+ROLE-SPECIFIC REQUIREMENTS:
 ${getRoleContext(setup.jobType, setup.industry)}
 
-EXPERIENCE LEVEL EXPECTATIONS:
+EXPERIENCE LEVEL CALIBRATION:
 ${getExperienceLevelContext(setup.experienceLevel)}
 
-TASK: Generate ${config.maxQuestions} focused ${interviewType} questions that are:
-1. SPECIFIC TO TYPE: ${config.focus}
-2. ROLE-RELEVANT: Appropriate for ${setup.jobType} in ${setup.industry}
-3. EXPERIENCE-APPROPRIATE: Matches ${setup.experienceLevel} expectations
-4. TIME-EFFICIENT: Can be answered in 2-3 minutes each
-5. PROGRESSIVE: Start easier, get more challenging
+QUESTION GENERATION REQUIREMENTS:
+
+1. **CONVERSATIONAL TONE**: Write questions in Alex's warm, engaging style - use "I'm curious about...", "What's your take on...", "Tell me about a time..."
+2. **CONCISE & FOCUSED**: Questions should be 1-2 sentences max, clear and to the point
+3. **RELEVANT**: Directly related to ${setup.jobType} in ${setup.industry}
+4. **PROGRESSIVE**: Build complexity gradually
+5. **AUTHENTIC**: Sound like a real conversation, not an interrogation
 
 ${interviewType === 'technical' ? `
-TECHNICAL QUESTION EXAMPLES TO DRAW FROM:
-${technicalQuestions.slice(0, 5).map(q => `- "${q}"`).join('\n')}
+TECHNICAL FOCUS AREAS:
+- Advanced technical concepts for ${setup.jobType}
+- System design and architecture challenges
+- Real-world problem-solving scenarios
+- Technology stack decision-making
+- Performance optimization and scaling
+- Best practices and trade-off analysis
 
-Choose from these or create similar technical questions that:
-- Test practical knowledge, not just memorization
-- Are appropriate for ${setup.experienceLevel} level
-- Can be answered concisely
-- Relate to ${setup.jobType} responsibilities` : ''}
+TECHNICAL QUESTION INSPIRATION (create unique variations):
+${technicalQuestions.slice(0, 8).map(q => `- "${q}"`).join('\n')}
+
+Create questions that test:
+- Deep technical understanding beyond memorization
+- Practical application of concepts
+- Decision-making in technical scenarios
+- Ability to explain complex topics clearly
+- Trade-off analysis and optimization thinking` : ''}
 
 ${interviewType === 'behavioral' ? `
-BEHAVIORAL QUESTION GUIDELINES:
-- Use STAR method structure (Situation, Task, Action, Result)
-- Focus on leadership, teamwork, problem-solving
-- Ask for specific examples and outcomes
-- Probe for quantifiable results when possible` : ''}
+BEHAVIORAL FOCUS AREAS:
+- Leadership in challenging situations
+- Impact and measurable results
+- Cross-functional collaboration
+- Innovation and change management
+- Conflict resolution and difficult conversations
+- Strategic thinking and long-term planning
+
+Question should probe for:
+- Specific examples with quantifiable outcomes
+- Leadership approach and philosophy
+- Handling of complex stakeholder dynamics
+- Decision-making under pressure
+- Growth mindset and learning from failures` : ''}
 
 ${interviewType === 'situational' ? `
-SITUATIONAL QUESTION GUIDELINES:
-- Present realistic workplace scenarios
-- Focus on decision-making and problem-solving
-- Include conflict resolution and team dynamics
-- Ask for step-by-step approach to challenges` : ''}
+SITUATIONAL FOCUS AREAS:
+- Complex workplace scenarios requiring strategic thinking
+- Ethical dilemmas and tough decisions
+- Crisis management and rapid response
+- Cross-functional collaboration challenges
+- Resource constraints and prioritization
+- Change management and organizational dynamics
 
-${interviewType === 'resume' ? `
-RESUME QUESTION GUIDELINES:
-- Ask about specific experiences and achievements
-- Probe for career motivations and goals
-- Focus on relevant skills and background
-- Connect past experience to current role` : ''}
+Create scenarios that are:
+- Realistic for ${setup.jobType} in ${setup.industry}
+- Complex enough to require strategic thinking
+- Open-ended to allow for multiple approaches
+- Test both analytical and interpersonal skills` : ''}
 
 ${interviewType === 'leadership' ? `
-LEADERSHIP QUESTION GUIDELINES:
-- Focus on team management and influence
-- Include strategic thinking scenarios
-- Ask about organizational impact
-- Probe for leadership philosophy and approach` : ''}
+LEADERSHIP FOCUS AREAS:
+- Executive presence and influence without authority
+- Organizational transformation and change leadership
+- Strategic vision and long-term planning
+- Team building and talent development
+- Stakeholder management and communication
+- Performance management and difficult conversations
 
-${interviewType === 'caseStudy' ? `
-CASE STUDY QUESTION GUIDELINES:
-- Present realistic business or technical scenarios
-- Focus on analytical thinking and problem-solving
-- Include market analysis and strategic considerations
-- Ask for structured approach using frameworks (Porter, McKinsey, etc.)
-- Require quantitative analysis and recommendations` : ''}
+Probe for:
+- Leadership philosophy and approach
+- Handling of complex organizational challenges
+- Building high-performing teams
+- Strategic decision-making
+- Influence and persuasion skills` : ''}
 
 ${interviewType === 'systemDesign' ? `
-SYSTEM DESIGN QUESTION GUIDELINES:
-- Focus on architecture and scalability challenges for software systems
-- Include trade-off analysis and decision-making for technical systems
-- Ask for detailed technical design discussions (databases, APIs, microservices)
-- Cover performance, reliability, and scalability considerations
-- Require whiteboarding-style thinking and technical communication
-- Focus on building applications, systems, and infrastructure
+SYSTEM DESIGN FOCUS AREAS:
+- Large-scale distributed system architecture
+- Performance, scalability, and reliability trade-offs
+- Database design and data modeling
+- API design and microservices architecture
+- Load balancing, caching, and optimization
+- Security, monitoring, and operational concerns
 
-EXAMPLES OF SYSTEM DESIGN QUESTIONS:
-- "Design a URL shortening service like bit.ly"
-- "How would you design a chat system like WhatsApp?"
-- "Design a video streaming service like Netflix"
-- "How would you build a social media feed?"` : ''}
+Create scenarios that require:
+- End-to-end system thinking
+- Technology choice justification
+- Scalability planning (millions of users)
+- Real-world constraints and trade-offs
+- Operational and maintenance considerations` : ''}
 
-${interviewType === 'leadershipAssessment' ? `
-LEADERSHIP ASSESSMENT GUIDELINES:
-- Present high-stakes executive scenarios
-- Focus on strategic decision-making under pressure
-- Include organizational leadership and change management
-- Ask about executive presence and influence
-- Probe for board-level thinking and stakeholder management` : ''}
+${interviewType === 'caseStudy' ? `
+CASE STUDY FOCUS AREAS:
+- Business strategy and market analysis
+- Profitability and growth frameworks
+- Competitive analysis and positioning
+- Data analysis and insights generation
+- Strategic recommendations and implementation
+- Risk assessment and mitigation
 
-${interviewType === 'culturalFit' ? `
-CULTURAL FIT QUESTION GUIDELINES:
-- Focus on values, team fit, and alignment with company mission
-- Ask about preferred work environments and collaboration styles
-- Probe for adaptability and openness to feedback
-- Explore alignment with company values and mission` : ''}
-
-${interviewType === 'communication' ? `
-COMMUNICATION QUESTION GUIDELINES:
-- Ask about presenting complex ideas to different audiences
-- Probe for clarity, storytelling, and active listening
-- Include scenarios for explaining technical concepts to non-experts
-- Assess ability to tailor communication style` : ''}
+Present cases that involve:
+- Complex business scenarios relevant to ${setup.industry}
+- Multiple stakeholders and competing priorities
+- Data interpretation and strategic insights
+- Market dynamics and competitive forces
+- Financial analysis and business metrics` : ''}
 
 ${interviewType === 'problemSolving' ? `
-PROBLEM SOLVING QUESTION GUIDELINES:
-- Present specific logic puzzles, riddles, or mathematical brainteasers
-- Ask classic problem-solving questions (e.g., "How many tennis balls fit in a school bus?")
-- Include step-by-step logical reasoning challenges
-- Focus on analytical thinking, NOT system architecture or technical design
-- Use puzzles that test reasoning ability, pattern recognition, and creative thinking
-- Avoid any questions about building systems, applications, or technical architecture
+PROBLEM SOLVING FOCUS AREAS:
+- Complex analytical reasoning challenges
+- Creative thinking and innovative approaches
+- Structured problem-solving frameworks
+- Logic puzzles requiring step-by-step thinking
+- Mathematical reasoning and estimation
+- Pattern recognition and abstract thinking
 
-EXAMPLES OF APPROPRIATE PROBLEM SOLVING QUESTIONS:
-- "You have 8 balls, one weighs differently. Using a balance scale only twice, how do you find the different ball?"
-- "How would you move Mount Fuji?"
-- "A man lives on the 20th floor. Every morning he takes the elevator down. When he comes home, he takes the elevator to the 10th floor and walks the rest, except on rainy days when he takes it all the way. Why?"
-- "How many piano tuners are there in Chicago?"
-- "You're shrunk to the height of a nickel and thrown in a blender. How do you escape?"` : ''}
+Create problems that:
+- Require systematic thinking and clear logic
+- Test analytical reasoning, not technical knowledge
+- Allow for creative and innovative approaches
+- Build in complexity that matches ${setup.experienceLevel} level
+- Focus on thinking process, not just correct answers` : ''}
 
-${interviewType === 'salaryNegotiation' ? `
-SALARY NEGOTIATION QUESTION GUIDELINES:
-- Ask about discussing compensation expectations
-- Probe for negotiation strategies and handling offers
-- Include scenarios for responding to counter-offers
-- Assess confidence and professionalism in negotiation` : ''}
+DIFFICULTY CALIBRATION:
+- Entry-level: Focus on foundational concepts, basic scenarios, learning orientation
+- Mid-level: Moderate complexity, some leadership elements, cross-functional collaboration
+- Senior-level: Complex strategic scenarios, organizational impact, advanced technical depth
+- Executive-level: Strategic vision, organizational transformation, industry-level thinking
 
-${interviewType === 'closing' ? `
-CLOSING/WRAP-UP QUESTION GUIDELINES:
-- Ask about final questions for the interviewer
-- Probe for interest in next steps and company fit
-- Include scenarios for ending interviews positively
-- Assess ability to leave a strong final impression` : ''}
+OUTPUT FORMAT:
+Return ONLY a JSON array with exactly ${config.maxQuestions} questions:
 
-Return ONLY this JSON format:
 [
   {
     "id": "fq1",
-    "text": "Your focused question here",
+    "text": "Your sophisticated, role-specific question here",
     "type": "${interviewType}",
-    "difficulty": "easy|medium|hard"
-  },
-  {
-    "id": "fq2",
-    "text": "Your second focused question here",
-    "type": "${interviewType}",
-    "difficulty": "easy|medium|hard"
+    "difficulty": "medium|hard"
   }
 ]
+
+EXAMPLES OF ALEX'S QUESTIONING STYLE:
+
+Instead of: "Describe a situation where you had to lead a cross-functional team through a major change initiative while managing competing stakeholder priorities and tight deadlines."
+Alex asks: "Tell me about a time you had to get different teams on the same page when everyone wanted different things. How'd you make it work?"
+
+Instead of: "Walk me through your architecture decisions for handling message delivery, user presence, file sharing, and ensuring sub-200ms latency worldwide while maintaining GDPR compliance."
+Alex asks: "If you had to build a chat system for thousands of users, what's the first technical challenge you'd tackle and why?"
+
+Keep Alex's questions short, conversational, and focused on one key concept per question.
 
 Generate exactly ${config.maxQuestions} questions. No additional text - just the JSON array.`;
 

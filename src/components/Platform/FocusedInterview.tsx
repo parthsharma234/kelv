@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { InterviewSetup, Question, InterviewResponse } from '../../types/interview';
 import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput } from '../../utils/openai';
+import { isElevenLabsTTSAvailable } from '../../utils/elevenLabsTTS';
 import AIInterviewer from '../AIInterviewer';
 import { createInitialInterviewSession, saveInterviewSession } from '../../utils/supabase-interview';
 import { extractSpeechMetrics } from '../../utils/openai';
@@ -54,10 +55,12 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [speechMetrics, setSpeechMetrics] = useState<any[]>([]);
-
   const isVoiceMode = setup.interviewMode === 'voice';
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
     import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
+
+  // Check if ElevenLabs TTS is available for voice synthesis
+  const hasTTSAvailable = isElevenLabsTTSAvailable();
 
   // Interview type configurations
   const interviewConfig = {
@@ -230,15 +233,13 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
     setHasStartedInterview(true);
     setStartTime(new Date());
     setCanUserRespond(true);
-    
-    // Play first question
-    if (questions.length > 0 && isVoiceMode && hasOpenAIKey) {
+      // Play first question
+    if (questions.length > 0 && isVoiceMode && hasTTSAvailable) {
       await playQuestion(questions[0].text);
     }
   };
-
   const playQuestion = async (questionText: string) => {
-    if (!hasOpenAIKey) return;
+    if (!hasTTSAvailable) return;
     
     setIsAISpeaking(true);
     setCanUserRespond(false);
@@ -349,9 +350,8 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
     
     if (nextIndex < questions.length) {
       setCurrentQuestionIndex(nextIndex);
-      
-      // Play the question if in voice mode
-      if (isVoiceMode && hasOpenAIKey) {
+        // Play the question if in voice mode
+      if (isVoiceMode && hasTTSAvailable) {
         await playQuestion(questions[nextIndex].text);
       } else {
         setCanUserRespond(true);
@@ -645,10 +645,8 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
                   </ul>
                 </div>
               </div>
-            )}
-
-            {/* Repeat question button - only for voice mode */}
-            {hasStartedInterview && currentQuestion && isVoiceMode && hasOpenAIKey && (
+            )}            {/* Repeat question button - only for voice mode */}
+            {hasStartedInterview && currentQuestion && isVoiceMode && hasTTSAvailable && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
