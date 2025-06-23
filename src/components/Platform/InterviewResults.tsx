@@ -40,6 +40,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     };
 
     saveSession();
+    
+    // Scroll to top when component mounts
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }, [sessionData]);
 
   const formatTime = (seconds: number) => {
@@ -635,10 +641,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 {/* Actions */}
                 <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
                   <h3 className="text-lg font-semibold text-white mb-4">What's Next?</h3>
-                  
-                  <div className="space-y-3">
+                    <div className="space-y-3">
                     <button
-                      onClick={onStartNewInterview}
+                      onClick={() => {
+                        onStartNewInterview();
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-medium hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
                     >
                       <Brain className="w-5 h-5" />
@@ -647,7 +655,10 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     </button>
                     
                     <button
-                      onClick={onBackToDashboard}
+                      onClick={() => {
+                        onBackToDashboard();
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       className="w-full px-6 py-3 bg-dark-700 text-white rounded-xl font-medium hover:bg-dark-600 transition-colors flex items-center justify-center gap-2"
                     >
                       <BarChart3 className="w-5 h-5" />

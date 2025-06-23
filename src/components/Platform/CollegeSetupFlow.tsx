@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   GraduationCap,
@@ -34,6 +34,14 @@ export const CollegeSetupFlow: React.FC<CollegeSetupFlowProps> = ({ onComplete, 
     interviewMode: 'text'
   });
   const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    // Scroll to top when component mounts
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
 
   const schoolTypes = [
     { id: 'public', label: 'Public University', icon: Building },
@@ -197,7 +205,7 @@ export const CollegeSetupFlow: React.FC<CollegeSetupFlowProps> = ({ onComplete, 
 
           {/* Progress indicator */}
           <div className="flex items-center justify-center space-x-4 mb-8">
-            {steps.map((step, index) => (
+            {steps.map((_, index) => (
               <div key={index} className="flex items-center">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                   index < currentStep 

@@ -1648,6 +1648,7 @@ ${getPreMedMajorContext(major)}`,
 
     'pre-law': `
 
+
 PROGRAM FOCUS - PRE-LAW:
 Your program seeks students who:
 - Demonstrate strong analytical and argumentative skills
@@ -1797,4 +1798,210 @@ EVALUATION CRITERIA:
 - Resilience and growth mindset
 - Leadership and collaborative abilities
 `;
+};
+
+// Analyze college interview responses with AI
+export const analyzeCollegeInterviewResponse = async (
+  question: any,
+  response: string,
+  setup: any
+): Promise<any> => {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    throw new Error('OpenAI API key is required');
+  }
+
+  try {
+    const responseLength = response.length;
+    const wordCount = response.split(' ').length;
+    const hasSpecificExamples = /(example|instance|time|when|project|case|experience)/i.test(response);
+    const hasPersonalReflection = /(learned|realized|discovered|grew|changed|developed)/i.test(response);
+    const showsPassion = /(excited|passionate|love|enjoy|fascinated|inspired|motivated)/i.test(response);
+    const mentionsSchool = new RegExp(setup.schoolType.replace('-', '|') + '|' + setup.program + '|' + setup.major, 'i').test(response);
+
+    const prompt = `You are an experienced college admissions officer evaluating a student's response to an admission interview question. Provide a comprehensive analysis that will help the student improve their college interview skills.
+
+INTERVIEW CONTEXT:
+- Institution Type: ${setup.schoolType}
+- Program: ${setup.program}
+- Major: ${setup.major}
+- Question Type: ${question.type}
+- Question Asked: "${question.text}"
+
+STUDENT RESPONSE:
+"${response}"
+
+RESPONSE METRICS:
+- Length: ${responseLength} characters, ${wordCount} words
+- Contains specific examples: ${hasSpecificExamples ? 'Yes' : 'No'}
+- Shows personal reflection: ${hasPersonalReflection ? 'Yes' : 'No'}
+- Demonstrates passion: ${showsPassion ? 'Yes' : 'No'}
+- References school/program: ${mentionsSchool ? 'Yes' : 'No'}
+
+EVALUATION CRITERIA FOR COLLEGE INTERVIEWS:
+
+CONTENT QUALITY (40%):
+- Demonstrates genuine interest in the school/program
+- Shows self-awareness and personal growth
+- Provides specific examples and experiences
+- Connects experiences to future goals
+- Shows knowledge of the institution
+
+AUTHENTICITY (25%):
+- Genuine and personal voice
+- Honest self-reflection
+- Real experiences rather than generic responses
+- Shows vulnerability and growth mindset
+
+COMMUNICATION SKILLS (20%):
+- Clear and articulate expression
+- Well-structured response
+- Appropriate depth for the question
+- Engaging storytelling
+
+PASSION & FIT (15%):
+- Enthusiasm for the field of study
+- Clear motivation for this specific school
+- Alignment with institutional values
+- Potential contribution to campus community
+
+Return a JSON object with this structure:
+{
+  "score": number (1-10, where 8-10 is excellent for college admission),
+  "feedback": "Specific, actionable feedback for improvement",
+  "strengths": ["strength1", "strength2", "strength3"],
+  "areasForImprovement": ["improvement1", "improvement2"],
+  "authenticity": number (1-10),
+  "passion": number (1-10),
+  "clarity": number (1-10),
+  "specificity": number (1-10),
+  "schoolKnowledge": number (1-10),
+  "personalGrowth": number (1-10),
+  "nextQuestionSuggestion": "suggestion for follow-up question based on response"
+}
+
+No additional text - just the JSON object.`;
+
+    const response_api = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 800,
+      }),
+    });
+
+    if (!response_api.ok) {
+      throw new Error(`OpenAI API error: ${response_api.status}`);
+    }
+
+    const data = await response_api.json();
+    const analysisText = data.choices[0].message.content.trim();
+    
+    // Extract JSON from response
+    const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('Error analyzing college response:', error);
+    throw error;
+  }
+};
+
+// Generate follow-up questions for college interviews
+export const generateCollegeFollowUp = async (
+  setup: any,
+  responses: any[],
+  currentResponse: string
+): Promise<any> => {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    throw new Error('OpenAI API key is required');
+  }
+
+  try {
+    const conversationContext = responses.slice(-2).map((r, index) => {
+      const qNum = responses.length - 1 + index;
+      return `Q${qNum}: ${r.questionText || 'Previous question'}
+A${qNum}: ${r.response}`;
+    }).join('\n\n');
+
+    const prompt = `You are an experienced college admissions officer conducting an interview for a ${setup.schoolType} institution. Based on the conversation so far, generate a thoughtful follow-up question.
+
+INTERVIEW CONTEXT:
+- Institution: ${setup.schoolType} 
+- Program: ${setup.program}
+- Major: ${setup.major}
+- Interview Format: ${setup.interviewMode}
+
+RECENT CONVERSATION:
+${conversationContext}
+
+CURRENT RESPONSE: "${currentResponse}"
+
+FOLLOW-UP QUESTION REQUIREMENTS:
+1. Build naturally on what the student just shared
+2. Encourage deeper reflection or specific examples
+3. Show genuine interest in their experiences
+4. Appropriate for college admission interview tone
+5. Help assess their fit for the program/institution
+6. 2-3 minutes to answer thoughtfully
+
+QUESTION TYPES TO CONSIDER:
+- Asking for specific examples when they mention general concepts
+- Exploring motivations behind their interests
+- Understanding their knowledge of the school/program
+- Assessing their personal growth and self-awareness
+- Connecting their experiences to future goals
+
+Return a JSON object:
+{
+  "id": "follow_up_${responses.length + 1}",
+  "text": "Your thoughtful follow-up question",
+  "type": "follow_up",
+  "category": "Follow-up",
+  "followUpPotential": true,
+  "reasoning": "Brief explanation of why this follow-up makes sense"
+}
+
+No additional text - just the JSON object.`;
+
+    const response_api = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.8,
+        max_tokens: 400,
+      }),
+    });
+
+    if (!response_api.ok) {
+      throw new Error(`OpenAI API error: ${response_api.status}`);
+    }
+
+    const data = await response_api.json();
+    const questionText = data.choices[0].message.content.trim();
+    
+    // Extract JSON from response
+    const jsonMatch = questionText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('Error generating college follow-up:', error);
+    throw error;
+  }
 };

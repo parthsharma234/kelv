@@ -126,9 +126,13 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   // Check if API key is configured
   const hasAPIKey = import.meta.env.VITE_OPENAI_API_KEY && 
                     import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
-
   useEffect(() => {
     loadSavedSetups();
+    // Scroll to top when component mounts
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }, []);
 
   // Auto-generate name when setup changes

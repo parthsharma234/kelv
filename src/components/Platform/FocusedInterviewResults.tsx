@@ -25,6 +25,14 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   onBackToDashboard,
   onStartNewFocusedInterview
 }) => {
+  useEffect(() => {
+    // Scroll to top when component mounts
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -179,9 +187,11 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={onBackToDashboard}
+          <div className="flex items-center gap-4 mb-6">            <button
+              onClick={() => {
+                onBackToDashboard();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-400" />
@@ -322,10 +332,12 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 Next Steps
               </h3>
               <p className="text-gray-300 mb-4">{nextPractice}</p>
-              
-              <div className="space-y-3">
+                <div className="space-y-3">
                 <button
-                  onClick={() => onStartNewFocusedInterview(sessionData.interviewType)}
+                  onClick={() => {
+                    onStartNewFocusedInterview(sessionData.interviewType);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg hover:from-orange-400 hover:to-orange-300 transition-all font-medium flex items-center justify-center gap-2"
                 >
                   <Play className="w-4 h-4" />
@@ -333,21 +345,29 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 </button>
                 
                 <button
-                  onClick={() => onStartNewFocusedInterview('behavioral')}
+                  onClick={() => {
+                    onStartNewFocusedInterview('behavioral');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="w-full px-4 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors font-medium"
                 >
                   Try Behavioral
                 </button>
-                
-                <button
-                  onClick={() => onStartNewFocusedInterview('technical')}
+                  <button
+                  onClick={() => {
+                    onStartNewFocusedInterview('technical');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="w-full px-4 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors font-medium"
                 >
                   Try Technical
                 </button>
                 
                 <button
-                  onClick={() => onStartNewFocusedInterview('situational')}
+                  onClick={() => {
+                    onStartNewFocusedInterview('situational');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="w-full px-4 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors font-medium"
                 >
                   Try Situational
@@ -455,11 +475,12 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 <InterviewTimeline duration={sessionData.duration} events={timelineEvents} />
                 <div className="text-xs text-gray-400 mt-2">Hover over the wave to see your performance and feedback at each moment.</div>
               </motion.div>
-            )}
-
-            {/* Back to Dashboard */}
+            )}            {/* Back to Dashboard */}
             <button
-              onClick={onBackToDashboard}
+              onClick={() => {
+                onBackToDashboard();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="w-full px-4 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors font-medium"
             >
               Back to Dashboard
