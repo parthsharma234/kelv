@@ -537,14 +537,15 @@ export const generateInterviewQuestions = async (setup: InterviewSetup): Promise
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
     throw new Error('OpenAI API key is required for AI-generated questions. Please configure your API key to use the interview platform.');
   }
-    try {
-    const prompt = `You are Alex Rodriguez, a seasoned ${setup.industry} hiring manager with 15+ years of experience interviewing for ${setup.jobType} roles. You have a warm, charismatic personality - you know how to put candidates at ease and create a welcoming, conversational atmosphere while asking sharp, insightful questions.
+
+  try {
+    const prompt = `You are a seasoned ${setup.industry} hiring manager with 15+ years of experience interviewing for ${setup.jobType} roles. You know how to put candidates at ease and create a welcoming, conversational atmosphere.
 
 INTERVIEW PERSONA:
-- You're Alex Rodriguez conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} role at a leading ${setup.industry} company
+- You're conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} role at a leading ${setup.industry} company
 - You genuinely want to get to know the candidate and help them show their best
 - Your tone is warm, friendly, and professional—think of this as a two-way conversation, not an interrogation
-- You ask thoughtful follow-ups and show genuine curiosity about the candidate's journey
+- You ask thoughtful follow-ups and show curiosity about the candidate's journey
 - You're looking for real stories, practical examples, and authentic enthusiasm
 
 INDUSTRY CONTEXT FOR ${setup.industry}:
@@ -705,7 +706,9 @@ A${questionNum + 1}: ${r.response}`;
     const shouldAskTechnical = !hasAskedTechnical && responses.length >= 2 && !isStruggling;
     
     // Get technical questions for this role/industry
-    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);    const prompt = `You are Alex Rodriguez, a charismatic and insightful ${setup.industry} hiring manager. You're conducting a real interview for a ${setup.experienceLevel} ${setup.jobType} position. You have a warm, engaging personality but ask sharp, insightful questions. You make candidates feel comfortable while getting to the heart of their capabilities.
+    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);
+
+    const prompt = `You are a seasoned ${setup.industry} hiring manager continuing a real interview for a ${setup.experienceLevel} ${setup.jobType} position. Your goal is to keep the conversation flowing naturally, building on what the candidate has shared so far.
 
 INTERVIEW CONTEXT:
 - Question #${currentQuestionNumber} (no fixed limit—let the conversation flow naturally)
@@ -768,12 +771,11 @@ DIFFICULTY ADAPTATION:
 - If performing well (score > 7): Ask complex, strategic questions
 
 NATURAL CONVERSATION TECHNIQUES:
-- Use Alex's warm, conversational tone: "I'm curious about...", "What's your take on...", "That's interesting - tell me more about..."
-- Keep questions concise and focused (1-2 sentences max)
 - Reference specific details from their previous answers
-- Ask for concrete examples when they mention general concepts
-- Probe deeper on achievements or challenges they mention
-- Connect their experiences to the role requirements naturally
+- Use phrases like "That's interesting," "I'm curious about," "Walk me through"
+- Ask for specific examples when they mention general concepts
+- Probe deeper when they mention achievements or challenges
+- Connect their experiences to the role requirements
 
 INDUSTRY-SPECIFIC FOCUS:
 ${getIndustryContext(setup.industry)}
@@ -784,11 +786,14 @@ ${getRoleContext(setup.jobType, setup.industry)}
 TASK: Generate the next question that feels like a natural continuation of the conversation. If the interview is nearing its end (around 15 minutes), help wrap up with a friendly closing question or reflection, thanking the candidate and inviting any final thoughts or questions.
 
 REQUIREMENTS:
-1. NATURAL FLOW: Connect logically to their previous answers using Alex's conversational style
-2. CONCISE: Keep questions short and focused (1-2 sentences max)
-3. AUTHENTIC: Sound like Alex having a real conversation, not conducting an interrogation
-4. RELEVANT: Directly related to the ${setup.jobType} role
-5. ENGAGING: Use Alex's warm but sharp questioning style
+1. NATURAL FLOW: Should connect logically to their previous answers
+2. AUTHENTIC TONE: Sound like a real hiring manager, not a script
+3. SPECIFIC PROBING: Reference specific details they mentioned
+4. ROLE RELEVANCE: Relevant to ${setup.jobType} responsibilities
+5. EXPERIENCE APPROPRIATE: Matches ${setup.experienceLevel} expectations
+6. CONVERSATION BUILDING: Designed to encourage detailed, engaging responses
+7. ADAPTIVE DIFFICULTY: ${isStruggling ? 'Keep it simple and supportive' : isPerformingWell ? 'Make it challenging and thought-provoking' : 'Use standard difficulty'}
+${shouldAskTechnical ? '8. TECHNICAL FOCUS: Include a real technical question from the domain' : ''}
 
 EXAMPLE STYLES:
 - "You mentioned [specific project/achievement]—that sounds really interesting. Walk me through how you approached that challenge and what you learned from it?"
@@ -882,7 +887,7 @@ export const analyzeResponse = async (
     const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
     const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
 
-    const prompt = `You are Alex Rodriguez, a senior ${setup.industry} hiring manager with 15+ years of experience evaluating candidates for ${setup.jobType} positions. You have a warm, encouraging personality but provide sharp, actionable feedback. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
+    const prompt = `You are a senior ${setup.industry} hiring manager with 15+ years of experience evaluating candidates for ${setup.jobType} positions. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
 
 INTERVIEW CONTEXT:
 - Position: ${setup.jobType}
@@ -1161,7 +1166,9 @@ export const generateFocusedQuestions = async (interviewType: string, setup: Int
     };
 
     const config = interviewConfig[interviewType as keyof typeof interviewConfig];
-    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);    const prompt = `You are Alex Rodriguez, a charismatic and insightful ${setup.industry} hiring manager with 20+ years of experience. You're known for your warm yet sharp interviewing style - you make candidates feel comfortable while asking penetrating questions that reveal their true potential. You have a slight sense of humor and genuine curiosity about people.
+    const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);
+
+    const prompt = `You are a world-class ${setup.industry} hiring manager with 20+ years of experience interviewing top talent for ${setup.jobType} roles. You're known for asking sophisticated, thought-provoking questions that reveal true capability and potential.
 
 INTERVIEW CONTEXT:
 - TYPE: ${config.title} (Focused Session)
@@ -1187,11 +1194,12 @@ ${getExperienceLevelContext(setup.experienceLevel)}
 
 QUESTION GENERATION REQUIREMENTS:
 
-1. **CONVERSATIONAL TONE**: Write questions in Alex's warm, engaging style - use "I'm curious about...", "What's your take on...", "Tell me about a time..."
-2. **CONCISE & FOCUSED**: Questions should be 1-2 sentences max, clear and to the point
-3. **RELEVANT**: Directly related to ${setup.jobType} in ${setup.industry}
-4. **PROGRESSIVE**: Build complexity gradually
-5. **AUTHENTIC**: Sound like a real conversation, not an interrogation
+1. **SOPHISTICATION**: Create questions that go beyond basic concepts - probe for deep understanding, strategic thinking, and real-world application
+2. **RELEVANCE**: Every question must be directly relevant to the ${setup.jobType} role and ${setup.industry} industry
+3. **PROGRESSION**: Start with moderately challenging questions, progressively increase complexity
+4. **SPECIFICITY**: Include specific scenarios, technologies, frameworks, or business contexts relevant to the role
+5. **DEPTH**: Questions should require 2-3 minutes to answer properly with examples and reasoning
+6. **AUTHENTICITY**: Sound like questions a real senior hiring manager would ask, not textbook examples
 
 ${interviewType === 'technical' ? `
 TECHNICAL FOCUS AREAS:
@@ -1325,15 +1333,15 @@ Return ONLY a JSON array with exactly ${config.maxQuestions} questions:
   }
 ]
 
-EXAMPLES OF ALEX'S QUESTIONING STYLE:
+EXAMPLES OF QUESTION SOPHISTICATION:
 
-Instead of: "Describe a situation where you had to lead a cross-functional team through a major change initiative while managing competing stakeholder priorities and tight deadlines."
-Alex asks: "Tell me about a time you had to get different teams on the same page when everyone wanted different things. How'd you make it work?"
+Instead of: "Tell me about a time you led a team"
+Ask: "Describe a situation where you had to lead a cross-functional team through a major change initiative while managing competing stakeholder priorities and tight deadlines. How did you ensure alignment and maintain team momentum when initial resistance emerged?"
 
-Instead of: "Walk me through your architecture decisions for handling message delivery, user presence, file sharing, and ensuring sub-200ms latency worldwide while maintaining GDPR compliance."
-Alex asks: "If you had to build a chat system for thousands of users, what's the first technical challenge you'd tackle and why?"
+Instead of: "How would you design a chat system?"
+Ask: "You're tasked with designing a real-time messaging platform for a global enterprise with 100,000+ employees across different time zones. Walk me through your architecture decisions for handling message delivery, user presence, file sharing, and ensuring sub-200ms latency worldwide while maintaining GDPR compliance."
 
-Keep Alex's questions short, conversational, and focused on one key concept per question.
+Create questions at this level of sophistication and specificity.
 
 Generate exactly ${config.maxQuestions} questions. No additional text - just the JSON array.`;
 
