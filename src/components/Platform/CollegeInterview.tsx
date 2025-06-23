@@ -12,6 +12,40 @@ import {
   Target
 } from 'lucide-react';
 import AIInterviewer from '../AIInterviewer';
+import { createInitialInterviewSession, saveInterviewSession } from '../../utils/supabase-interview';
+
+// Utility function to format category labels
+const formatCategoryLabel = (category: string): string => {
+  const categoryMappings: { [key: string]: string } = {
+    'school_fit': 'School Fit',
+    'personal_qualities': 'Personal Qualities',
+    'academic_readiness': 'Academic Readiness',
+    'future_goals': 'Future Goals',
+    'personal': 'Personal',
+    'academic': 'Academic',
+    'values': 'Values',
+    'community': 'Community',
+    'behavioral': 'Behavioral',
+    'technical': 'Technical',
+    'situational': 'Situational',
+    'follow_up': 'Follow-up',
+    'cultural_fit': 'Cultural Fit',
+    'leadership': 'Leadership',
+    'problem_solving': 'Problem Solving',
+    'communication': 'Communication',
+    'teamwork': 'Teamwork',
+    'motivation': 'Motivation',
+    'extracurricular': 'Extracurricular',
+    'goals': 'Goals',
+    'fit': 'Fit',
+    'challenge': 'Challenge',
+    'diversity': 'Diversity'
+  };
+  
+  return categoryMappings[category] || category.split('_').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
+};
 
 interface CollegeInterviewSetup {
   schoolType: string;
@@ -104,7 +138,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
         id: q.id,
         text: q.text,
         type: q.type as 'personal' | 'academic' | 'extracurricular' | 'goals' | 'fit' | 'challenge' | 'leadership' | 'diversity',
-        category: q.type.charAt(0).toUpperCase() + q.type.slice(1),
+        category: formatCategoryLabel(q.type),
         followUpPotential: true
       }));
     } catch (error) {
@@ -420,6 +454,20 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       setHasStartedInterview(true);
       setStartTime(new Date());
       setCanUserRespond(true);
+        // Create the initial interview session record in the database
+      try {
+        // Convert college setup to standard interview setup format
+        const standardSetup = {
+          industry: 'Education',
+          jobType: `${setup.schoolType} - ${setup.major}`,
+          experienceLevel: setup.program,
+          interviewMode: setup.interviewMode
+        };
+        await createInitialInterviewSession(sessionId, standardSetup, 'college');
+      } catch (error) {
+        console.error('Error creating initial session record:', error);
+        // Continue with the interview even if database creation fails
+      }
       
     } catch (error) {
       console.error('Error starting interview:', error);
@@ -578,8 +626,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
     } finally {
       setIsAnalyzing(false);
     }
-  };
-  const completeInterview = async (finalResponses: CollegeResponse[]) => {
+  };  const completeInterview = async (finalResponses: CollegeResponse[]) => {
     setIsInterviewComplete(true);
     
     // Calculate overall metrics from AI analysis
@@ -610,6 +657,15 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       questionsAnswered: finalResponses.length,
       metrics
     };
+
+    // Save interview session to Supabase
+    try {
+      await saveInterviewSession(sessionData);
+      console.log('College interview session saved to Supabase');
+    } catch (error) {
+      console.error('Error saving college interview session:', error);
+      // Continue to results even if save fails
+    }
 
     onComplete(sessionData);
   };
@@ -751,14 +807,10 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                       ? "AI is thinking of a thoughtful follow-up question based on your response..."
                       : currentQuestion?.text || "Loading question..."
                     : `Click 'Start Interview' to begin your college admission interview practice session.`}
-                </p>
-                {hasStartedInterview && currentQuestion && (
+                </p>                {hasStartedInterview && currentQuestion && (
                   <div className="mt-4 flex items-center gap-2">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
                       {currentQuestion.category}
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                      {currentQuestion.type}
                     </span>
                   </div>
                 )}

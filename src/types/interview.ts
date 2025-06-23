@@ -1,3 +1,10 @@
+export interface CollegeInterviewSetup {
+  schoolType: string;
+  program: string;
+  major: string;
+  interviewMode: 'voice' | 'text';
+}
+
 export interface InterviewSetup {
   industry: string;
   jobType: string;
@@ -126,6 +133,15 @@ export interface InterviewHistory {
     voiceStability: number;
   };
   interviewType?: string; // 'technical', 'behavioral', etc. for focused interviews
+  // College interview specific metrics
+  metrics?: {
+    authenticity?: number;
+    passion?: number;
+    clarity?: number;
+    specificity?: number;
+    schoolKnowledge?: number;
+    personalGrowth?: number;
+  };
 }
 
 export interface AIInterviewerState {

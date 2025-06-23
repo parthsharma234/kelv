@@ -17,6 +17,39 @@ import {
 import { saveInterviewSession } from '../../utils/supabase-interview';
 import { InterviewTimeline } from './InterviewTimeline';
 
+// Utility function to format category labels
+const formatCategoryLabel = (category: string): string => {
+  const categoryMappings: { [key: string]: string } = {
+    'school_fit': 'School Fit',
+    'personal_qualities': 'Personal Qualities',
+    'academic_readiness': 'Academic Readiness',
+    'future_goals': 'Future Goals',
+    'personal': 'Personal',
+    'academic': 'Academic',
+    'values': 'Values',
+    'community': 'Community',
+    'behavioral': 'Behavioral',
+    'technical': 'Technical',
+    'situational': 'Situational',
+    'follow_up': 'Follow-up',
+    'cultural_fit': 'Cultural Fit',
+    'leadership': 'Leadership',
+    'problem_solving': 'Problem Solving',
+    'communication': 'Communication',
+    'teamwork': 'Teamwork',
+    'motivation': 'Motivation',
+    'extracurricular': 'Extracurricular',
+    'goals': 'Goals',
+    'fit': 'Fit',
+    'challenge': 'Challenge',
+    'diversity': 'Diversity'
+  };
+  
+  return categoryMappings[category] || category.split('_').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
+};
+
 interface InterviewResultsProps {
   sessionData: any;
   onBackToDashboard: () => void;
@@ -374,9 +407,8 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                                 ? 'bg-green-500/20 text-green-400'
                                 : question?.type === 'follow_up'
                                 ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-orange-500/20 text-orange-400'
-                            }`}>
-                              {question?.type?.replace('_', ' ')}
+                                : 'bg-orange-500/20 text-orange-400'                            }`}>
+                              {formatCategoryLabel(question?.type || '')}
                             </span>
                             {question?.difficulty && (
                               <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -601,11 +633,10 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     </div>
                     
                     <div className="p-4 bg-dark-700/30 rounded-lg">
-                      <h4 className="font-medium text-white mb-2">Question Flow</h4>
-                      <div className="space-y-2">
+                      <h4 className="font-medium text-white mb-2">Question Flow</h4>                      <div className="space-y-2">
                         {Object.entries(questionTypes).map(([type, count]) => (
                           <div key={type} className="flex justify-between text-sm">
-                            <span className="text-gray-400 capitalize">{type.replace('_', ' ')}:</span>
+                            <span className="text-gray-400">{formatCategoryLabel(type)}:</span>
                             <span className="text-white">{count as number}</span>
                           </div>
                         ))}

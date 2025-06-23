@@ -1,10 +1,22 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { InterviewSession, InterviewHistory, InterviewSetup, SpeechMetrics } from '../types/interview';
+import { InterviewHistory, InterviewSetup, CollegeInterviewSetup } from '../types/interview';
 
+// Standard interview setup interface
 export interface SavedInterviewSetup {
   id: string;
   name: string;
   setup: InterviewSetup;
+  is_favorite: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// College interview setup interface  
+export interface SavedCollegeInterviewSetup {
+  id: string;
+  name: string;
+  setup: CollegeInterviewSetup;
   is_favorite: boolean;
   usage_count: number;
   created_at: string;
@@ -21,30 +33,37 @@ export const createInitialInterviewSession = async (sessionId: string, setup: In
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
+    }    const sessionData: any = {
+      id: sessionId,
+      user_id: user.id,
+      setup: setup,
+      responses: [],
+      overall_score: 0,
+      duration: 0,
+      questions_answered: 0,
+      status: 'incomplete',
+      speech_metrics: {},
+      audio_data: {},
+      interview_type: interviewType
+    };
+
+    // Only add metrics if it's a college interview (where metrics are expected)
+    if (interviewType === 'college') {
+      sessionData.metrics = null;
     }
 
     const { error } = await supabase
       .from('interview_sessions')
-      .insert({
-        id: sessionId,
-        user_id: user.id,
-        setup: setup,
-        responses: [],
-        overall_score: 0,
-        duration: 0,
-        questions_answered: 0,
-        status: 'incomplete',
-        speech_metrics: {},
-        audio_data: {},
-        interview_type: interviewType
-      });
-
-    if (error) {
+      .insert(sessionData);if (error) {
       console.error('Error creating initial interview session:', error);
+      console.error('Error details:', error.message, error.details, error.hint);
       throw error;
     }
   } catch (error) {
     console.error('Failed to create initial interview session:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+    }
     throw error;
   }
 };
@@ -63,26 +82,45 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
 
     // Prepare speech metrics for storage
     const speechMetrics = sessionData.speechMetrics || {};
-    const audioData = sessionData.audioData || {};    // Update the existing session record instead of inserting
+    const audioData = sessionData.audioData || {};    
+    
+    // Prepare data for update
+    const updateData: any = {
+      responses: sessionData.responses,
+      questions: sessionData.questions, // Also save questions array
+      overall_score: sessionData.overallScore,
+      duration: sessionData.duration,
+      questions_answered: sessionData.responses.length,
+      status: 'completed',
+      speech_metrics: speechMetrics,
+      audio_data: audioData,
+      interview_type: sessionData.type || sessionData.interviewType // Add interview type to database
+    };
+
+    // Only add metrics if they exist (for college interviews)
+    if (sessionData.metrics) {
+      updateData.metrics = sessionData.metrics;
+    }
+
+    console.log('Saving interview session with data:', {
+      sessionId: sessionData.id,
+      interviewType: updateData.interview_type,
+      status: updateData.status,
+      metricsIncluded: !!sessionData.metrics
+    });
+
+    // Update the existing session record instead of inserting
     const { error } = await supabase
       .from('interview_sessions')
-      .update({
-        responses: sessionData.responses,
-        questions: sessionData.questions, // Also save questions array
-        overall_score: sessionData.overallScore,
-        duration: sessionData.duration,
-        questions_answered: sessionData.responses.length,
-        status: 'completed',
-        speech_metrics: speechMetrics,
-        audio_data: audioData,
-        interview_type: sessionData.interviewType // Add interview type to database
-      })
+      .update(updateData)
       .eq('id', sessionData.id);
 
     if (error) {
       console.error('Error updating interview session:', error);
       throw error;
     }
+
+    console.log('Interview session saved successfully');
 
     // Update user speech profile asynchronously
     try {
@@ -324,12 +362,13 @@ export const toggleSetupFavorite = async (setupId: string, isFavorite: boolean):
     }
   } catch (error) {
     console.error('Failed to toggle setup favorite:', error);
+    throw error;
   }
 };
 
-export const deleteInterviewSetup = async (setupId: string): Promise<void> => {
+export const deleteInterviewSetup = async (setupId: string): Promise<boolean> => {
   if (!isSupabaseConfigured()) {
-    return;
+    return false;
   }
 
   try {
@@ -340,10 +379,142 @@ export const deleteInterviewSetup = async (setupId: string): Promise<void> => {
 
     if (error) {
       console.error('Error deleting interview setup:', error);
-      throw error;
+      return false;
     }
+
+    return true;
   } catch (error) {
     console.error('Failed to delete interview setup:', error);
+    return false;
+  }
+};
+
+// College Interview Setup functions
+export const saveCollegeInterviewSetup = async (
+  name: string, 
+  setup: CollegeInterviewSetup, 
+  isFavorite: boolean = false
+): Promise<SavedCollegeInterviewSetup | null> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping college setup save');
+    return null;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('college_interview_setups')
+      .insert({
+        user_id: user.id,
+        name,
+        setup,
+        is_favorite: isFavorite,
+        usage_count: 1
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving college interview setup:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to save college interview setup:', error);
+    return null;
+  }
+};
+
+export const getUserCollegeInterviewSetups = async (): Promise<SavedCollegeInterviewSetup[]> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning empty college setups');
+    return [];
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('college_interview_setups')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching college interview setups:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch college interview setups:', error);
+    return [];
+  }
+};
+
+export const updateCollegeSetupUsage = async (setupId: string): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    // First get the current usage count
+    const { data: currentData, error: fetchError } = await supabase
+      .from('college_interview_setups')
+      .select('usage_count')
+      .eq('id', setupId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching current college setup usage count:', fetchError);
+      return;
+    }
+
+    // Then update with incremented value
+    const { error } = await supabase
+      .from('college_interview_setups')
+      .update({ 
+        usage_count: (currentData.usage_count || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', setupId);
+
+    if (error) {
+      console.error('Error updating college setup usage:', error);
+    }
+  } catch (error) {
+    console.error('Failed to update college setup usage:', error);
+  }
+};
+
+export const deleteCollegeInterviewSetup = async (setupId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured()) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('college_interview_setups')
+      .delete()
+      .eq('id', setupId);
+
+    if (error) {
+      console.error('Error deleting college interview setup:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to delete college interview setup:', error);
+    return false;
   }
 };
 
@@ -366,10 +537,16 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
       // Fallback to localStorage
       const localHistory = localStorage.getItem('kelv-interview-history');
       return localHistory ? JSON.parse(localHistory) : [];
-    }
+    }    
+
+    console.log('Fetched interview history from Supabase:', {
+      total: data.length,
+      collegeInterviews: data.filter(s => s.interview_type === 'college').length,
+      interviewTypes: data.map(s => s.interview_type)
+    });
 
     // Transform Supabase data to InterviewHistory format
-    return data.map(session => ({
+    const transformedHistory = data.map(session => ({
       id: session.id,
       date: new Date(session.created_at),
       setup: session.setup,
@@ -383,8 +560,17 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
         speechRate: session.speech_metrics.timing?.speechRate || 0,
         voiceStability: session.speech_metrics.voice?.voiceStability || 0
       } : undefined,
-      interviewType: session.interview_type // Add this line
+      interviewType: session.interview_type, // Add this line
+      metrics: session.metrics || undefined // Include college interview metrics
     }));
+
+    console.log('Transformed interview history:', transformedHistory.map(h => ({
+      id: h.id,
+      interviewType: h.interviewType,
+      metrics: !!h.metrics
+    })));
+
+    return transformedHistory;
 
   } catch (error) {
     console.error('Failed to fetch interview history:', error);

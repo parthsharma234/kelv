@@ -6,6 +6,39 @@ import { isElevenLabsTTSAvailable } from '../../utils/elevenLabsTTS';
 import { saveSpeechAnalysisCache, createInitialInterviewSession } from '../../utils/supabase-interview';
 import AIInterviewer from '../AIInterviewer';
 
+// Utility function to format category labels
+const formatCategoryLabel = (category: string): string => {
+  const categoryMappings: { [key: string]: string } = {
+    'school_fit': 'School Fit',
+    'personal_qualities': 'Personal Qualities',
+    'academic_readiness': 'Academic Readiness',
+    'future_goals': 'Future Goals',
+    'personal': 'Personal',
+    'academic': 'Academic',
+    'values': 'Values',
+    'community': 'Community',
+    'behavioral': 'Behavioral',
+    'technical': 'Technical',
+    'situational': 'Situational',
+    'follow_up': 'Follow-up',
+    'cultural_fit': 'Cultural Fit',
+    'leadership': 'Leadership',
+    'problem_solving': 'Problem Solving',
+    'communication': 'Communication',
+    'teamwork': 'Teamwork',
+    'motivation': 'Motivation',
+    'extracurricular': 'Extracurricular',
+    'goals': 'Goals',
+    'fit': 'Fit',
+    'challenge': 'Challenge',
+    'diversity': 'Diversity'
+  };
+  
+  return categoryMappings[category] || category.split('_').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
+};
+
 interface InterviewSessionProps {
   setup: InterviewSetup;
   onComplete: (sessionData: any) => void;

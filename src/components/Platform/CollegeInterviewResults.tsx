@@ -13,9 +13,41 @@ import {
   Star,
   CheckCircle,
   Lightbulb,
-  FileText,
-  BarChart3
+  FileText,  BarChart3
 } from 'lucide-react';
+
+// Utility function to format category labels
+const formatCategoryLabel = (category: string): string => {
+  const categoryMappings: { [key: string]: string } = {
+    'school_fit': 'School Fit',
+    'personal_qualities': 'Personal Qualities',
+    'academic_readiness': 'Academic Readiness',
+    'future_goals': 'Future Goals',
+    'personal': 'Personal',
+    'academic': 'Academic',
+    'values': 'Values',
+    'community': 'Community',
+    'behavioral': 'Behavioral',
+    'technical': 'Technical',
+    'situational': 'Situational',
+    'follow_up': 'Follow-up',
+    'cultural_fit': 'Cultural Fit',
+    'leadership': 'Leadership',
+    'problem_solving': 'Problem Solving',
+    'communication': 'Communication',
+    'teamwork': 'Teamwork',
+    'motivation': 'Motivation',
+    'extracurricular': 'Extracurricular',
+    'goals': 'Goals',
+    'fit': 'Fit',
+    'challenge': 'Challenge',
+    'diversity': 'Diversity'
+  };
+  
+  return categoryMappings[category] || category.split('_').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
+};
 
 interface CollegeInterviewResultsProps {
   sessionData: any;
@@ -352,9 +384,8 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-gray-400">Q{index + 1}</span>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
-                                {question?.category}
+                              <span className="text-xs font-medium text-gray-400">Q{index + 1}</span>                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+                                {formatCategoryLabel(question?.category || '')}
                               </span>
                             </div>
                             <p className="text-white text-sm font-medium">{question?.text}</p>
