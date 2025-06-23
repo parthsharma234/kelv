@@ -210,7 +210,6 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
 
     return improvementsMap[type] || ["Add more detail", "Show enthusiasm"];
   };
-
   // Initialize interview session
   useEffect(() => {
     const initializeSession = async () => {
@@ -222,9 +221,8 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
         setQuestions(generatedQuestions);
         setSessionId(crypto.randomUUID());
         
-        if (isVoiceMode) {
-          await requestPermissions();
-        }
+        // Always request camera permissions for video display
+        await requestPermissions();
       } catch (error) {
         console.error('Error initializing session:', error);
         setLoadingError(error instanceof Error ? error.message : 'Failed to initialize interview session');
@@ -234,7 +232,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
     };
 
     initializeSession();
-  }, [isVoiceMode]);
+  }, []);
   // Timer effect - 5 minute limit with natural conclusion
   useEffect(() => {
     if (hasStartedInterview && startTime) {
@@ -252,8 +250,116 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       }, 1000);
       
       return () => clearInterval(interval);
+    }  }, [hasStartedInterview, startTime, responses, isAnalyzing]);
+  // Cleanup streams on unmount
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (previewStream) {
+        previewStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream, previewStream]);
+  // Handle preview video stream
+  useEffect(() => {
+    if (previewStream && previewVideoRef.current && !hasStartedInterview) {
+      const videoElement = previewVideoRef.current;
+      
+      // Clear any existing stream first
+      if (videoElement.srcObject) {
+        videoElement.srcObject = null;
+      }
+      
+      // Small delay to ensure element is ready
+      setTimeout(() => {
+        videoElement.srcObject = previewStream;
+        console.log('Preview video: Stream assigned', {
+          streamActive: previewStream.active,
+          streamTracks: previewStream.getTracks().length,
+          videoTracks: previewStream.getVideoTracks().length
+        });
+        
+        const playVideo = async () => {
+          try {
+            await videoElement.play();
+            console.log('Preview video started successfully');
+          } catch (error) {
+            console.error('Error playing preview video:', error);
+            // Try reloading the stream
+            videoElement.load();
+            try {
+              await videoElement.play();
+              console.log('Preview video started after reload');
+            } catch (retryError) {
+              console.error('Failed to start preview video after retry:', retryError);
+            }
+          }
+        };
+        
+        playVideo();
+      }, 50);
     }
-  }, [hasStartedInterview, startTime, responses, isAnalyzing]);
+  }, [previewStream, hasStartedInterview]);  // Handle main video stream
+  useEffect(() => {
+    if (stream && videoRef.current && hasStartedInterview) {
+      const videoElement = videoRef.current;
+      
+      console.log('Main video useEffect triggered', {
+        stream: !!stream,
+        videoElement: !!videoElement,
+        hasStartedInterview,
+        streamActive: stream.active,
+        currentSrcObject: !!videoElement.srcObject
+      });
+      
+      // Clear any existing stream first
+      if (videoElement.srcObject) {
+        console.log('Clearing existing srcObject');
+        videoElement.srcObject = null;
+      }
+      
+      // Small delay to ensure clean transition
+      setTimeout(() => {
+        videoElement.srcObject = stream;
+        console.log('Main video: Stream assigned', {
+          streamActive: stream.active,
+          streamTracks: stream.getTracks().length,
+          videoTracks: stream.getVideoTracks().length,
+          elementSrcObject: !!videoElement.srcObject,
+          elementSrcObjectActive: videoElement.srcObject ? (videoElement.srcObject as MediaStream).active : false
+        });
+        
+        const playVideo = async () => {
+          try {
+            console.log('Attempting to play main video...');
+            await videoElement.play();
+            console.log('Main video started successfully');
+          } catch (error) {
+            console.error('Error playing main video:', error);
+            // Try reloading the stream
+            console.log('Trying to reload and play again...');
+            videoElement.load();
+            try {
+              await videoElement.play();
+              console.log('Main video started after reload');
+            } catch (retryError) {
+              console.error('Failed to start video after retry:', retryError);
+            }
+          }
+        };
+        
+        playVideo();
+      }, 100);
+    } else {
+      console.log('Main video useEffect conditions not met', {
+        stream: !!stream,
+        videoElement: !!videoRef.current,
+        hasStartedInterview
+      });
+    }
+  }, [stream, hasStartedInterview]);
 
   const requestPermissions = async () => {
     try {
@@ -261,14 +367,9 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
         video: true,
         audio: true
       });
-      
-      setPreviewStream(mediaStream);
+        setPreviewStream(mediaStream);
       setPermissionGranted(true);
       setCameraError(null);
-      
-      if (previewVideoRef.current) {
-        previewVideoRef.current.srcObject = mediaStream;
-      }
     } catch (error) {
       console.error('Error requesting permissions:', error);
       if (error instanceof Error) {
@@ -281,35 +382,63 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
         }
       }
     }
-  };
-
-  const startInterview = async () => {
-    if (!permissionGranted && isVoiceMode) {
+  };  const startInterview = async () => {
+    if (!permissionGranted) {
       await requestPermissions();
       return;
-    }
+    }    
 
-    try {
-      if (isVoiceMode && previewStream) {
-        setStream(previewStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = previewStream;
-        }
+    try {      
+      // Always get a fresh stream for the main video to avoid conflicts
+      console.log('Getting fresh stream for interview');
+      const mainStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      
+      console.log('Starting interview with fresh stream:', {
+        streamActive: mainStream.active,
+        tracks: mainStream.getTracks().length,
+        videoTracks: mainStream.getVideoTracks().length
+      });
+      
+      // Clear the preview video element before starting
+      if (previewVideoRef.current) {
+        previewVideoRef.current.srcObject = null;
       }
-
+      
+      // Stop the preview stream since we're getting a new one
+      if (previewStream) {
+        previewStream.getTracks().forEach(track => track.stop());
+        setPreviewStream(null);
+      }
+      
+      // Set the new stream
+      setStream(mainStream);
+      
+      // Set interview as started
       setHasStartedInterview(true);
       setStartTime(new Date());
       setCanUserRespond(true);
+      
     } catch (error) {
       console.error('Error starting interview:', error);
       setCameraError('Failed to start interview. Please try again.');
     }
   };
-
   const startRecording = async () => {
-    if (!stream) return;
+    if (!stream) {
+      console.error('No stream available for recording');
+      return;
+    }
 
     try {
+      console.log('Starting recording with stream:', {
+        streamActive: stream.active,
+        audioTracks: stream.getAudioTracks().length,
+        videoTracks: stream.getVideoTracks().length
+      });
+
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
 
@@ -317,16 +446,26 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
-      };      recorder.onstop = () => {
+      };
+
+      recorder.onstop = () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         processVoiceResponse(audioBlob);
+      };
+
+      recorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        setIsRecording(false);
+        setCanUserRespond(true);
       };
 
       setMediaRecorder(recorder);
       recorder.start();
       setIsRecording(true);
+      console.log('Recording started successfully');
     } catch (error) {
       console.error('Error starting recording:', error);
+      setCanUserRespond(true);
     }
   };
 
@@ -731,9 +870,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
               size="xl"
               showStatus={true}
             />
-          </div>
-
-          {/* User Video */}
+          </div>          {/* User Video */}
           <div className="absolute bottom-6 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10">
             {!hasStartedInterview ? (
               <video
@@ -742,6 +879,10 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log('Preview video metadata loaded')}
+                onCanPlay={() => console.log('Preview video can play')}
+                onPlay={() => console.log('Preview video started playing')}
+                onError={(e) => console.error('Preview video error:', e)}
               />
             ) : (
               <video
@@ -750,8 +891,11 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                 muted
                 playsInline
                 className="w-full h-full object-cover"
-              />
-            )}
+                onLoadedMetadata={() => console.log('Main video metadata loaded')}
+                onCanPlay={() => console.log('Main video can play')}
+                onPlay={() => console.log('Main video started playing')}
+                onError={(e) => console.error('Main video error:', e)}
+              />            )}
           </div>
 
           {/* Controls */}

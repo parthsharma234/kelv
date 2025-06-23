@@ -470,7 +470,6 @@ Generate a thoughtful follow-up question that digs deeper into their response. R
       }
     }
   };
-
   const startInterview = async () => {
     if (!permissionGranted && isVoiceMode) {
       await requestPermissions();
@@ -478,10 +477,36 @@ Generate a thoughtful follow-up question that digs deeper into their response. R
     }
 
     try {
-      if (isVoiceMode && previewStream) {
-        setStream(previewStream);
+      if (isVoiceMode) {
+        // Always get a fresh stream for the main video to avoid conflicts
+        console.log('Getting fresh stream for college interview (old)');
+        const mainStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+        
+        console.log('Starting college interview (old) with fresh stream:', {
+          streamActive: mainStream.active,
+          tracks: mainStream.getTracks().length,
+          videoTracks: mainStream.getVideoTracks().length
+        });
+        
+        // Clear the preview video element before starting
+        if (previewVideoRef.current) {
+          previewVideoRef.current.srcObject = null;
+        }
+        
+        // Stop the preview stream since we're getting a new one
+        if (previewStream) {
+          previewStream.getTracks().forEach(track => track.stop());
+          setPreviewStream(null);
+        }
+        
+        // Set the new stream
+        setStream(mainStream);
+        
         if (videoRef.current) {
-          videoRef.current.srcObject = previewStream;
+          videoRef.current.srcObject = mainStream;
         }
       }
 
@@ -493,11 +518,19 @@ Generate a thoughtful follow-up question that digs deeper into their response. R
       setCameraError('Failed to start interview. Please try again.');
     }
   };
-
   const startRecording = async () => {
-    if (!stream) return;
+    if (!stream) {
+      console.error('No stream available for recording');
+      return;
+    }
 
     try {
+      console.log('Starting recording with stream:', {
+        streamActive: stream.active,
+        audioTracks: stream.getAudioTracks().length,
+        videoTracks: stream.getVideoTracks().length
+      });
+
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
 
@@ -505,16 +538,26 @@ Generate a thoughtful follow-up question that digs deeper into their response. R
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
-      };      recorder.onstop = () => {
+      };
+
+      recorder.onstop = () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         processVoiceResponse(audioBlob);
+      };
+
+      recorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        setIsRecording(false);
+        setCanUserRespond(true);
       };
 
       setMediaRecorder(recorder);
       recorder.start();
       setIsRecording(true);
+      console.log('Recording started successfully');
     } catch (error) {
       console.error('Error starting recording:', error);
+      setCanUserRespond(true);
     }
   };
 

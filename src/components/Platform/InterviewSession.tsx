@@ -90,7 +90,6 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     }
     return () => clearInterval(interval);
   }, [session?.isActive, hasStartedInterview, isInterviewComplete]);
-
   useEffect(() => {
     const currentVideoRef = hasStartedInterview ? videoRef : previewVideoRef;
     if (currentVideoRef.current) {
@@ -100,45 +99,102 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       setIsVideoElementReady(false);
     };
   }, [hasStartedInterview]);
-
+  // Separate effect for preview video stream
   useEffect(() => {
-    const currentVideoRef = hasStartedInterview ? videoRef : previewVideoRef;
-    const currentStream = hasStartedInterview ? stream : previewStream;
-
-    if (currentVideoRef.current && currentStream && isVideoElementReady) {
-      currentVideoRef.current.srcObject = currentStream;
-      currentVideoRef.current.play().catch(error => {
-        console.error('Error playing video:', error);
-        setCameraError('Error playing video stream. Please check your browser settings.');
+    if (previewVideoRef.current && previewStream && !hasStartedInterview) {
+      const videoElement = previewVideoRef.current;
+      videoElement.srcObject = previewStream;
+      
+      const playVideo = async () => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await videoElement.play();
+          console.log('Preview video started successfully');
+        } catch (error) {
+          console.error('Error playing preview video:', error);
+        }
+      };
+      
+      playVideo();
+    }
+  }, [previewStream, hasStartedInterview]);  // Separate effect for main video stream
+  useEffect(() => {
+    if (videoRef.current && stream && hasStartedInterview) {
+      const videoElement = videoRef.current;
+      
+      console.log('InterviewSession main video useEffect triggered', {
+        stream: !!stream,
+        videoElement: !!videoElement,
+        hasStartedInterview,
+        streamActive: stream.active,
+        currentSrcObject: !!videoElement.srcObject
+      });
+      
+      // Clear any existing stream first
+      if (videoElement.srcObject) {
+        console.log('Clearing existing srcObject');
+        videoElement.srcObject = null;
+      }
+      
+      // Small delay to ensure clean transition
+      setTimeout(() => {
+        videoElement.srcObject = stream;
+        console.log('InterviewSession main video: Stream assigned', {
+          streamActive: stream.active,
+          streamTracks: stream.getTracks().length,
+          videoTracks: stream.getVideoTracks().length,
+          elementSrcObject: !!videoElement.srcObject,
+          elementSrcObjectActive: videoElement.srcObject ? (videoElement.srcObject as MediaStream).active : false
+        });
+        
+        const playVideo = async () => {
+          try {
+            console.log('Attempting to play interview session main video...');
+            await videoElement.play();
+            console.log('InterviewSession main video started successfully');
+          } catch (error) {
+            console.error('Error playing interview session main video:', error);
+            // Try reloading the stream
+            console.log('Trying to reload and play again...');
+            videoElement.load();
+            try {
+              await videoElement.play();
+              console.log('InterviewSession main video started after reload');
+            } catch (retryError) {
+              console.error('Failed to start interview session video after retry:', retryError);
+            }
+          }
+        };
+        
+        playVideo();
+      }, 100);
+    } else {
+      console.log('InterviewSession main video useEffect conditions not met', {
+        stream: !!stream,
+        videoElement: !!videoRef.current,
+        hasStartedInterview
       });
     }
-
-    return () => {
-      if (currentVideoRef.current) {
-        currentVideoRef.current.srcObject = null;
-      }
-    };
-  }, [stream, previewStream, hasStartedInterview, isVideoElementReady]);
+  }, [stream, hasStartedInterview]);
 
   const requestPermissions = async () => {
     setIsRequestingPermission(true);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: isVoiceMode // Only request audio for voice mode
-      });
-      setPreviewStream(mediaStream);
+        audio: true // Always request audio for functionality
+      });      setPreviewStream(mediaStream);
       setPermissionGranted(true);
       setCameraError(null);
     } catch (error) {
       console.error('Error requesting permissions:', error);
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
-          setCameraError(`Camera${isVoiceMode ? ' and microphone' : ''} access denied. Please enable permissions in your browser settings.`);
+          setCameraError(`Camera and microphone access denied. Please enable permissions in your browser settings.`);
         } else if (error.name === 'NotFoundError') {
-          setCameraError(`No camera${isVoiceMode ? ' or microphone' : ''} found. Please connect a camera${isVoiceMode ? ' and microphone' : ''} to continue.`);
+          setCameraError(`No camera or microphone found. Please connect a camera and microphone to continue.`);
         } else {
-          setCameraError(`Unable to access camera${isVoiceMode ? ' and microphone' : ''}. Please check your device settings.`);
+          setCameraError(`Unable to access camera and microphone. Please check your device settings.`);
         }
       }
     } finally {
@@ -158,32 +214,41 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       previewStream.getTracks().forEach(track => track.stop());
       setPreviewStream(null);
     }
-  };
-
-  const startInterview = async () => {
+  };  const startInterview = async () => {
     try {
       setCameraError(null);
-      let mediaStream = previewStream;
-      if (!mediaStream) {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: isVoiceMode
-        });
+      
+      // Always get a fresh stream for the main video to avoid conflicts
+      console.log('Getting fresh stream for interview session');
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true // Always request audio for functionality
+      });
+      
+      console.log('Starting interview session with fresh stream:', {
+        streamActive: mediaStream.active,
+        tracks: mediaStream.getTracks().length,
+        videoTracks: mediaStream.getVideoTracks().length
+      });
+      
+      // Clear the preview video element before starting
+      if (previewVideoRef.current) {
+        previewVideoRef.current.srcObject = null;
       }
       
+      // Stop the preview stream since we're getting a new one
+      if (previewStream) {
+        previewStream.getTracks().forEach(track => track.stop());
+        setPreviewStream(null);
+      }
+      
+      // Set the new stream
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        try {
-          await videoRef.current.play();
-        } catch (playError) {
-          console.error('Error playing main video:', playError);
-        }
-      }
-      
+        // Set interview as started
       setHasStartedInterview(true);
+      
       if (session) {
-        setSession({ ...session, isActive: true });        // Create the initial interview session record in the database
+        setSession({ ...session, isActive: true });// Create the initial interview session record in the database
         try {
           await createInitialInterviewSession(session.id, setup, undefined); // Regular interview (not focused)
         } catch (error) {
@@ -202,16 +267,15 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         }
       }
       
-      stopPreviewCamera();
-    } catch (error) {
+      stopPreviewCamera();    } catch (error) {
       console.error('Error starting interview:', error);
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
-          setCameraError(`Camera${isVoiceMode ? ' and microphone' : ''} access denied. Please enable permissions in your browser settings.`);
+          setCameraError(`Camera and microphone access denied. Please enable permissions in your browser settings.`);
         } else if (error.name === 'NotFoundError') {
-          setCameraError(`No camera${isVoiceMode ? ' or microphone' : ''} found. Please connect a camera${isVoiceMode ? ' and microphone' : ''} to continue.`);
+          setCameraError(`No camera or microphone found. Please connect a camera and microphone to continue.`);
         } else {
-          setCameraError(`Unable to access camera${isVoiceMode ? ' and microphone' : ''}. Please check your device settings.`);
+          setCameraError(`Unable to access camera and microphone. Please check your device settings.`);
         }
       }
     }
@@ -267,9 +331,11 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           communicationStyle: 'detailed',
           strugglingAreas: [],
           strongAreas: []
-        }
-      };
+        }      };
       setSession(newSession);
+      
+      // Always request camera and microphone permissions for video display
+      await requestPermissions();
     } catch (error) {
       console.error('Error initializing session:', error);
       setLoadingError(error instanceof Error ? error.message : 'Failed to initialize interview session');
@@ -1020,9 +1086,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               size="xl"
               showStatus={true}
             />
-          </div>
-
-          {/* User video - picture in picture style */}
+          </div>          {/* User video - picture in picture style */}
           <div className="absolute bottom-6 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10">
             {!hasStartedInterview ? (
               <video
@@ -1031,6 +1095,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log('Preview video metadata loaded')}
+                onCanPlay={() => console.log('Preview video can play')}
+                onPlay={() => console.log('Preview video started playing')}
+                onError={(e) => console.error('Preview video error:', e)}
               />
             ) : (
               <video
@@ -1039,12 +1107,14 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log('Main video metadata loaded')}
+                onCanPlay={() => console.log('Main video can play')}
+                onPlay={() => console.log('Main video started playing')}
                 onError={(e) => {
                   console.error('Main video error:', e);
                   setCameraError('Error playing video stream. Please check your browser settings.');
                 }}
-              />
-            )}
+              />            )}
           </div>
 
           {/* Camera controls - only microphone toggle */}

@@ -43,9 +43,11 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [hasStartedInterview, setHasStartedInterview] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);  const [userResponse, setUserResponse] = useState('');
+  const [hasStartedInterview, setHasStartedInterview] = useState(false);  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [userResponse, setUserResponse] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
   const [isInterviewComplete, setIsInterviewComplete] = useState(false);const [isRecording, setIsRecording] = useState(false);
@@ -161,7 +163,6 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   useEffect(() => {
     initializeSession();
   }, []);
-
   useEffect(() => {
     if (hasStartedInterview && startTime) {
       const interval = setInterval(() => {
@@ -177,6 +178,95 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       return () => clearInterval(interval);
     }
   }, [hasStartedInterview, startTime, responses, config.duration]);
+  // Cleanup streams on unmount
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (previewStream) {
+        previewStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream, previewStream]);
+
+  // Handle preview video stream
+  useEffect(() => {
+    if (previewStream && previewVideoRef.current && !hasStartedInterview) {
+      const videoElement = previewVideoRef.current;
+      videoElement.srcObject = previewStream;
+      
+      const playVideo = async () => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await videoElement.play();
+          console.log('Preview video started successfully');
+        } catch (error) {
+          console.error('Error playing preview video:', error);
+        }
+      };
+      
+      playVideo();
+    }
+  }, [previewStream, hasStartedInterview]);  // Handle main video stream
+  useEffect(() => {
+    if (stream && videoRef.current && hasStartedInterview) {
+      const videoElement = videoRef.current;
+      
+      console.log('FocusedInterview main video useEffect triggered', {
+        stream: !!stream,
+        videoElement: !!videoElement,
+        hasStartedInterview,
+        streamActive: stream.active,
+        currentSrcObject: !!videoElement.srcObject
+      });
+      
+      // Clear any existing stream first
+      if (videoElement.srcObject) {
+        console.log('Clearing existing srcObject');
+        videoElement.srcObject = null;
+      }
+      
+      // Small delay to ensure clean transition
+      setTimeout(() => {
+        videoElement.srcObject = stream;
+        console.log('FocusedInterview main video: Stream assigned', {
+          streamActive: stream.active,
+          streamTracks: stream.getTracks().length,
+          videoTracks: stream.getVideoTracks().length,
+          elementSrcObject: !!videoElement.srcObject,
+          elementSrcObjectActive: videoElement.srcObject ? (videoElement.srcObject as MediaStream).active : false
+        });
+        
+        const playVideo = async () => {
+          try {
+            console.log('Attempting to play focused interview main video...');
+            await videoElement.play();
+            console.log('FocusedInterview main video started successfully');
+          } catch (error) {
+            console.error('Error playing focused interview main video:', error);
+            // Try reloading the stream
+            console.log('Trying to reload and play again...');
+            videoElement.load();
+            try {
+              await videoElement.play();
+              console.log('FocusedInterview main video started after reload');
+            } catch (retryError) {
+              console.error('Failed to start focused interview video after retry:', retryError);
+            }
+          }
+        };
+        
+        playVideo();
+      }, 100);
+    } else {
+      console.log('FocusedInterview main video useEffect conditions not met', {
+        stream: !!stream,
+        videoElement: !!videoRef.current,
+        hasStartedInterview
+      });
+    }
+  }, [stream, hasStartedInterview]);
 
   const initializeSession = async () => {
     setIsLoading(true);
@@ -201,15 +291,24 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       setIsLoading(false);
     }
   };
-
   const requestPermissions = async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: isVoiceMode
       });
+      
+      setPreviewStream(mediaStream);
       setPermissionGranted(true);
       setCameraError(null);
+        if (previewVideoRef.current) {
+        previewVideoRef.current.srcObject = mediaStream;
+        try {
+          await previewVideoRef.current.play();
+        } catch (playError) {
+          console.error('Error playing preview video:', playError);
+        }
+      }
     } catch (error) {
       console.error('Error requesting permissions:', error);
       if (error instanceof Error) {
@@ -222,20 +321,52 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
         }
       }
     }
-  };
-
-  const startInterview = async () => {
+  };  const startInterview = async () => {
     if (!permissionGranted) {
       await requestPermissions();
       return;
     }
 
-    setHasStartedInterview(true);
-    setStartTime(new Date());
-    setCanUserRespond(true);
+    try {      
+      // Always get a fresh stream for the main video to avoid conflicts
+      console.log('Getting fresh stream for focused interview');
+      const mainStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      
+      console.log('Starting focused interview with fresh stream:', {
+        streamActive: mainStream.active,
+        tracks: mainStream.getTracks().length,
+        videoTracks: mainStream.getVideoTracks().length
+      });
+      
+      // Clear the preview video element before starting
+      if (previewVideoRef.current) {
+        previewVideoRef.current.srcObject = null;
+      }
+      
+      // Stop the preview stream since we're getting a new one
+      if (previewStream) {
+        previewStream.getTracks().forEach(track => track.stop());
+        setPreviewStream(null);
+      }
+      
+      // Set the new stream
+      setStream(mainStream);
+      
+      // Set interview as started
+      setHasStartedInterview(true);
+      setStartTime(new Date());
+      setCanUserRespond(true);
+      
       // Play first question
-    if (questions.length > 0 && isVoiceMode && hasTTSAvailable) {
-      await playQuestion(questions[0].text);
+      if (questions.length > 0 && isVoiceMode && hasTTSAvailable) {
+        await playQuestion(questions[0].text);
+      }
+    } catch (error) {
+      console.error('Error starting interview:', error);
+      setCameraError('Failed to start interview. Please try again.');
     }
   };
   const playQuestion = async (questionText: string) => {
@@ -690,9 +821,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
               size="xl"
               showStatus={true}
             />
-          </div>
-
-          {/* User video - picture in picture style */}
+          </div>          {/* User video - picture in picture style */}
           <div className="absolute bottom-6 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10">
             {!hasStartedInterview ? (
               <video
@@ -701,6 +830,10 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log('Preview video metadata loaded')}
+                onCanPlay={() => console.log('Preview video can play')}
+                onPlay={() => console.log('Preview video started playing')}
+                onError={(e) => console.error('Preview video error:', e)}
               />
             ) : (
               <video
@@ -709,12 +842,14 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log('Main video metadata loaded')}
+                onCanPlay={() => console.log('Main video can play')}
+                onPlay={() => console.log('Main video started playing')}
                 onError={(e) => {
                   console.error('Main video error:', e);
                   setCameraError('Error playing video stream. Please check your browser settings.');
                 }}
-              />
-            )}
+              />            )}
           </div>
 
           {/* Camera controls */}
