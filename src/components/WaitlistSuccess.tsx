@@ -71,12 +71,11 @@ const WaitlistSuccess: React.FC = () => {
       label: "Waitlist Members",
       value: isLoading ? "..." : waitlistCount.toLocaleString(),
       change: isLoading ? "..." : `+${weeklyGrowth} this week`
-    },
-    {
+    },    {
       icon: Calendar,
-      label: "Expected Launch",
-      value: "June 2025",
-      change: "On track"
+      label: "Beta Launch",
+      value: "July 3, 2025",
+      change: "Coming soon"
     }
   ];
 
@@ -267,24 +266,22 @@ const WaitlistSuccess: React.FC = () => {
                 <p className="text-gray-300 text-sm">Get behind-the-scenes insights as we build the future of interview preparation</p>
               </div>
             </div>
-            
-            <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3">
               <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                 <span className="text-white text-sm font-bold">2</span>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-2">Beta Access</h4>
-                <p className="text-gray-300 text-sm">Be among the first to test our interview coaching platform</p>
+                <p className="text-gray-300 text-sm">Join our exclusive beta program launching July 3rd, 2025 - be the first to experience the future of interview prep</p>
               </div>
             </div>
             
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                 <span className="text-white text-sm font-bold">3</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-2">Launch Day</h4>
-                <p className="text-gray-300 text-sm">Get instant access when we officially launch in June 2025 with exclusive member benefits</p>
+              </div>              <div>
+                <h4 className="font-semibold text-white mb-2">Beta Launch</h4>
+                <p className="text-gray-300 text-sm">Get exclusive early access to our interview coaching platform starting July 3rd, 2025</p>
               </div>
             </div>
           </div>
@@ -318,10 +315,21 @@ const WaitlistSuccess: React.FC = () => {
               </Link>
             )}
           </div>
-          
-          <p className="text-gray-400 text-sm mt-6">
-            Share Kelv AI with friends and colleagues to help them prepare for success too!
-          </p>
+            <div className="mt-6 space-y-3">
+            <p className="text-gray-400 text-sm">
+              Share Kelv AI with friends and colleagues to help them prepare for success too!
+            </p>
+            <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
+              <Mail className="w-4 h-4 text-orange-400" />
+              <span>Questions? Reach out to us at</span>
+              <a 
+                href="mailto:team@kelvai.com" 
+                className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
+              >
+                team@kelvai.com
+              </a>
+            </div>
+          </div>
         </motion.div>
       </div>
     </div>
