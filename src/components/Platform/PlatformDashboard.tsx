@@ -48,6 +48,35 @@ const formatInterviewType = (type: string): string => {
     .replace(/\b\w/g, letter => letter.toUpperCase());
 };
 
+// Utility function to format college interview titles
+const formatCollegeInterviewTitle = (jobType: string): string => {
+  // jobType format: "schoolType - major" (e.g., "public - business-admin")
+  const parts = jobType.split(' - ');
+  if (parts.length !== 2) return jobType;
+  
+  const [schoolType, major] = parts;
+  
+  // Format school type
+  const schoolTypeMap: { [key: string]: string } = {
+    'public': 'Public University',
+    'private': 'Private University',
+    'ivy-league': 'Ivy League',
+    'liberal-arts': 'Liberal Arts College',
+    'community': 'Community College',
+    'technical': 'Technical Institute'
+  };
+  
+  // Format major (convert kebab-case to Title Case)
+  const formattedMajor = major
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  
+  const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
+  
+  return `${formattedMajor} - ${formattedSchoolType}`;
+};
+
 interface PlatformDashboardProps {
   onStartInterview: () => void;
   onStartFocusedInterview: () => void;
@@ -686,10 +715,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                               isCollegeInterview ? 'text-purple-300' :
                               isFocusedInterview ? 'text-blue-300' : 'text-orange-400'
                             }`} />
-                          </div>
-                          <div>
+                          </div>                          <div>
                             <h4 className="font-medium text-white flex items-center gap-2">
-                              {interview.setup.jobType} - {interview.setup.industry}
+                              {isCollegeInterview 
+                                ? formatCollegeInterviewTitle(interview.setup.jobType)
+                                : `${interview.setup.jobType} - ${interview.setup.industry}`
+                              }
                               {isCollegeInterview && (
                                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-500/40 text-purple-200 border border-purple-400/50" title="College Interview">College</span>
                               )}

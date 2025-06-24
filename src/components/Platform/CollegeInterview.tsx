@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import AIInterviewer from '../AIInterviewer';
 import { createInitialInterviewSession, saveInterviewSession } from '../../utils/supabase-interview';
+import { synthesizeSpeech, AudioRecorder, processVoiceInput } from '../../utils/openai';
+import { isElevenLabsTTSAvailable } from '../../utils/elevenLabsTTS';
 
 // Utility function to format category labels
 const formatCategoryLabel = (category: string): string => {
@@ -105,16 +107,19 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [sessionId, setSessionId] = useState<string>('');  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
-  // Voice mode specific states
+  // Voice mode specific states  // Voice mode specific states
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [canUserRespond, setCanUserRespond] = useState(false);
-  const [isAISpeaking] = useState(false);
+  const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
+
+  // TTS specific states
+  const [hasTTSAvailable, setHasTTSAvailable] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   // Camera refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -243,8 +248,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
     };
 
     return improvementsMap[type] || ["Add more detail", "Show enthusiasm"];
-  };
-  // Initialize interview session
+  };  // Initialize interview session
   useEffect(() => {
     const initializeSession = async () => {
       setIsLoading(true);
@@ -254,6 +258,9 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
         const generatedQuestions = await generateCollegeQuestions();
         setQuestions(generatedQuestions);
         setSessionId(crypto.randomUUID());
+        
+        // Initialize TTS availability
+        setHasTTSAvailable(isElevenLabsTTSAvailable());
         
         // Always request camera permissions for video display
         await requestPermissions();
@@ -266,6 +273,14 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
     };
 
     initializeSession();
+    
+    return () => {
+      // Cleanup audio on unmount
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = '';
+      }
+    };
   }, []);
   // Timer effect - 5 minute limit with natural conclusion
   useEffect(() => {
@@ -395,6 +410,57 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
     }
   }, [stream, hasStartedInterview]);
 
+  // TTS function to play question audio
+  const playQuestion = async (questionText: string) => {
+    if (!audioEnabled || !isVoiceMode || !hasTTSAvailable) {
+      // For text mode or when audio is disabled, user can respond immediately
+      setCanUserRespond(true);
+      return;
+    }
+    
+    try {
+      setIsAISpeaking(true);
+      setCanUserRespond(false);
+      
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      console.log('Synthesizing speech for college interview question:', questionText);
+      const audio = await synthesizeSpeech(questionText);
+      if (audio) {
+        setCurrentAudio(audio);
+        audio.muted = !audioEnabled;
+        
+        // Set up event listeners for when audio finishes
+        audio.onended = () => {
+          setIsAISpeaking(false);
+          setCanUserRespond(true); // User can now respond
+          setCurrentAudio(null);
+        };
+        
+        audio.onerror = () => {
+          setIsAISpeaking(false);
+          setCanUserRespond(true); // Allow response even if audio fails
+          setCurrentAudio(null);
+        };
+        
+        await audio.play();
+      } else {
+        // If audio synthesis fails, allow user to respond after a short delay
+        setTimeout(() => {
+          setIsAISpeaking(false);
+          setCanUserRespond(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error playing college interview question:', error);
+      setIsAISpeaking(false);
+      setCanUserRespond(true); // Allow response if there's an error
+    }
+  };
+
   const requestPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -449,11 +515,19 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       
       // Set the new stream
       setStream(mainStream);
-      
-      // Set interview as started
+        // Set interview as started
       setHasStartedInterview(true);
       setStartTime(new Date());
-      setCanUserRespond(true);
+      
+      // Play the first question in voice mode after session is active
+      if (questions.length > 0 && isVoiceMode && hasTTSAvailable) {
+        const firstQuestion = questions[0];
+        console.log('Playing first college interview question:', firstQuestion.text);
+        await playQuestion(firstQuestion.text);
+      } else {
+        // For text mode, user can respond immediately
+        setCanUserRespond(true);
+      }
         // Create the initial interview session record in the database
       try {
         // Convert college setup to standard interview setup format
@@ -473,80 +547,63 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       console.error('Error starting interview:', error);
       setCameraError('Failed to start interview. Please try again.');
     }
-  };
+  };  const audioRecorderRef = useRef<AudioRecorder | null>(null);
+
   const startRecording = async () => {
-    if (!stream) {
-      console.error('No stream available for recording');
+    if (!canUserRespond || isAISpeaking || !isVoiceMode) {
+      console.log('Cannot start recording:', { 
+        canUserRespond, 
+        isAISpeaking, 
+        isVoiceMode 
+      });
       return;
     }
-
-    try {
-      console.log('Starting recording with stream:', {
-        streamActive: stream.active,
-        audioTracks: stream.getAudioTracks().length,
-        videoTracks: stream.getVideoTracks().length
-      });
-
-      const recorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-        processVoiceResponse(audioBlob);
-      };
-
-      recorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event);
-        setIsRecording(false);
-        setCanUserRespond(true);
-      };
-
-      setMediaRecorder(recorder);
-      recorder.start();
+    
+    if (!audioRecorderRef.current) {
+      audioRecorderRef.current = new AudioRecorder();
+    }
+    
+    const success = await audioRecorderRef.current.startRecording();
+    if (success) {
       setIsRecording(true);
-      console.log('Recording started successfully');
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      setCanUserRespond(true);
+      setUserResponse(''); // Clear any existing text
+    } else {
+      console.error('Failed to start recording');
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      setIsProcessingVoice(true);
-    }
-  };
-  const processVoiceResponse = async (audioBlob: Blob) => {
-    try {
-      // Use real speech-to-text processing
-      const { processVoiceInput } = await import('../../utils/openai');
-      const transcription = await processVoiceInput(audioBlob);
+  const stopRecording = async () => {
+    if (!audioRecorderRef.current || !isVoiceMode) return;
+    
+    setIsRecording(false);
+    setIsProcessingVoice(true);
+    
+    const result = await audioRecorderRef.current.stopRecording();
+    if (result) {
+      const { audioBlob } = result;
       
-      if (transcription && transcription.trim()) {
-        setUserResponse(transcription);
-        // Auto-submit after processing
-        await submitResponse(transcription, audioBlob);
-      } else {
-        console.warn('No transcription received');
+      try {
+        // Process voice input directly
+        const transcription = await processVoiceInput(audioBlob);
+        if (transcription && transcription.trim().length > 0) {
+          setUserResponse(transcription);
+          // Auto-submit after processing
+          await submitResponse(transcription, audioBlob);
+        } else {
+          console.warn('No transcription received for college interview');
+          setIsProcessingVoice(false);
+          setCanUserRespond(true);
+        }
+      } catch (error) {
+        console.error('Error processing voice response in college interview:', error);
         setIsProcessingVoice(false);
         setCanUserRespond(true);
       }
-    } catch (error) {
-      console.error('Error processing voice response:', error);
-      
-      // Fallback to allowing text input
+    } else {
       setIsProcessingVoice(false);
       setCanUserRespond(true);
-    }
-  };
+    }  };
+
   const submitResponse = async (responseText?: string, audioBlob?: Blob) => {
     const finalResponse = responseText || userResponse;
     if (!finalResponse.trim()) return;
@@ -605,15 +662,25 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
           followUpPotential: true
         };        setQuestions(prev => [...prev, newQuestion]);
         setCurrentQuestionIndex(prev => prev + 1);
-        setCanUserRespond(true);
-        setIsAIGenerating(false);      } catch (followUpError) {
-        console.error('Error generating follow-up, moving to next preset question:', followUpError);
         setIsAIGenerating(false);
         
-        // Fallback: move to next preset question if available
+        // Play the new question in voice mode
+        if (isVoiceMode && hasTTSAvailable) {
+          await playQuestion(newQuestion.text);
+        } else {
+          setCanUserRespond(true);
+        }} catch (followUpError) {
+        console.error('Error generating follow-up, moving to next preset question:', followUpError);
+        setIsAIGenerating(false);
+          // Fallback: move to next preset question if available
         if (currentQuestionIndex < questions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
-          setCanUserRespond(true);
+          // Play the next preset question in voice mode
+          if (isVoiceMode && hasTTSAvailable) {
+            await playQuestion(questions[currentQuestionIndex + 1].text);
+          } else {
+            setCanUserRespond(true);
+          }
         } else {
           // No more preset questions and AI failed - complete interview
           await completeInterview(updatedResponses);
@@ -726,7 +793,6 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       </div>
     );
   }
-
   if (isInterviewComplete) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
@@ -734,66 +800,99 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
           <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <GraduationCap className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-4">College Interview Complete!</h2>
-          <p className="text-gray-400 mb-6">
+          <h2 className="text-3xl font-bold text-white mb-4">College Interview Complete!</h2>
+          <p className="text-gray-400 mb-8">
             Analyzing your responses and preparing detailed feedback...
           </p>
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-500 border-t-transparent mx-auto"></div>
-        </div>
-      </div>
-    );
-  }
-
-  const currentQuestion = questions[currentQuestionIndex];
-  return (
-    <div className="min-h-screen bg-dark-900 flex flex-col">
-      {/* Header */}
-      <div className="sticky top-16 bg-dark-900/95 backdrop-blur-sm border-b border-dark-700 z-30">
-        <div className="container max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-400" />
-              </button>
-              <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
-              <span className="text-white font-medium">College Interview</span>
-              {hasStartedInterview && (
-                <div className="px-2 py-1 bg-purple-500/20 rounded text-purple-400 text-xs font-medium border border-purple-500/30">
-                  Live Session
-                </div>
-              )}
-            </div>
-            <div className="flex items-center space-x-4">              {hasStartedInterview && (
-                <>
-                  <div className="flex items-center space-x-2">
-                    <Clock className={`w-4 h-4 ${timeElapsed >= 240 ? 'text-orange-400' : 'text-purple-500'}`} />
-                    <span className={`font-medium ${timeElapsed >= 240 ? 'text-orange-400' : 'text-white'}`}>
-                      {formatTime(timeElapsed)} / 5:00
-                    </span>
-                    {timeElapsed >= 240 && (
-                      <span className="text-xs text-orange-400 animate-pulse">
-                        (Wrapping up)
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Target className="w-4 h-4 text-purple-500" />
-                    <span className="text-white font-medium">Q{responses.length + 1} - AI Flow</span>
-                  </div>
-                </>
-              )}
+          
+          <div className="flex items-center justify-center space-x-2 mb-6">
+            <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce"></div>
+            <div className="w-3 h-3 bg-purple-600 rounded-full animate-bounce delay-100"></div>
+            <div className="w-3 h-3 bg-indigo-500 rounded-full animate-bounce delay-200"></div>
+          </div>
+          
+          <div className="bg-gray-900/50 rounded-xl p-6 border border-purple-500/20">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="text-center">
+                <span className="text-gray-400 block mb-1">Duration:</span>
+                <p className="font-bold text-xl text-purple-500">{formatTime(timeElapsed)}</p>
+              </div>
+              <div className="text-center">
+                <span className="text-gray-400 block mb-1">Questions:</span>
+                <p className="font-bold text-xl text-purple-500">{responses.length}</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
+    );
+  }
+  const currentQuestion = questions[currentQuestionIndex];
 
-      {/* Main Content - Full Height */}
-      <div className="flex-1 flex min-h-0">        {/* Left Panel - Question */}
-        <div className="w-1/3 border-r border-purple-500/20 flex flex-col">
-          <div className="flex-1 bg-gray-900/50 m-6 rounded-xl p-8 border border-purple-500/10 flex flex-col">
+  return (
+    <div className="min-h-screen bg-dark-900 flex flex-col pt-20">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-400" />
+          </button>
+          <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+          <span className="text-white font-medium">
+            College Interview
+          </span>
+          {hasStartedInterview && (
+            <div className="px-2 py-1 bg-purple-500/20 rounded text-purple-400 text-xs font-medium border border-purple-500/30">
+              Live Session
+            </div>
+          )}
+        </div>
+        <div className="flex items-center space-x-4">
+          {hasStartedInterview && (
+            <>
+              <div className="flex items-center space-x-2">
+                <Clock className={`w-4 h-4 ${timeElapsed >= 240 ? 'text-orange-400' : 'text-purple-500'}`} />
+                <span className={`font-medium ${timeElapsed >= 240 ? 'text-orange-400' : 'text-white'}`}>
+                  {formatTime(timeElapsed)} / 5:00
+                </span>
+                {timeElapsed >= 240 && (
+                  <span className="text-xs text-orange-400 animate-pulse">
+                    (Wrapping up)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Target className="w-4 h-4 text-purple-500" />
+                <span className="text-white font-medium">Q{responses.length + 1} - AI Flow</span>
+              </div>
+              {isVoiceMode && (
+                <button
+                  onClick={toggleAudio}
+                  className={`p-2 rounded-lg transition-colors ${
+                    audioEnabled ? 'bg-gray-800 hover:bg-gray-700' : 'bg-red-500 hover:bg-red-600'
+                  }`}
+                >
+                  {audioEnabled ? (
+                    <Volume2 className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <VolumeX className="w-4 h-4 text-white" />
+                  )}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Main content area */}
+      <div className="flex-1 flex">
+        {/* Left side - Question panel */}
+        <div className="w-1/3 p-8 border-r border-purple-500/20">
+          <div className="bg-gray-900/50 rounded-xl p-8 h-full border border-purple-500/10 flex flex-col">
+            {/* Current question section */}
             <div className="flex items-start space-x-4 mb-8">
               <div className="w-10 h-10 rounded-lg bg-purple-500 flex items-center justify-center flex-shrink-0">
                 <GraduationCap className="w-5 h-5 text-white" />
@@ -801,27 +900,39 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
               <div>
                 <h3 className="text-white font-semibold mb-3 text-lg">
                   {hasStartedInterview ? "College Interview Question" : "Ready to Start"}
-                </h3>                <p className="text-gray-300 text-base leading-relaxed">
+                </h3>
+                <p className="text-gray-300 text-base leading-relaxed">
                   {hasStartedInterview 
                     ? isAIGenerating 
                       ? "AI is thinking of a thoughtful follow-up question based on your response..."
                       : currentQuestion?.text || "Loading question..."
                     : `Click 'Start Interview' to begin your college admission interview practice session.`}
-                </p>                {hasStartedInterview && currentQuestion && (
-                  <div className="mt-4 flex items-center gap-2">
+                </p>
+                {hasStartedInterview && currentQuestion && (
+                  <div className="mt-3 flex items-center gap-2 justify-between">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
                       {currentQuestion.category}
                     </span>
+                    {isVoiceMode && hasTTSAvailable && (
+                      <button
+                        onClick={() => playQuestion(currentQuestion.text)}
+                        disabled={isAISpeaking || !audioEnabled}
+                        className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-purple-500/30"
+                        title="Replay question"
+                      >
+                        <Volume2 className="w-4 h-4 text-purple-400" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Response Section */}
+            {/* Response input section */}
             {hasStartedInterview && currentQuestion && (
               <div className="flex-1 flex flex-col space-y-4">
                 <div className="flex-1">
-                  {isVoiceMode ? (
+                  {isVoiceMode && hasTTSAvailable ? (
                     <div className="text-center">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}
@@ -832,55 +943,55 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                             : canUserRespond && !isAISpeaking
                             ? 'bg-purple-500 hover:bg-purple-600'
                             : 'bg-gray-600 cursor-not-allowed'
-                        }`}
+                        } disabled:opacity-50`}
                       >
-                        <Mic className="w-8 h-8 text-white" />
-                      </button>                      <p className="text-gray-400 text-sm mt-4">
-                        {isRecording
-                          ? 'Recording... Click to stop'
-                          : isProcessingVoice
-                          ? 'Processing your response...'
-                          : isAIGenerating
-                          ? 'AI is preparing your next question...'
-                          : !canUserRespond
-                          ? 'Please wait...'
-                          : 'Click to start recording your response'
-                        }
+                        {isProcessingVoice ? (
+                          <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Mic className="w-8 h-8 text-white" />
+                        )}
+                      </button>
+                      <p className="text-sm text-gray-400 mt-3">
+                        {isAISpeaking ? 'Please wait for the question to finish...' :
+                         !canUserRespond ? 'Please wait...' :
+                         isRecording ? 'Recording... Click to stop' : 
+                         isProcessingVoice ? 'Processing voice...' : 'Click to record your response'}
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <textarea
-                        value={userResponse}
-                        onChange={(e) => setUserResponse(e.target.value)}
-                        placeholder="Type your response here..."
-                        className="w-full h-40 p-4 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:border-purple-500"
-                        disabled={!canUserRespond || isAnalyzing}
-                      />
-                      <button
-                        onClick={() => submitResponse()}
-                        disabled={!userResponse.trim() || isAnalyzing || !canUserRespond}
-                        className="w-full px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center space-x-2"
-                      >
-                        {isAnalyzing ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>Analyzing Response...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-5 h-5" />
-                            <span>Submit Response</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <textarea
+                      value={userResponse}
+                      onChange={(e) => setUserResponse(e.target.value)}
+                      placeholder={canUserRespond ? "Type your response here..." : "Please wait for the question to finish..."}
+                      disabled={!canUserRespond || isAISpeaking}
+                      className="w-full h-32 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none transition-colors resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
                   )}
                 </div>
+                
+                <button
+                  onClick={() => submitResponse()}
+                  disabled={!userResponse.trim() || isAnalyzing || isRecording || isProcessingVoice || !canUserRespond || isAISpeaking}
+                  className="w-full px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base font-medium flex items-center justify-center space-x-2"
+                >
+                  {isAnalyzing || isAIGenerating ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>
+                        {isAIGenerating ? 'Generating Next Question...' : 'Processing...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>Submit Response</span>
+                    </>
+                  )}
+                </button>
               </div>
             )}
 
-            {/* Start Interview Button */}
+            {/* Start interview button */}
             {!hasStartedInterview && (
               <div className="mt-8 pt-6 border-t border-purple-500/20">
                 <button
@@ -891,17 +1002,33 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                   <GraduationCap className="w-6 h-6" />
                   <span>Start College Interview</span>
                 </button>
+                
+                <div className="mt-4 p-4 bg-dark-700/30 rounded-lg">
+                  <h4 className="text-sm font-medium text-white mb-2">
+                    Session Details:
+                  </h4>
+                  <ul className="text-xs text-gray-400 space-y-1">
+                    <li>• Duration: 5 minutes</li>
+                    <li>• Questions: AI-generated based on responses</li>
+                    <li>• Focus: {setup.major} at {setup.schoolType.replace('-', ' ')} institutions</li>
+                    <li>• {isVoiceMode ? 'Voice interaction with speech analysis' : 'Text-based responses'}</li>
+                    <li>• Comprehensive performance analysis at completion</li>
+                  </ul>
+                </div>
               </div>
             )}
           </div>
-        </div>        {/* Right Panel - Video */}
-        <div className="flex-1 relative bg-gradient-to-br from-purple-900/20 to-indigo-900/20 min-h-full">
+        </div>
+
+        {/* Right side - Video area */}
+        <div className="flex-1 relative bg-gray-900">
+          {/* Camera error overlay */}
           {cameraError && (
-            <div className="absolute inset-0 flex items-center justify-center z-20 bg-dark-900/90">
-              <div className="text-center max-w-md p-6">
-                <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-white mb-4">Camera Access Required</h3>
-                <p className="text-red-400 mb-6">{cameraError}</p>
+            <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-50">
+              <div className="text-center max-w-md px-6">
+                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">Camera Error</h3>
+                <p className="text-gray-400 mb-6">{cameraError}</p>
                 <button
                   onClick={requestPermissions}
                   className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
@@ -912,17 +1039,20 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
             </div>
           )}
 
-          {/* AI Interviewer */}
+          {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
+            {/* AI Interviewer */}
             <AIInterviewer 
               isActive={hasStartedInterview}
               isSpeaking={isAISpeaking}
               isListening={isRecording}
-              isProcessing={isProcessingVoice || isAnalyzing}
+              isProcessing={isProcessingVoice || isAnalyzing || isAIGenerating}
               size="xl"
               showStatus={true}
             />
-          </div>          {/* User Video */}
+          </div>
+
+          {/* User video - picture in picture style */}
           <div className="absolute bottom-6 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10">
             {!hasStartedInterview ? (
               <video
@@ -946,21 +1076,16 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                 onLoadedMetadata={() => console.log('Main video metadata loaded')}
                 onCanPlay={() => console.log('Main video can play')}
                 onPlay={() => console.log('Main video started playing')}
-                onError={(e) => console.error('Main video error:', e)}
-              />            )}
+                onError={(e) => {
+                  console.error('Main video error:', e);
+                  setCameraError('Error playing video stream. Please check your browser settings.');
+                }}
+              />
+            )}
           </div>
 
-          {/* Controls */}
+          {/* Camera controls */}
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-gray-900/90 backdrop-blur-sm px-6 py-3 rounded-full border border-gray-800 z-20">
-            {isVoiceMode && (
-              <button
-                onClick={toggleAudio}
-                className={`p-2 rounded-full ${audioEnabled ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} transition-colors`}
-              >
-                {audioEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
-              </button>
-            )}
-            
             <button
               onClick={handleEndInterview}
               className="p-2 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
