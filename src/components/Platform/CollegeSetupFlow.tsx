@@ -28,6 +28,29 @@ interface CollegeSetupFlowProps {
 }
 
 export const CollegeSetupFlow: React.FC<CollegeSetupFlowProps> = ({ onComplete, onBack }) => {
+  // Utility function to format text for display
+  const formatDisplayText = (text: string): string => {
+    return text
+      .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Utility function to format school type for display
+  const formatSchoolTypeForDisplay = (schoolType: string): string => {
+    const schoolTypeMap: { [key: string]: string } = {
+      'public': 'Public',
+      'private': 'Private', 
+      'ivy-league': 'Ivy League',
+      'liberal-arts': 'Liberal Arts',
+      'community': 'Community',
+      'technical': 'Technical'
+    };
+    
+    return schoolTypeMap[schoolType] || formatDisplayText(schoolType);
+  };
+
   const [currentStep, setCurrentStep] = useState(0);
   const [setup, setSetup] = useState<CollegeInterviewSetup>({
     schoolType: '',
@@ -86,7 +109,6 @@ export const CollegeSetupFlow: React.FC<CollegeSetupFlowProps> = ({ onComplete, 
   const isSetupComplete = () => {
     return setup.schoolType && setup.program && setup.major && setup.interviewMode;
   };
-
   const generateAutoName = () => {
     if (!isSetupComplete()) return '';
     
@@ -113,21 +135,26 @@ export const CollegeSetupFlow: React.FC<CollegeSetupFlowProps> = ({ onComplete, 
 
   const handleLoadSetup = async (savedSetup: SavedCollegeInterviewSetup) => {
     try {
+      // Update usage count
       await updateCollegeSetupUsage(savedSetup.id);
-      setSetup(savedSetup.setup);
-      setShowSavedSetups(false);
+      
+      // Use the saved setup
       onComplete(savedSetup.setup);
     } catch (error) {
-      console.error('Error loading saved setup:', error);
+      console.error('Error loading college setup:', error);
+      // Still proceed with the setup even if update fails
+      onComplete(savedSetup.setup);
     }
   };
-
   const handleDeleteSetup = async (setupId: string) => {
+    if (!confirm('Are you sure you want to delete this setup?')) return;
+    
     try {
       await deleteCollegeInterviewSetup(setupId);
-      await loadSavedSetups();
+      await loadSavedSetups(); // Refresh the list
     } catch (error) {
-      console.error('Error deleting setup:', error);
+      console.error('Error deleting college setup:', error);
+      alert('Failed to delete setup. Please try again.');
     }
   };
 
@@ -324,9 +351,8 @@ export const CollegeSetupFlow: React.FC<CollegeSetupFlowProps> = ({ onComplete, 
                           </span>
                         </div>
                       </div>
-                      
-                      <div className="text-sm text-gray-400 mb-3">
-                        {savedSetup.setup.schoolType.replace('-', ' ')} • {savedSetup.setup.program} • {savedSetup.setup.major}
+                        <div className="text-sm text-gray-400 mb-3">
+                        {formatSchoolTypeForDisplay(savedSetup.setup.schoolType)} • {formatDisplayText(savedSetup.setup.program)} • {formatDisplayText(savedSetup.setup.major)}
                       </div>
                       
                       <div className="flex items-center gap-2">

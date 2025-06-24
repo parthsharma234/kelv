@@ -493,7 +493,6 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       await completeInterview(currentResponses);
     }
   };
-
   const completeInterview = async (finalResponses: InterviewResponse[]) => {
     setIsInterviewComplete(true);
     const endTime = new Date();
@@ -501,6 +500,29 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
     const averageScore = finalResponses.length > 0 
       ? finalResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / finalResponses.length * 10
       : 0;
+
+    // Calculate voice metrics averages if available (to match college interview format)
+    let voiceMetrics = null;
+    if (speechMetrics && speechMetrics.length > 0) {
+      const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
+      if (validMetrics.length > 0) {
+        voiceMetrics = {
+          speechRate: Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2)),
+          fluencyScore: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length),
+          voiceConfidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length),
+          fillerWordCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length),
+          averageVolume: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / validMetrics.length),
+          delivery: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / validMetrics.length),
+          clarity: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / validMetrics.length),
+          confidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.confidence || m.voiceConfidence || 0), 0) / validMetrics.length),
+          paceConsistency: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.paceConsistency || 0), 0) / validMetrics.length),
+          repetitionCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.repetitionCount || 0), 0) / validMetrics.length),
+          pauseRatio: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseRatio || 0), 0) / validMetrics.length),
+          estimatedPitch: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.estimatedPitch || 0), 0) / validMetrics.length)
+        };
+      }
+    }
+    
     const sessionData = {
       id: sessionId || crypto.randomUUID(),
       setup, // Pass setup as-is
@@ -512,7 +534,8 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       startTime,
       endTime,
       config,
-      speechMetrics
+      speechMetrics,
+      voiceMetrics
     };
     // Save session to Supabase
     try {

@@ -23,7 +23,7 @@ export interface SavedCollegeInterviewSetup {
   updated_at: string;
 }
 
-export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup, interviewType?: string): Promise<void> => {
+export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup | CollegeInterviewSetup, interviewType?: string): Promise<void> => {
   if (!isSupabaseConfigured()) {
     console.log('Supabase not configured, skipping initial session creation');
     return;
@@ -821,16 +821,26 @@ export const getUserStrengthsAndWeaknesses = async () => {
   }
 };
 
-export const getInterviewById = async (interviewId: string) => {  if (!isSupabaseConfigured()) {
+export const getInterviewById = async (interviewId: string) => {
+  console.log('getInterviewById called with ID:', interviewId);
+  
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, using localStorage fallback');
     // Return localStorage data as fallback
     const localHistory = localStorage.getItem('kelv-interview-history');
     const history = localHistory ? JSON.parse(localHistory) : [];
+    console.log('Local history found:', history.length, 'interviews');
+    
     const interview = history.find((interview: any) => interview.id === interviewId);
+    console.log('Found interview in localStorage:', !!interview, interview ? interview.type || interview.interviewType : 'N/A');
     
-    if (!interview) return null;
-    
+    if (!interview) {
+      console.log('Interview not found in localStorage');
+      return null;
+    }
+
     // Transform localStorage data to sessionData format if needed
-    return {
+    const transformedData = {
       id: interview.id,
       setup: interview.setup,
       overallScore: interview.overallScore,
@@ -839,16 +849,23 @@ export const getInterviewById = async (interviewId: string) => {  if (!isSupabas
       status: interview.status,
       responses: interview.responses || [],
       questions: interview.questions || [],
-      interviewType: interview.interviewType,
+      interviewType: interview.interviewType || interview.type,
       speechMetrics: interview.speechMetrics ? [interview.speechMetrics] : [],
       date: new Date(interview.date),
       startTime: interview.startTime ? new Date(interview.startTime) : new Date(interview.date),
       endTime: interview.endTime ? new Date(interview.endTime) : undefined,
-      speechMetricsAverage: interview.speechMetricsAverage
+      speechMetricsAverage: interview.speechMetricsAverage,
+      // Include metrics for college interviews
+      metrics: interview.metrics || undefined,
+      // Include voice metrics if present
+      voiceMetrics: interview.voiceMetrics || undefined
     };
+    
+    console.log('Transformed localStorage data:', transformedData);
+    return transformedData;
   }
-
   try {
+    console.log('Querying Supabase for interview ID:', interviewId);
     const { data, error } = await supabase
       .from('interview_sessions')
       .select('*')
@@ -860,8 +877,10 @@ export const getInterviewById = async (interviewId: string) => {  if (!isSupabas
       return null;
     }
 
+    console.log('Supabase data found:', !!data, data ? data.interview_type : 'N/A');
+
     // Transform Supabase data to sessionData format expected by results components
-    return {
+    const transformedData = {
       id: data.id,
       setup: data.setup,
       overallScore: data.overall_score,
@@ -880,8 +899,15 @@ export const getInterviewById = async (interviewId: string) => {  if (!isSupabas
         fluencyScore: data.speech_metrics.fluency?.fluencyScore || 0,
         speechRate: data.speech_metrics.timing?.speechRate || 0,
         voiceStability: data.speech_metrics.voice?.voiceStability || 0
-      } : undefined
+      } : undefined,
+      // Include metrics for college interviews
+      metrics: data.metrics || undefined,
+      // Include voice metrics if present
+      voiceMetrics: data.speech_metrics || undefined
     };
+    
+    console.log('Transformed Supabase data:', transformedData);
+    return transformedData;
 
   } catch (error) {
     console.error('Failed to fetch interview by ID:', error);

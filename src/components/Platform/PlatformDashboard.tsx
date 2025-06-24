@@ -49,32 +49,60 @@ const formatInterviewType = (type: string): string => {
 };
 
 // Utility function to format college interview titles
-const formatCollegeInterviewTitle = (jobType: string): string => {
-  // jobType format: "schoolType - major" (e.g., "public - business-admin")
-  const parts = jobType.split(' - ');
-  if (parts.length !== 2) return jobType;
+const formatCollegeInterviewTitle = (setup: any): string => {
+  // For college interviews, setup contains schoolType, program, major directly
+  if (setup.schoolType && setup.major) {
+    const { schoolType, major } = setup;
+    
+    // Format school type
+    const schoolTypeMap: { [key: string]: string } = {
+      'public': 'Public University',
+      'private': 'Private University',
+      'ivy-league': 'Ivy League',
+      'liberal-arts': 'Liberal Arts College',
+      'community': 'Community College',
+      'technical': 'Technical Institute'
+    };
+    
+    // Format major (convert kebab-case to Title Case)
+    const formattedMajor = major
+      .split('-')
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    
+    const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
+    
+    return `${formattedMajor} - ${formattedSchoolType}`;
+  }
   
-  const [schoolType, major] = parts;
+  // Fallback for legacy format or if data is missing
+  if (typeof setup === 'string') {
+    // Handle legacy format: "schoolType - major"
+    const parts = setup.split(' - ');
+    if (parts.length !== 2) return setup;
+    
+    const [schoolType, major] = parts;
+    
+    const schoolTypeMap: { [key: string]: string } = {
+      'public': 'Public University',
+      'private': 'Private University',
+      'ivy-league': 'Ivy League',
+      'liberal-arts': 'Liberal Arts College',
+      'community': 'Community College',
+      'technical': 'Technical Institute'
+    };
+    
+    const formattedMajor = major
+      .split('-')
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    
+    const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
+    
+    return `${formattedMajor} - ${formattedSchoolType}`;
+  }
   
-  // Format school type
-  const schoolTypeMap: { [key: string]: string } = {
-    'public': 'Public University',
-    'private': 'Private University',
-    'ivy-league': 'Ivy League',
-    'liberal-arts': 'Liberal Arts College',
-    'community': 'Community College',
-    'technical': 'Technical Institute'
-  };
-  
-  // Format major (convert kebab-case to Title Case)
-  const formattedMajor = major
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-  
-  const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
-  
-  return `${formattedMajor} - ${formattedSchoolType}`;
+  return 'College Interview';
 };
 
 interface PlatformDashboardProps {
@@ -85,7 +113,8 @@ interface PlatformDashboardProps {
 }
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview, onStartCollegeInterview, onViewInterviewResults }) => {
-  const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);  const [stats, setStats] = useState({
+  const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
+  const [showAllInterviews, setShowAllInterviews] = useState(false);const [stats, setStats] = useState({
     totalInterviews: 0,
     averageScore: 0,
     totalHours: 0,
@@ -663,15 +692,17 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
             </div>
 
             {/* Recent Interviews */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <div className="flex items-center justify-between mb-6">
+            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">              <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-white flex items-center gap-3">
                   <BarChart3 className="w-5 h-5 text-orange-400" />
                   Recent Interviews
                 </h3>
-                {interviewHistory.length > 0 && (
-                  <button className="text-orange-400 hover:text-orange-300 text-sm font-medium">
-                    View All
+                {interviewHistory.length > 5 && (
+                  <button 
+                    onClick={() => setShowAllInterviews(!showAllInterviews)}
+                    className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors"
+                  >
+                    {showAllInterviews ? 'Show Recent' : 'View All'}
                   </button>
                 )}
               </div>
@@ -689,10 +720,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                   <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
                   <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
                 </div>
-              ) : (                <div className="space-y-4">
-                  {interviewHistory.slice(0, 5).map((interview) => {
-                    const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined;
-                    const isCollegeInterview = interview.interviewType === 'college' || interview.setup.industry === 'Education';
+              ) : (                <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2' : ''}`}>
+                  {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5)).map((interview) => {
+                    const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college';
+                    const isCollegeInterview = interview.interviewType === 'college';
                     
                     return (
                       <div
@@ -704,7 +735,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                             ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20' 
                             : 'bg-dark-700/30 border-dark-700'
                         }`}
-                        onClick={() => onViewInterviewResults(interview.id, isFocusedInterview ? interview.interviewType : null)}
+                        onClick={() => onViewInterviewResults(interview.id, interview.interviewType)}
                       >
                         <div className="flex items-center gap-4">
                           <div className={`p-2 rounded-lg ${
@@ -715,10 +746,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                               isCollegeInterview ? 'text-purple-300' :
                               isFocusedInterview ? 'text-blue-300' : 'text-orange-400'
                             }`} />
-                          </div>                          <div>
-                            <h4 className="font-medium text-white flex items-center gap-2">
+                          </div>                          <div>                            <h4 className="font-medium text-white flex items-center gap-2">
                               {isCollegeInterview 
-                                ? formatCollegeInterviewTitle(interview.setup.jobType)
+                                ? formatCollegeInterviewTitle(interview.setup)
                                 : `${interview.setup.jobType} - ${interview.setup.industry}`
                               }
                               {isCollegeInterview && (

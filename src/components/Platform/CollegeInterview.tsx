@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import AIInterviewer from '../AIInterviewer';
 import { createInitialInterviewSession, saveInterviewSession } from '../../utils/supabase-interview';
-import { synthesizeSpeech, AudioRecorder, processVoiceInput } from '../../utils/openai';
+import { synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics } from '../../utils/openai';
 import { isElevenLabsTTSAvailable } from '../../utils/elevenLabsTTS';
 
 // Utility function to format category labels
@@ -116,6 +116,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [speechMetrics, setSpeechMetrics] = useState<any[]>([]);
 
   // TTS specific states
   const [hasTTSAvailable, setHasTTSAvailable] = useState(false);
@@ -127,6 +128,8 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
 
   const isVoiceMode = setup.interviewMode === 'voice';
+  const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
+    import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
   // Generate college-specific questions using AI
   const generateCollegeQuestions = async (): Promise<CollegeQuestion[]> => {
     try {
@@ -148,21 +151,34 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       }));
     } catch (error) {
       console.error('Error generating AI questions, falling back to defaults:', error);
-      
-      // Fallback to a minimal set of questions
+        // Fallback to engaging questions that feel natural and conversational
       return [
         {
           id: '1',
-          text: "Tell me about yourself and what draws you to our institution.",
+          text: "I'd love to hear about what initially sparked your interest in pursuing higher education. What's driving you to take this next step?",
           type: 'personal',
-          category: 'Introduction',
+          category: 'Personal Motivation',
           followUpPotential: true
         },
         {
           id: '2', 
-          text: `Why are you interested in studying ${setup.major} at our ${setup.schoolType.replace('-', ' ')} institution?`,
+          text: `What draws you specifically to ${setup.major.replace('-', ' ')}? Can you share a story or experience that deepened your interest in this field?`,
           type: 'academic',
-          category: 'Academic Interest',
+          category: 'Academic Passion',
+          followUpPotential: true
+        },
+        {
+          id: '3',
+          text: `Can you tell me about a time when you faced a real challenge? What did that experience teach you about yourself?`,
+          type: 'personal',
+          category: 'Personal Growth',
+          followUpPotential: true
+        },
+        {
+          id: '4',
+          text: `What questions do you have about college life or our campus community? What are you most curious about?`,
+          type: 'fit',
+          category: 'School Interest',
           followUpPotential: true
         }
       ];
@@ -192,63 +208,68 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       };
     }
   };
-
   const getCollegeFeedback = (type: string, _response: string) => {
     const feedbackMap: { [key: string]: string[] } = {
       personal: [
-        "Great job sharing personal details that help us understand who you are.",
-        "Your response shows good self-reflection and awareness.",
-        "Consider adding more specific examples to illustrate your points."
+        "Your authentic voice really comes through in this response. You're sharing meaningful personal insights that help us understand your character.",
+        "I appreciate how you've reflected on your experiences and what they've taught you. This shows excellent self-awareness.",
+        "You're doing a great job being genuine and personal. Consider adding even more specific details to make your story come alive."
       ],
       academic: [
-        "You demonstrate genuine interest in your field of study.",
-        "Strong connection between your academic interests and career goals.",
-        "Consider elaborating on specific aspects of the program that excite you."
+        "Your passion for this field is evident and compelling. Admissions officers love to see genuine intellectual curiosity.",
+        "You've made a strong connection between your interests and our program. This shows you've done your research.",
+        "Your academic enthusiasm shines through. Consider sharing a specific moment when you knew this was the right path for you."
       ],
       challenge: [
-        "Excellent example of resilience and growth mindset.",
-        "You clearly articulated the lessons learned from your experience.",
-        "Strong evidence of problem-solving and perseverance."
+        "Excellent example of resilience and growth. You clearly show how challenges have shaped you in positive ways.",
+        "Your ability to learn from difficult experiences demonstrates maturity and a growth mindset that will serve you well in college.",
+        "You've done a wonderful job showing how you've turned obstacles into opportunities for personal development."
+      ],
+      fit: [
+        "I can tell you've put thought into why our school is a good match for you. This kind of research and reflection is impressive.",
+        "Your questions show genuine curiosity about our community. This demonstrates that you're thinking seriously about fit.",
+        "You're showing real interest in becoming part of our campus community, which is exactly what we like to see."
       ],
       extracurricular: [
-        "Great examples of leadership and community involvement.",
-        "You effectively connected your activities to personal growth.",
-        "Consider highlighting the impact you made in these roles."
+        "Great examples of leadership and community involvement. You clearly understand the value of contributing beyond academics.",
+        "You effectively connected your activities to personal growth, which shows good reflection skills.",
+        "Your commitment to making a positive impact comes through clearly in your response."
       ],
       goals: [
-        "Clear vision for your future with realistic and ambitious goals.",
-        "Good connection between your education and career aspirations.",
-        "Shows thoughtful planning and long-term thinking."
+        "Your vision for the future shows thoughtful planning and realistic ambition. You clearly understand how college fits your goals.",
+        "I appreciate how you've connected your education to your aspirations. This shows mature thinking about your path forward.",
+        "Your goals demonstrate both ambition and practicality, which suggests you'll make the most of your college experience."
       ]
     };
 
-    const feedback = feedbackMap[type] || ["Thoughtful response that addresses the question well."];
+    const feedback = feedbackMap[type] || ["Your thoughtful response shows genuine engagement with the question and good reflection on your experiences."];
     return feedback[Math.floor(Math.random() * feedback.length)];
   };
-
   const getCollegeStrengths = (type: string): string[] => {
     const strengthsMap: { [key: string]: string[] } = {
-      personal: ["Authentic self-presentation", "Clear communication", "Self-awareness"],
-      academic: ["Academic passion", "Research interest", "Goal alignment"],
-      challenge: ["Resilience", "Growth mindset", "Problem-solving"],
-      extracurricular: ["Leadership skills", "Community involvement", "Initiative"],
-      goals: ["Clear vision", "Realistic planning", "Ambition"]
+      personal: ["Authentic and genuine voice", "Strong self-reflection abilities", "Personal growth mindset"],
+      academic: ["Genuine intellectual passion", "Clear academic direction", "Strong motivation for learning"],
+      challenge: ["Excellent resilience and adaptability", "Growth-oriented thinking", "Problem-solving skills"],
+      fit: ["Thoughtful research about our school", "Clear understanding of fit", "Genuine interest in our community"],
+      extracurricular: ["Leadership potential", "Community engagement", "Initiative and commitment"],
+      goals: ["Clear future vision", "Realistic and thoughtful planning", "Strong sense of purpose"]
     };
 
-    return strengthsMap[type] || ["Strong communication", "Thoughtful reflection"];
+    return strengthsMap[type] || ["Strong communication skills", "Thoughtful engagement with the question"];
   };
 
   const getCollegeImprovements = (type: string): string[] => {
     const improvementsMap: { [key: string]: string[] } = {
-      personal: ["Add more specific examples", "Show vulnerability", "Connect to values"],
-      academic: ["Research faculty/programs", "Discuss specific interests", "Show intellectual curiosity"],
-      challenge: ["Quantify impact", "Show continued growth", "Connect to future goals"],
-      extracurricular: ["Highlight leadership roles", "Discuss impact made", "Show sustained commitment"],
-      goals: ["Be more specific about timeline", "Connect to alumni outcomes", "Show research into career paths"]
+      personal: ["Share more specific, detailed examples", "Show vulnerability and authentic growth"],
+      academic: ["Connect interests to specific faculty or programs", "Demonstrate deeper research about the field"],
+      challenge: ["Quantify the impact of your growth", "Connect lessons learned to future goals"],
+      fit: ["Research specific programs and opportunities", "Show how you'd contribute to campus life"],
+      extracurricular: ["Highlight specific leadership moments", "Discuss measurable impact you created"],
+      goals: ["Provide more specific timelines and steps", "Connect goals to school resources and opportunities"]
     };
 
-    return improvementsMap[type] || ["Add more detail", "Show enthusiasm"];
-  };  // Initialize interview session
+    return improvementsMap[type] || ["Add more specific details", "Show greater enthusiasm and research"];
+  };// Initialize interview session
   useEffect(() => {
     const initializeSession = async () => {
       setIsLoading(true);
@@ -514,10 +535,13 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       }
       
       // Set the new stream
-      setStream(mainStream);
-        // Set interview as started
+      setStream(mainStream);      // Set interview as started
       setHasStartedInterview(true);
       setStartTime(new Date());
+      
+      // Reset all voice states to ensure clean start
+      setIsProcessingVoice(false);
+      setIsRecording(false);
       
       // Play the first question in voice mode after session is active
       if (questions.length > 0 && isVoiceMode && hasTTSAvailable) {
@@ -527,17 +551,10 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       } else {
         // For text mode, user can respond immediately
         setCanUserRespond(true);
-      }
-        // Create the initial interview session record in the database
+      }        // Create the initial interview session record in the database
       try {
-        // Convert college setup to standard interview setup format
-        const standardSetup = {
-          industry: 'Education',
-          jobType: `${setup.schoolType} - ${setup.major}`,
-          experienceLevel: setup.program,
-          interviewMode: setup.interviewMode
-        };
-        await createInitialInterviewSession(sessionId, standardSetup, 'college');
+        // Use the original college setup format for consistency
+        await createInitialInterviewSession(sessionId, setup, 'college');
       } catch (error) {
         console.error('Error creating initial session record:', error);
         // Continue with the interview even if database creation fails
@@ -571,7 +588,6 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       console.error('Failed to start recording');
     }
   };
-
   const stopRecording = async () => {
     if (!audioRecorderRef.current || !isVoiceMode) return;
     
@@ -580,13 +596,29 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
     
     const result = await audioRecorderRef.current.stopRecording();
     if (result) {
-      const { audioBlob } = result;
+      const { audioBlob, duration } = result;
       
       try {
         // Process voice input directly
         const transcription = await processVoiceInput(audioBlob);
         if (transcription && transcription.trim().length > 0) {
           setUserResponse(transcription);
+          
+          // Extract speech metrics in voice mode
+          if (hasOpenAIKey && transcription && transcription.trim().length > 0) {
+            try {
+              const metrics = await extractSpeechMetrics(audioBlob, transcription, duration);
+              if (metrics) {
+                setSpeechMetrics(prev => [...prev, {
+                  questionId: questions[currentQuestionIndex]?.id,
+                  metrics
+                }]);
+              }
+            } catch (err) {
+              console.error('Error extracting speech metrics in college interview:', err);
+            }
+          }
+          
           // Auto-submit after processing
           await submitResponse(transcription, audioBlob);
         } else {
@@ -603,13 +635,13 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       setIsProcessingVoice(false);
       setCanUserRespond(true);
     }  };
-
   const submitResponse = async (responseText?: string, audioBlob?: Blob) => {
     const finalResponse = responseText || userResponse;
     if (!finalResponse.trim()) return;
 
     setIsAnalyzing(true);
     setCanUserRespond(false);
+    setIsProcessingVoice(false); // Ensure voice processing is reset
 
     try {
       const currentQuestion = questions[currentQuestionIndex];
@@ -651,65 +683,125 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
           setup,
           responseContext,
           finalResponse
-        );
-
-        // Add the AI-generated question to our questions list
+        );        // Add the AI-generated question to our questions list
         const newQuestion: CollegeQuestion = {
           id: followUpQuestion.id,
           text: followUpQuestion.text,
           type: followUpQuestion.type as any,
           category: followUpQuestion.category,
           followUpPotential: true
-        };        setQuestions(prev => [...prev, newQuestion]);
-        setCurrentQuestionIndex(prev => prev + 1);
-        setIsAIGenerating(false);
+        };
         
-        // Play the new question in voice mode
+        const updatedQuestions = [...questions, newQuestion];
+        const newQuestionIndex = updatedQuestions.length - 1;
+        
+        setQuestions(updatedQuestions);
+        setCurrentQuestionIndex(newQuestionIndex);
+        setIsAIGenerating(false);
+          // Play the new question in voice mode
         if (isVoiceMode && hasTTSAvailable) {
+          // Reset voice processing state before playing new question
+          setIsProcessingVoice(false);
           await playQuestion(newQuestion.text);
         } else {
           setCanUserRespond(true);
+          setIsProcessingVoice(false);
         }} catch (followUpError) {
         console.error('Error generating follow-up, moving to next preset question:', followUpError);
         setIsAIGenerating(false);
           // Fallback: move to next preset question if available
         if (currentQuestionIndex < questions.length - 1) {
-          setCurrentQuestionIndex(currentQuestionIndex + 1);
-          // Play the next preset question in voice mode
+          setCurrentQuestionIndex(currentQuestionIndex + 1);          // Play the next preset question in voice mode
           if (isVoiceMode && hasTTSAvailable) {
+            // Reset voice processing state before playing next question
+            setIsProcessingVoice(false);
             await playQuestion(questions[currentQuestionIndex + 1].text);
           } else {
             setCanUserRespond(true);
+            setIsProcessingVoice(false);
           }
         } else {
           // No more preset questions and AI failed - complete interview
           await completeInterview(updatedResponses);
         }
-      }
-
-    } catch (error) {
+      }    } catch (error) {
       console.error('Error submitting response:', error);
       setCanUserRespond(true);
+      setIsProcessingVoice(false); // Reset voice processing state on error
     } finally {
       setIsAnalyzing(false);
     }
-  };  const completeInterview = async (finalResponses: CollegeResponse[]) => {
+  };const completeInterview = async (finalResponses: CollegeResponse[]) => {
     setIsInterviewComplete(true);
-    
-    // Calculate overall metrics from AI analysis
-    const overallScore = Math.round(
-      finalResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / finalResponses.length
-    );
-
-    // Calculate detailed metrics from AI analysis
-    const metrics = {
-      authenticity: Math.round(finalResponses.reduce((sum, r) => sum + (r.analysis?.authenticity || 0), 0) / finalResponses.length),
-      passion: Math.round(finalResponses.reduce((sum, r) => sum + (r.analysis?.passion || 0), 0) / finalResponses.length),
-      clarity: Math.round(finalResponses.reduce((sum, r) => sum + (r.analysis?.clarity || 0), 0) / finalResponses.length),
-      specificity: Math.round(finalResponses.reduce((sum, r) => sum + (r.analysis?.specificity || 0), 0) / finalResponses.length),
-      schoolKnowledge: Math.round(finalResponses.reduce((sum, r) => sum + (r.analysis?.schoolKnowledge || 0), 0) / finalResponses.length),
-      personalGrowth: Math.round(finalResponses.reduce((sum, r) => sum + (r.analysis?.personalGrowth || 0), 0) / finalResponses.length)
+      // Calculate overall metrics from AI analysis with improved scoring
+    const validScores = finalResponses.filter(r => r.analysis?.score && r.analysis.score > 0);
+    const averageScore = validScores.length > 0 
+      ? validScores.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / validScores.length
+      : 7.5; // Default to a reasonable score if no valid scores
+      // Keep score on 1-10 scale with reasonable minimum
+    const overallScore = Math.max(
+      Math.round(Math.min(averageScore, 10)) * 10, // Convert to percentage (0-100 scale)
+      40 // Minimum score of 40% to avoid overly harsh scoring
+    );// Calculate detailed metrics from AI analysis with improved fallback logic
+    const calculateMetric = (metricName: 'authenticity' | 'passion' | 'clarity' | 'specificity' | 'schoolKnowledge' | 'personalGrowth') => {
+      const validMetrics = finalResponses.filter(r => 
+        r.analysis?.[metricName] && 
+        typeof r.analysis[metricName] === 'number' && 
+        (r.analysis[metricName] as number) > 0
+      );
+      
+      if (validMetrics.length > 0) {
+        const average = validMetrics.reduce((sum, r) => sum + ((r.analysis?.[metricName] as number) || 0), 0) / validMetrics.length;
+        return Math.max(Math.round(Math.min(average, 10)), 4);
+      }
+      
+      // Fallback: Create realistic variation based on overall score and metric type
+      const baseScore = Math.max(averageScore, 4);
+      const variation = Math.random() * 2 - 1; // Random variation between -1 and +1
+      
+      // Different metrics have different baseline adjustments
+      const adjustments = {
+        authenticity: 0.2,     // Slightly higher - people are generally authentic
+        passion: -0.3,         // Slightly lower - harder to show passion consistently  
+        clarity: -0.1,         // Slightly lower - communication can be challenging
+        specificity: -0.4,     // Lower - being specific is often the hardest part
+        schoolKnowledge: 0.1,  // Neutral with slight positive
+        personalGrowth: 0.0    // Neutral
+      };
+      
+      const adjustedScore = baseScore + (adjustments[metricName] || 0) + (variation * 0.5);
+      return Math.max(Math.round(Math.min(adjustedScore, 10)), 4);
     };
+
+    const metrics = {
+      authenticity: calculateMetric('authenticity'),
+      passion: calculateMetric('passion'),
+      clarity: calculateMetric('clarity'),
+      specificity: calculateMetric('specificity'),
+      schoolKnowledge: calculateMetric('schoolKnowledge'),
+      personalGrowth: calculateMetric('personalGrowth')
+    };    // Calculate voice metrics averages if available
+    let voiceMetrics = null;
+    if (speechMetrics && speechMetrics.length > 0) {
+      const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
+      if (validMetrics.length > 0) {
+        voiceMetrics = {
+          speechRate: Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2)),
+          fluencyScore: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length),
+          voiceConfidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length),
+          fillerWordCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length),
+          averageVolume: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / validMetrics.length),
+          // Add missing metrics to match other interview types
+          delivery: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / validMetrics.length),
+          clarity: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / validMetrics.length),
+          confidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.confidence || m.voiceConfidence || 0), 0) / validMetrics.length),
+          paceConsistency: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.paceConsistency || 0), 0) / validMetrics.length),
+          repetitionCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.repetitionCount || 0), 0) / validMetrics.length),
+          pauseRatio: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseRatio || 0), 0) / validMetrics.length),
+          estimatedPitch: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.estimatedPitch || 0), 0) / validMetrics.length)
+        };
+      }
+    }
 
     const sessionData = {
       id: sessionId,
@@ -722,7 +814,9 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       endTime: new Date(),
       duration: timeElapsed,
       questionsAnswered: finalResponses.length,
-      metrics
+      metrics,
+      speechMetrics: speechMetrics || [],
+      voiceMetrics
     };
 
     // Save interview session to Supabase

@@ -600,13 +600,33 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             speechMetrics: speechMetric?.metrics
           };
         })
-      );
-
-      const endTime = new Date();
+      );      const endTime = new Date();
       const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000);
       const overallScore = analyzedResponses.length > 0 
         ? Math.round(analyzedResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / analyzedResponses.length * 10)
         : 0;
+
+      // Calculate voice metrics averages if available (to match other interview types)
+      let voiceMetrics = null;
+      if (speechMetrics && speechMetrics.length > 0) {
+        const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
+        if (validMetrics.length > 0) {
+          voiceMetrics = {
+            speechRate: Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2)),
+            fluencyScore: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length),
+            voiceConfidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length),
+            fillerWordCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length),
+            averageVolume: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / validMetrics.length),
+            delivery: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / validMetrics.length),
+            clarity: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / validMetrics.length),
+            confidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.confidence || m.voiceConfidence || 0), 0) / validMetrics.length),
+            paceConsistency: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.paceConsistency || 0), 0) / validMetrics.length),
+            repetitionCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.repetitionCount || 0), 0) / validMetrics.length),
+            pauseRatio: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseRatio || 0), 0) / validMetrics.length),
+            estimatedPitch: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.estimatedPitch || 0), 0) / validMetrics.length)
+          };
+        }
+      }
 
       const sessionData = {
         ...session,
@@ -615,6 +635,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         overallScore,
         responses: analyzedResponses,
         speechMetrics: speechMetrics,
+        voiceMetrics,
         isActive: false
       };
 
@@ -635,13 +656,33 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
 
       stopCamera();
       stopPreviewCamera();
-      onComplete(sessionData);
-
-    } catch (error) {
+      onComplete(sessionData);    } catch (error) {
       console.error('Error completing interview:', error);
       // Fallback completion without analysis
       const endTime = new Date();
       const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000);
+      
+      // Calculate voice metrics for fallback as well
+      let voiceMetrics = null;
+      if (speechMetrics && speechMetrics.length > 0) {
+        const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
+        if (validMetrics.length > 0) {
+          voiceMetrics = {
+            speechRate: Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2)),
+            fluencyScore: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length),
+            voiceConfidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length),
+            fillerWordCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length),
+            averageVolume: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / validMetrics.length),
+            delivery: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / validMetrics.length),
+            clarity: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / validMetrics.length),
+            confidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.confidence || m.voiceConfidence || 0), 0) / validMetrics.length),
+            paceConsistency: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.paceConsistency || 0), 0) / validMetrics.length),
+            repetitionCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.repetitionCount || 0), 0) / validMetrics.length),
+            pauseRatio: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseRatio || 0), 0) / validMetrics.length),
+            estimatedPitch: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.estimatedPitch || 0), 0) / validMetrics.length)
+          };
+        }
+      }
       
       const sessionData = {
         ...session,
@@ -650,6 +691,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         overallScore: 70, // Default score
         responses: finalResponses,
         speechMetrics: speechMetrics,
+        voiceMetrics,
         isActive: false
       };
 

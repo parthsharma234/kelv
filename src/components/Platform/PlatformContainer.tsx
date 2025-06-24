@@ -14,7 +14,7 @@ import CollegeInterviewResults from './CollegeInterviewResults';
 import { InterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'college-setup' | 'college-interview' | 'college-results';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results';
 
 const PlatformContainer: React.FC = () => {
   const { user, loading } = useAuth();
@@ -36,17 +36,24 @@ const PlatformContainer: React.FC = () => {
       behavior: 'smooth'
     });
   };
-  
   // Effect for loading interview data when viewing results - moved to top level
   React.useEffect(() => {
-    if ((currentState === 'view-results' || currentState === 'view-focused-results') && viewingInterviewId) {
+    if ((currentState === 'view-results' || currentState === 'view-focused-results' || currentState === 'view-college-results') && viewingInterviewId) {
       let isMounted = true;
       setViewingSessionData(null); // Reset data when starting to load
       
+      console.log('PlatformContainer: Loading interview data for ID:', viewingInterviewId, 'State:', currentState);
+      
       import('../../utils/supabase-interview').then(({ getInterviewById }) => {
         getInterviewById(viewingInterviewId).then((data: any) => {
+          console.log('PlatformContainer: Received interview data:', data);
           if (isMounted) {
             setViewingSessionData(data);
+          }
+        }).catch((error) => {
+          console.error('PlatformContainer: Error loading interview data:', error);
+          if (isMounted) {
+            setViewingSessionData(null);
           }
         });
       });
@@ -166,10 +173,12 @@ const PlatformContainer: React.FC = () => {
     setSessionData(null);
     setCurrentState('college-setup');
     scrollToTop();
-  };
-  const handleViewInterviewResults = (interviewId: string, interviewType?: string | null) => {
+  };  const handleViewInterviewResults = (interviewId: string, interviewType?: string | null) => {
     setViewingInterviewId(interviewId);
-    if (interviewType) {
+    if (interviewType === 'college') {
+      // It's a college interview - route to college results
+      setCurrentState('view-college-results');
+    } else if (interviewType) {
       // It's a focused interview - set the type and route to focused results
       setFocusedInterviewType(interviewType);
       setCurrentState('view-focused-results');
@@ -178,8 +187,7 @@ const PlatformContainer: React.FC = () => {
       setCurrentState('view-results');
     }
     scrollToTop();
-  };
-  // Handle viewing focused interview results
+  };  // Handle viewing focused interview results
   if (currentState === 'view-focused-results' && viewingInterviewId) {
     if (!viewingSessionData) {
       return (
@@ -196,6 +204,33 @@ const PlatformContainer: React.FC = () => {
         sessionData={viewingSessionData}
         onBackToDashboard={handleBackToDashboard}
         onStartNewFocusedInterview={handleStartNewFocusedInterview}
+      />
+    );
+  }
+  // Handle viewing college interview results
+  if (currentState === 'view-college-results' && viewingInterviewId) {
+    if (!viewingSessionData) {
+      return (
+        <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading college interview results...</p>
+            <p className="text-gray-500 text-sm mt-2">Interview ID: {viewingInterviewId}</p>
+            <button
+              onClick={handleBackToDashboard}
+              className="mt-4 px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <CollegeInterviewResults
+        sessionData={viewingSessionData}
+        onBackToDashboard={handleBackToDashboard}
+        onStartNewCollegeInterview={handleStartNewCollegeInterview}
       />
     );
   }

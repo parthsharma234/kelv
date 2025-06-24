@@ -1464,55 +1464,112 @@ CANDIDATE PROFILE:
 - Intended major: ${setup.major}
 - Program area: ${setup.program}
 - Institution type: ${setup.schoolType}
-- Interview format: ${setup.interviewMode === 'voice' ? 'In-person/Virtual conversation' : 'Written application interview'}
+- Interview format: ${setup.interviewMode === 'voice' ? 'Live conversational interview (spoken responses)' : 'Structured written interview (typed responses)'}
 
 INTERVIEW OBJECTIVES:
-1. Assess academic preparedness and intellectual curiosity
-2. Evaluate personal character, values, and maturity
-3. Understand motivation and "why this school/program"
-4. Gauge potential contribution to campus community
-5. Determine alignment with institutional mission and values
+1. Assess genuine academic passion and intellectual curiosity beyond grades
+2. Evaluate personal character, resilience, and emotional maturity
+3. Understand authentic motivation for this specific school/program
+4. Gauge potential positive impact on campus community and culture
+5. Determine values alignment and cultural fit with institutional mission
+6. Explore unique perspectives, experiences, and contributions they would bring
+7. Assess communication skills and ability to think on their feet
 
-QUESTION GENERATION REQUIREMENTS:
-Generate exactly 8-10 thoughtful college interview questions that:
+QUESTION GENERATION STRATEGY:
+Create a carefully sequenced interview that:
 
-1. **Academic Readiness**: Test knowledge of their intended field and intellectual engagement
-2. **Personal Growth**: Explore challenges, failures, and learning experiences
-3. **School Fit**: Assess knowledge of the institution and genuine interest
-4. **Community Impact**: Understand leadership, service, and collaborative abilities
-5. **Future Vision**: Explore goals, aspirations, and post-graduation plans
-6. **Values Alignment**: Assess character, ethics, and personal values
-7. **Unique Perspective**: Uncover what makes them distinctive
+**OPENING (Questions 1-2)**: Warm, accessible questions that help the student relax
+- Start with broad, comfortable topics (background, interests)
+- Build rapport and encourage natural conversation
+- Assess basic communication skills and confidence
 
-QUESTION TYPES TO INCLUDE:
-- Academic interest and preparation questions
-- "Why this school/program" questions
-- Personal experience and growth questions
-- Ethical/values-based scenarios
-- Future goals and vision questions
-- Community engagement questions
-- Problem-solving/critical thinking questions
+**EXPLORATION (Questions 3-6)**: Deeper dive into key areas
+- Academic passion and intellectual engagement
+- Personal growth through challenges or failures
+- School knowledge and authentic interest ("Why us?")
+- Values and character through specific experiences
+
+**INSIGHT (Questions 7-8)**: More sophisticated questions requiring reflection
+- Future vision and goal articulation
+- Ethical reasoning or hypothetical scenarios
+- Unique perspectives and potential contributions
+- Leadership philosophy or collaborative experiences
+
+**CLOSING (Questions 9-10)**: Memorable and forward-looking
+- What questions do they have for you?
+- Final chance to share something important
+- Vision for their college experience
+
+QUESTION CRAFTING PRINCIPLES:
+
+**For ${setup.interviewMode === 'voice' ? 'VOICE' : 'TEXT'} Mode:**
+${setup.interviewMode === 'voice' ? 
+`- Use natural, conversational language as if speaking aloud
+- Keep questions concise enough to remember when spoken
+- Include vocal cues like "Tell me about..." or "I'm curious about..."
+- Create space for follow-up questions and natural dialogue
+- Consider questions that invite storytelling and personal anecdotes` :
+`- Craft questions that work well for thoughtful written responses
+- Allow for more complex, multi-part questions that students can re-read
+- Include questions that benefit from careful reflection and detailed answers
+- Structure questions to encourage comprehensive, well-organized responses`}
+
+**Content Requirements:**
+1. **Specificity Over Generic**: Avoid cliché questions like "What's your greatest weakness?"
+2. **Experience-Based**: Ask for specific examples and stories, not hypotheticals
+3. **School-Specific**: Include questions that show research about your institution
+4. **Growth-Oriented**: Focus on learning, development, and future potential
+5. **Authentic Voice**: Sound like a genuine conversation, not an interrogation
+
+**Question Types to Include (8-10 total):**
+- Academic passion and intellectual curiosity (2 questions)
+- Personal experiences and character development (2-3 questions)
+- School knowledge and genuine fit (1-2 questions)
+- Future goals and vision (1-2 questions)
+- Values, ethics, or community engagement (1-2 questions)
+- Unique perspective or contribution (1 question)
+
+**Excellence Indicators:**
+✓ Questions feel natural and conversational
+✓ Each question reveals something different about the candidate
+✓ Progressive difficulty that builds confidence
+✓ Opportunities for follow-up and deeper exploration
+✓ Balance between challenging and supportive
+✓ Authentic to your institution's values and culture
+
+**Avoid:**
+✗ Generic questions that could apply to any school
+✗ Questions with obvious "right" answers
+✗ Overly personal or inappropriate topics
+✗ Questions that can be answered with simple yes/no
+✗ Intimidating or gotcha-style questions
 
 TONE AND STYLE:
-- Warm but professional, like a faculty member or senior admissions officer
-- Intellectually curious and genuinely interested in the student
-- Appropriately challenging without being intimidating
-- Encouraging deeper reflection and thoughtful responses
-- Authentic and conversational, not scripted
+- Warm, curious, and genuinely interested in the student as a person
+- Professional but approachable, like a favorite professor or mentor
+- Intellectually engaging without being overwhelming
+- Encouraging of authentic self-expression and vulnerability
+- Respectful of diverse backgrounds and experiences
 
 FORMAT: Return as a JSON array of question objects with this structure:
 [
   {
-    "id": "unique_id",
-    "text": "Interview question text",
-    "type": "academic|personal|school_fit|values|future_goals|community",
-    "difficulty": "moderate|challenging",
+    "id": "q1",
+    "text": "Interview question text (natural and conversational)",
+    "type": "academic|personal|school_fit|values|future_goals|community|unique_perspective",
+    "difficulty": "warm_up|moderate|challenging|reflective",
     "expectedDuration": "2-3 minutes",
-    "followUpHints": ["potential follow-up question"]
+    "followUpHints": ["Natural follow-up question based on likely responses"]
   }
 ]
 
-Remember: This is a college ADMISSION interview, not a job interview. Focus on academic potential, personal character, school fit, and future contribution to the university community.`;
+EXAMPLE EXCELLENT QUESTIONS:
+- "What's something you've learned recently outside of school that genuinely excited you?"
+- "Can you tell me about a time when you had to advocate for something you believed in?"
+- "What initially drew you to [specific program/major], and how has that interest evolved?"
+- "If you could design your ideal learning experience at our university, what would it look like?"
+
+Remember: This is a college ADMISSION interview focused on discovering the authentic person behind the application. Create questions that help students share their genuine selves while demonstrating their potential to thrive at your institution.`;
 };
 
 // Get university-specific context based on school type
@@ -1768,35 +1825,102 @@ const getArtsMajorContext = (major: string): string => {
 // Get general college interview context
 const getCollegeInterviewContext = (): string => {
   return `
-COLLEGE INTERVIEW BEST PRACTICES:
-- Create a welcoming, conversational atmosphere
-- Ask open-ended questions that encourage reflection
-- Show genuine interest in the student's experiences and perspectives
-- Allow time for thoughtful responses
-- Ask follow-up questions to dig deeper into interesting responses
-- Balance challenge with encouragement
-- Focus on growth, learning, and potential rather than just achievements
-- Remember this is also an opportunity for the student to learn about the school
+COLLEGE INTERVIEW PHILOSOPHY:
+Your goal is to discover the authentic person behind the application while creating a comfortable environment where students can showcase their best selves. This is NOT an interrogation but a meaningful conversation about their potential and fit.
 
-COMMON COLLEGE INTERVIEW TOPICS:
-1. Academic interests and intellectual curiosity
-2. Personal experiences and character development
-3. School knowledge and genuine interest ("Why us?")
-4. Leadership and community involvement
-5. Challenges overcome and lessons learned
-6. Future goals and aspirations
-7. Values and ethical reasoning
-8. What they would contribute to campus community
+INTERVIEW BEST PRACTICES:
+- Create a welcoming atmosphere that puts students at ease
+- Show genuine curiosity about their experiences and perspectives
+- Ask follow-up questions that demonstrate active listening
+- Balance structure with natural conversation flow
+- Give students time to think and formulate thoughtful responses
+- Look for potential and growth mindset, not just current achievements
+- Remember this is mutual evaluation - they're assessing your school too
 
-EVALUATION CRITERIA:
-- Intellectual curiosity and academic potential
-- Personal maturity and character
-- Communication skills and articulation
-- Genuine interest in the institution
-- Potential contribution to campus community
-- Alignment with institutional values
-- Resilience and growth mindset
-- Leadership and collaborative abilities
+EFFECTIVE QUESTIONING TECHNIQUES:
+- Use "Tell me about..." to invite storytelling
+- Ask "What was that like for you?" to encourage reflection
+- Follow interesting threads: "That's fascinating - can you say more about..."
+- Probe for specifics: "Can you give me a concrete example?"
+- Explore learning: "What did that experience teach you?"
+- Connect to future: "How do you see that playing out in college?"
+
+KEY EVALUATION AREAS:
+
+**INTELLECTUAL VITALITY (25%)**
+- Genuine curiosity and love of learning
+- Ability to think critically and ask good questions
+- Engagement with ideas beyond grade requirements
+- Academic passion that goes beyond career preparation
+
+**PERSONAL CHARACTER (25%)**
+- Self-awareness and emotional maturity
+- Resilience and ability to learn from failure
+- Integrity and ethical reasoning
+- Empathy and consideration for others
+
+**INSTITUTIONAL FIT (20%)**
+- Knowledge of and genuine interest in your specific school
+- Understanding of academic programs and opportunities
+- Alignment with campus culture and values
+- Realistic expectations about college experience
+
+**CONTRIBUTION POTENTIAL (20%)**
+- Leadership experience and potential
+- Collaborative skills and teamwork
+- Unique perspectives or experiences they bring
+- Initiative and ability to make positive impact
+
+**COMMUNICATION (10%)**
+- Ability to articulate thoughts clearly
+- Active listening and engagement in conversation
+- Appropriate depth and insight in responses
+- Comfort with intellectual discussion
+
+QUESTION CATEGORIES & PURPOSES:
+
+**Academic Passion Questions** - Assess genuine intellectual engagement
+- "What's the most interesting thing you've learned recently?"
+- "Describe a time when you disagreed with something you read or were taught"
+- "What questions keep you up at night thinking?"
+
+**Personal Growth Questions** - Evaluate character and self-awareness  
+- "Tell me about a time when you failed at something important to you"
+- "What's something you've changed your mind about recently?"
+- "Describe a challenge that helped you grow as a person"
+
+**School Fit Questions** - Test genuine interest and research
+- "What specifically draws you to our [program/campus/community]?"
+- "How do you see yourself contributing to our campus community?"
+- "What questions do you have about student life here?"
+
+**Values & Ethics Questions** - Understand moral reasoning
+- "Describe a time when you had to stand up for something you believed in"
+- "Tell me about a leader you admire and why"
+- "How do you handle disagreement with someone you respect?"
+
+**Future Vision Questions** - Assess goals and planning
+- "Where do you see yourself making an impact in 10 years?"
+- "What kind of legacy do you want to leave?"
+- "How do you think college will change you as a person?"
+
+**Red Flags to Avoid:**
+- Generic responses that could apply to any school
+- Focus solely on prestige or rankings
+- Inability to discuss challenges or growth
+- Lack of intellectual curiosity beyond grades
+- Poor knowledge of the institution despite claiming interest
+- Inflexibility or closed-mindedness
+- Inappropriate responses or lack of maturity
+
+**Green Flags to Celebrate:**
+- Specific, thoughtful responses showing real research
+- Evidence of intellectual curiosity and independent thinking
+- Growth mindset and learning from experiences
+- Genuine enthusiasm for learning and contribution
+- Self-awareness and emotional intelligence
+- Authentic voice and personality coming through
+- Questions that show serious consideration of fit
 `;
 };
 
@@ -1816,9 +1940,7 @@ export const analyzeCollegeInterviewResponse = async (
     const hasSpecificExamples = /(example|instance|time|when|project|case|experience)/i.test(response);
     const hasPersonalReflection = /(learned|realized|discovered|grew|changed|developed)/i.test(response);
     const showsPassion = /(excited|passionate|love|enjoy|fascinated|inspired|motivated)/i.test(response);
-    const mentionsSchool = new RegExp(setup.schoolType.replace('-', '|') + '|' + setup.program + '|' + setup.major, 'i').test(response);
-
-    const prompt = `You are an experienced college admissions officer evaluating a student's response to an admission interview question. Provide a comprehensive analysis that will help the student improve their college interview skills.
+    const mentionsSchool = new RegExp(setup.schoolType.replace('-', '|') + '|' + setup.program + '|' + setup.major, 'i').test(response);    const prompt = `You are an experienced college admissions officer evaluating a student's response to an admission interview question. Your goal is to provide constructive, encouraging feedback that helps students improve while recognizing their strengths.
 
 INTERVIEW CONTEXT:
 - Institution Type: ${setup.schoolType}
@@ -1826,58 +1948,87 @@ INTERVIEW CONTEXT:
 - Major: ${setup.major}
 - Question Type: ${question.type}
 - Question Asked: "${question.text}"
+- Interview Format: ${setup.interviewMode === 'voice' ? 'Spoken conversation' : 'Written response'}
 
 STUDENT RESPONSE:
 "${response}"
 
-RESPONSE METRICS:
+RESPONSE ANALYSIS:
 - Length: ${responseLength} characters, ${wordCount} words
 - Contains specific examples: ${hasSpecificExamples ? 'Yes' : 'No'}
 - Shows personal reflection: ${hasPersonalReflection ? 'Yes' : 'No'}
-- Demonstrates passion: ${showsPassion ? 'Yes' : 'No'}
+- Demonstrates passion/enthusiasm: ${showsPassion ? 'Yes' : 'No'}
 - References school/program: ${mentionsSchool ? 'Yes' : 'No'}
 
-EVALUATION CRITERIA FOR COLLEGE INTERVIEWS:
+EVALUATION FRAMEWORK FOR COLLEGE INTERVIEWS:
 
-CONTENT QUALITY (40%):
-- Demonstrates genuine interest in the school/program
-- Shows self-awareness and personal growth
-- Provides specific examples and experiences
-- Connects experiences to future goals
-- Shows knowledge of the institution
+**AUTHENTICITY & VOICE (30%)**
+- Genuine, personal tone that feels authentic to the student
+- Real experiences and honest self-reflection
+- Vulnerability and willingness to share meaningful experiences
+- Avoids generic or "what they want to hear" responses
+- Shows unique personality and perspective
 
-AUTHENTICITY (25%):
-- Genuine and personal voice
-- Honest self-reflection
-- Real experiences rather than generic responses
-- Shows vulnerability and growth mindset
+**DEPTH & INSIGHT (25%)**
+- Provides specific examples and concrete details
+- Demonstrates self-awareness and personal growth
+- Shows ability to reflect on experiences and extract meaning
+- Goes beyond surface-level responses to deeper insights
+- Connects experiences to broader themes or future goals
 
-COMMUNICATION SKILLS (20%):
-- Clear and articulate expression
-- Well-structured response
-- Appropriate depth for the question
-- Engaging storytelling
+**INTELLECTUAL ENGAGEMENT (20%)**
+- Shows genuine curiosity and love of learning
+- Demonstrates critical thinking and analytical skills
+- Connects academic interests to real-world applications
+- Shows knowledge of and interest in the specific institution/program
+- Exhibits growth mindset and intellectual humility
 
-PASSION & FIT (15%):
-- Enthusiasm for the field of study
-- Clear motivation for this specific school
-- Alignment with institutional values
-- Potential contribution to campus community
+**COMMUNICATION SKILLS (15%)**
+- Clear, organized, and articulate expression
+- Appropriate depth and detail for the question
+- ${setup.interviewMode === 'voice' ? 'Natural conversational flow and verbal fluency' : 'Well-structured written communication'}
+- Engaging storytelling that holds listener's attention
+- Professional yet personable tone
+
+**INSTITUTIONAL FIT (10%)**
+- Demonstrates research and genuine interest in the school
+- Shows understanding of campus culture and values
+- Articulates how they would contribute to the community
+- Realistic expectations about the college experience
+- Alignment between their goals and institutional offerings
+
+SCORING GUIDELINES:
+- 9-10: Exceptional response that would impress any admissions officer
+- 8: Strong response that clearly demonstrates college readiness
+- 7: Good response with clear strengths and minor areas for improvement
+- 6: Decent response that meets expectations but lacks distinction
+- 5: Average response that needs development in key areas
+- 3-4: Below average response with significant areas for improvement
+- 1-2: Poor response that suggests lack of preparation or fit
+
+FEEDBACK APPROACH:
+- Lead with genuine strengths and positive observations
+- Provide specific, actionable suggestions for improvement
+- Encourage authentic self-expression over "perfect" answers
+- Connect feedback to college admissions best practices
+- Maintain an encouraging, developmental tone
 
 Return a JSON object with this structure:
 {
-  "score": number (1-10, where 8-10 is excellent for college admission),
-  "feedback": "Specific, actionable feedback for improvement",
-  "strengths": ["strength1", "strength2", "strength3"],
-  "areasForImprovement": ["improvement1", "improvement2"],
-  "authenticity": number (1-10),
-  "passion": number (1-10),
-  "clarity": number (1-10),
-  "specificity": number (1-10),
-  "schoolKnowledge": number (1-10),
-  "personalGrowth": number (1-10),
-  "nextQuestionSuggestion": "suggestion for follow-up question based on response"
+  "score": number (1-10, calibrated for college admission standards),
+  "feedback": "Encouraging, specific feedback that highlights strengths and provides actionable improvement suggestions",
+  "strengths": ["Specific strength with example", "Another strength", "Third strength"],
+  "areasForImprovement": ["Specific, actionable improvement suggestion", "Another improvement area"],
+  "authenticity": number (1-10, how genuine and personal the response feels),
+  "passion": number (1-10, level of enthusiasm and engagement shown),
+  "clarity": number (1-10, how well-organized and articulate the response is),
+  "specificity": number (1-10, use of concrete examples and details),
+  "schoolKnowledge": number (1-10, demonstration of research and genuine interest),
+  "personalGrowth": number (1-10, evidence of self-awareness and development),
+  "nextQuestionSuggestion": "Natural follow-up question that builds on their response"
 }
+
+Focus on being developmental rather than purely evaluative. Help this student improve while recognizing what they're doing well.
 
 No additional text - just the JSON object.`;
 
@@ -1930,45 +2081,74 @@ export const generateCollegeFollowUp = async (
       const qNum = responses.length - 1 + index;
       return `Q${qNum}: ${r.questionText || 'Previous question'}
 A${qNum}: ${r.response}`;
-    }).join('\n\n');
-
-    const prompt = `You are an experienced college admissions officer conducting an interview for a ${setup.schoolType} institution. Based on the conversation so far, generate a thoughtful follow-up question.
+    }).join('\n\n');    const prompt = `You are an experienced college admissions officer conducting a warm, conversational interview for a ${setup.schoolType} institution. Based on what the student just shared, craft a natural follow-up question that shows you're actively listening and genuinely interested in their story.
 
 INTERVIEW CONTEXT:
 - Institution: ${setup.schoolType} 
 - Program: ${setup.program}
 - Major: ${setup.major}
-- Interview Format: ${setup.interviewMode}
+- Interview Format: ${setup.interviewMode === 'voice' ? 'Live conversation (spoken)' : 'Structured interview (written)'}
+- Interview Stage: Mid-conversation follow-up
 
 RECENT CONVERSATION:
 ${conversationContext}
 
-CURRENT RESPONSE: "${currentResponse}"
+STUDENT'S LATEST RESPONSE: 
+"${currentResponse}"
 
-FOLLOW-UP QUESTION REQUIREMENTS:
-1. Build naturally on what the student just shared
-2. Encourage deeper reflection or specific examples
-3. Show genuine interest in their experiences
-4. Appropriate for college admission interview tone
-5. Help assess their fit for the program/institution
-6. 2-3 minutes to answer thoughtfully
+YOUR GOAL AS INTERVIEWER:
+You want to help this student share their best self while gathering insights about their potential fit and contribution to your campus community. This follow-up should feel like a natural continuation of an engaging conversation.
 
-QUESTION TYPES TO CONSIDER:
-- Asking for specific examples when they mention general concepts
-- Exploring motivations behind their interests
-- Understanding their knowledge of the school/program
-- Assessing their personal growth and self-awareness
-- Connecting their experiences to future goals
+FOLLOW-UP QUESTION PRINCIPLES:
+
+**Natural Conversation Flow:**
+- Reference something specific they just mentioned
+- Show genuine curiosity about their experience
+- Use warm, engaging language ("That's fascinating..." "I'm curious...")
+- Make it feel like you're truly interested, not interrogating
+
+**Strategic Purpose:**
+- Deepen understanding of their character, values, or motivations
+- Explore specific examples when they mentioned general concepts
+- Assess self-awareness, growth mindset, or reflection skills
+- Understand their knowledge of or fit with your institution
+- Reveal leadership potential, collaborative skills, or unique perspectives
+
+**Question Types That Work Well:**
+- "That sounds like it was really meaningful - what did that experience teach you about yourself?"
+- "You mentioned [specific detail] - can you tell me more about how that shaped your thinking?"
+- "I'm curious about [something they said] - what was that like for you?"
+- "That's interesting - how do you see that experience connecting to what you hope to do here?"
+- "It sounds like that was challenging - what did you learn from navigating that?"
+
+**For ${setup.interviewMode === 'voice' ? 'VOICE' : 'TEXT'} Mode:**
+${setup.interviewMode === 'voice' ? 
+`- Keep the question conversational and natural to speak aloud
+- Use tone that conveys genuine interest and warmth
+- Make it easy to respond to in a flowing conversation
+- Include verbal cues that show active listening` :
+`- Craft questions that invite thoughtful, detailed written responses
+- Allow for reflection and careful consideration
+- Structure for clear, organized answers`}
+
+**Avoid:**
+- Generic questions that could follow any response
+- Questions that put students on the defensive
+- Multiple questions packed into one
+- Questions that can be answered with simple yes/no
+- Anything that feels like a test rather than genuine interest
 
 Return a JSON object:
 {
   "id": "follow_up_${responses.length + 1}",
-  "text": "Your thoughtful follow-up question",
-  "type": "follow_up",
+  "text": "Your natural, engaging follow-up question that builds on their response",
+  "type": "follow_up", 
   "category": "Follow-up",
   "followUpPotential": true,
-  "reasoning": "Brief explanation of why this follow-up makes sense"
+  "reasoning": "Brief explanation of what this follow-up aims to explore based on their response"
 }
+
+Make this feel like the kind of follow-up question a caring mentor or favorite teacher would ask - genuinely interested in understanding the student better.
 
 No additional text - just the JSON object.`;
 
