@@ -19,7 +19,9 @@ type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-
 const PlatformContainer: React.FC = () => {
   const { user, loading } = useAuth();
   useScrollToTop(); // Use the hook to handle scroll to top on route changes
-  const [currentState, setCurrentState] = useState<PlatformState>('dashboard');  const [interviewSetup, setInterviewSetup] = useState<InterviewSetup | null>(null);
+  const [currentState, setCurrentState] = useState<PlatformState>('dashboard');
+  const [dashboardKey, setDashboardKey] = useState(0); // Add key to force dashboard refresh
+  const [interviewSetup, setInterviewSetup] = useState<InterviewSetup | null>(null);
   const [sessionData, setSessionData] = useState<any>(null);
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
@@ -131,6 +133,7 @@ const PlatformContainer: React.FC = () => {
     setFocusedInterviewType('');
     setIsFocusedFlow(false);
     setIsCollegeFlow(false);
+    setDashboardKey(prev => prev + 1); // Force dashboard refresh
     scrollToTop();
   };
 
@@ -259,6 +262,7 @@ const PlatformContainer: React.FC = () => {
   return (
     <>      {currentState === 'dashboard' && (
         <PlatformDashboard 
+          key={dashboardKey}
           onStartInterview={handleStartInterview}
           onStartFocusedInterview={handleStartFocusedInterview}
           onStartCollegeInterview={handleStartCollegeInterview}

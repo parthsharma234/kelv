@@ -33,7 +33,7 @@ export const createInitialInterviewSession = async (sessionId: string, setup: In
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
-    }    const sessionData: any = {
+    }      const sessionData: any = {
       id: sessionId,
       user_id: user.id,
       setup: setup,
@@ -47,15 +47,24 @@ export const createInitialInterviewSession = async (sessionId: string, setup: In
       interview_type: interviewType
     };
 
-
+    console.log('Creating initial interview session:', {
+      sessionId: sessionId,
+      interviewType: interviewType,
+      userId: user.id,
+      status: sessionData.status
+    });
 
     const { error } = await supabase
       .from('interview_sessions')
-      .insert(sessionData);if (error) {
+      .insert(sessionData);
+
+    if (error) {
       console.error('Error creating initial interview session:', error);
       console.error('Error details:', error.message, error.details, error.hint);
       throw error;
     }
+    
+    console.log('Initial interview session created successfully with ID:', sessionId);
   } catch (error) {
     console.error('Failed to create initial interview session:', error);
     if (error instanceof Error) {
@@ -74,8 +83,11 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      console.error('saveInterviewSession: User not authenticated');
       throw new Error('User not authenticated');
     }
+    
+    console.log('saveInterviewSession: User authenticated:', user.id);
 
     // Prepare speech metrics for storage
     const speechMetrics = sessionData.speechMetrics || {};
@@ -106,6 +118,48 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       }
     }
 
+    // Calculate interview metrics based on interview type and responses
+    const calculateInterviewMetrics = (responses: any[], interviewType: string) => {
+      if (!responses || responses.length === 0) {
+        return null;
+      }
+      
+      const validResponses = responses.filter((r: any) => r.analysis);
+      if (validResponses.length === 0) {
+        return null;
+      }
+      
+      if (interviewType === 'college') {
+        // College interview metrics
+        const authenticityScores = validResponses.map((r: any) => r.analysis.authenticity || 0);
+        const passionScores = validResponses.map((r: any) => r.analysis.passion || 0);
+        const clarityScores = validResponses.map((r: any) => r.analysis.clarity || 0);
+        const specificityScores = validResponses.map((r: any) => r.analysis.specificity || 0);
+        
+        return {
+          authenticity: Math.round(authenticityScores.reduce((a: number, b: number) => a + b, 0) / authenticityScores.length),
+          passion: Math.round(passionScores.reduce((a: number, b: number) => a + b, 0) / passionScores.length),
+          clarity: Math.round(clarityScores.reduce((a: number, b: number) => a + b, 0) / clarityScores.length),
+          specificity: Math.round(specificityScores.reduce((a: number, b: number) => a + b, 0) / specificityScores.length)
+        };
+      } else {
+        // Focused interview metrics
+        const problemSolvingScores = validResponses.map((r: any) => r.analysis.problem_solving || 0);
+        const communicationScores = validResponses.map((r: any) => r.analysis.communication || 0);
+        const depthScores = validResponses.map((r: any) => r.analysis.depth || 0);
+        const relevanceScores = validResponses.map((r: any) => r.analysis.relevance || 0);
+        
+        return {
+          problem_solving: Math.round(problemSolvingScores.reduce((a: number, b: number) => a + b, 0) / problemSolvingScores.length),
+          communication: Math.round(communicationScores.reduce((a: number, b: number) => a + b, 0) / communicationScores.length),
+          depth: Math.round(depthScores.reduce((a: number, b: number) => a + b, 0) / depthScores.length),
+          relevance: Math.round(relevanceScores.reduce((a: number, b: number) => a + b, 0) / relevanceScores.length)
+        };
+      }
+    };
+    
+    const calculatedMetrics = calculateInterviewMetrics(sessionData.responses, sessionData.type || sessionData.interviewType || 'standard');
+
     // Prepare data for update
     const updateData: any = {
       responses: sessionData.responses,
@@ -118,6 +172,7 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       audio_data: audioData,
       interview_type: sessionData.type || sessionData.interviewType, // Add interview type to database
       voice_metrics_summary: voiceMetricsSummary // <-- Save the summary here
+      // Note: metrics column doesn't exist in current DB schema, so we don't include it
     };
 
     console.log('Saving interview session with data:', {
@@ -125,10 +180,49 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       interviewType: updateData.interview_type,
       status: updateData.status,
       speechMetricsIncluded: !!sessionData.speechMetrics,
-      voiceMetricsSummary: voiceMetricsSummary
+      voiceMetricsSummary: voiceMetricsSummary,
+      calculatedMetrics: calculatedMetrics,
+      responsesCount: sessionData.responses ? sessionData.responses.length : 0,
+      questionsCount: sessionData.questions ? sessionData.questions.length : 0
     });
 
     // Update the existing session record instead of inserting
+    console.log('Attempting to update session with ID:', sessionData.id);
+    
+    // First check if the session exists
+    const { data: existingSession, error: checkError } = await supabase
+      .from('interview_sessions')
+      .select('id, status')
+      .eq('id', sessionData.id)
+      .single();
+    
+    if (checkError) {
+      console.error('Error checking existing session:', checkError);
+      if (checkError.code === 'PGRST116') {
+        console.error('Session not found in database, ID:', sessionData.id);
+        // Try to create a new session instead
+        console.log('Attempting to create new session since it was not found...');
+        const { error: insertError } = await supabase
+          .from('interview_sessions')
+          .insert({
+            ...updateData,
+            id: sessionData.id,
+            user_id: user.id,
+            created_at: new Date().toISOString()
+          });
+        
+        if (insertError) {
+          console.error('Error creating new session:', insertError);
+          throw insertError;
+        }
+        console.log('Successfully created new session with ID:', sessionData.id);
+        return;
+      }
+      throw checkError;
+    }
+    
+    console.log('Found existing session:', existingSession);
+    
     const { error } = await supabase
       .from('interview_sessions')
       .update(updateData)
@@ -136,10 +230,16 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
 
     if (error) {
       console.error('Error updating interview session:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       throw error;
     }
 
-    console.log('Interview session saved successfully');
+    console.log('Interview session saved successfully with ID:', sessionData.id);
 
     // Update user speech profile asynchronously
     try {

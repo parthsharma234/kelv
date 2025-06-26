@@ -278,11 +278,13 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       const generatedQuestions = await generateFocusedQuestions(interviewType, setup);
       setQuestions(generatedQuestions);      // Create a unique session ID and create initial session in Supabase
       const newSessionId = crypto.randomUUID();
+      console.log('FocusedInterview: Generated new session ID:', newSessionId);
       setSessionId(newSessionId);
       try {
         await createInitialInterviewSession(newSessionId, setup, interviewType); // Pass interview type
+        console.log('FocusedInterview: Successfully created initial session in Supabase');
       } catch (err) {
-        console.error('Error creating initial focused interview session:', err);
+        console.error('FocusedInterview: Error creating initial focused interview session:', err);
       }
     } catch (error) {
       console.error('Error initializing session:', error);
@@ -456,7 +458,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       };
       
       // Analyze response
-      const analysis = await analyzeResponse(currentQuestion, userResponse, setup, responses);
+      const analysis = await analyzeResponse(currentQuestion, userResponse, setup, responses, interviewType);
       response.analysis = analysis;
       
       const updatedResponses = [...responses, response];
@@ -527,22 +529,40 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       id: sessionId || crypto.randomUUID(),
       setup, // Pass setup as-is
       responses: finalResponses,
+      questions, // Include the questions array for saving to database
       duration,
       overallScore: Math.round(averageScore),
       questionsAnswered: finalResponses.length,
       interviewType, // Still include for dashboard/results
+      type: interviewType, // Add type for database consistency
       startTime,
       endTime,
       config,
       speechMetrics,
       voiceMetrics
     };
+    
+    console.log('FocusedInterview: Completing interview with session data:', {
+      sessionId: sessionData.id,
+      interviewType: sessionData.type,
+      duration: sessionData.duration,
+      questionsAnswered: sessionData.questionsAnswered,
+      overallScore: sessionData.overallScore,
+      responseCount: finalResponses.length,
+      questionCount: questions.length
+    });
+    
     // Save session to Supabase
     try {
+      console.log('FocusedInterview: Attempting to save session to Supabase...');
       await saveInterviewSession(sessionData);
+      console.log('FocusedInterview: Successfully saved session to Supabase');
     } catch (err) {
-      console.error('Error saving focused interview session:', err);
+      console.error('FocusedInterview: Error saving focused interview session:', err);
+      // Still complete the interview locally even if save fails
     }
+    
+    console.log('FocusedInterview: Calling onComplete with session data');
     onComplete(sessionData);
   };
 

@@ -589,7 +589,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           const question = session.questions.find(q => q.id === response.questionId);
           if (!question) return response;
 
-          const analysis = await analyzeResponse(question, response.response, setup, finalResponses.slice(0, index));
+          const analysis = await analyzeResponse(question, response.response, setup, finalResponses.slice(0, index), 'college');
           
           // Add speech metrics if available
           const speechMetric = speechMetrics.find(m => m.questionId === response.questionId);

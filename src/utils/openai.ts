@@ -937,10 +937,11 @@ export const analyzeResponse = async (
   question: Question,
   response: string,
   setup: InterviewSetup,
-  previousResponses: InterviewResponse[]
+  previousResponses: InterviewResponse[],
+  interviewType?: string
 ): Promise<any> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return getFallbackAnalysis(response);
+    return getFallbackAnalysis(response, interviewType);
   }
 
   try {
@@ -956,6 +957,10 @@ export const analyzeResponse = async (
     const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
     const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
 
+    // Determine if this is a focused interview
+    const isFocusedInterview = interviewType && interviewType !== 'college';
+    const isCollegeInterview = interviewType === 'college';
+
     const prompt = `You are a senior ${setup.industry} hiring manager with 15+ years of experience evaluating candidates for ${setup.jobType} positions. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
 
 INTERVIEW CONTEXT:
@@ -964,6 +969,7 @@ INTERVIEW CONTEXT:
 - Experience Level: ${setup.experienceLevel}
 - Question Type: ${question.type}
 - Question Asked: "${question.text}"
+- Interview Type: ${isFocusedInterview ? `Focused Interview (${interviewType})` : 'Standard Interview'}
 
 CANDIDATE RESPONSE:
 "${response}"
@@ -1027,6 +1033,22 @@ ANALYSIS REQUIREMENTS:
 5. ENCOURAGING: Be constructive and supportive, but also critical
 6. CAPITALIZATION: Use proper title case for all strength and improvement items (e.g., "Technical Problem Solving", "Clear Communication")
 
+${isFocusedInterview ? `
+FOCUSED INTERVIEW METRICS:
+For this focused interview, provide scores (1-10) for these specific metrics:
+- problem_solving: How well the candidate demonstrates analytical thinking and problem-solving approach
+- communication: Clarity, structure, and effectiveness of communication
+- depth: Level of detail, insight, and thoroughness in the response
+- relevance: How well the response directly addresses the question and role requirements
+` : `
+COLLEGE INTERVIEW METRICS:
+For this college interview, provide scores (1-10) for these specific metrics:
+- authenticity: How genuine and honest the response feels
+- passion: Level of enthusiasm and interest demonstrated
+- clarity: How clear and well-structured the communication is
+- specificity: Use of specific examples and concrete details
+`}
+
 Return ONLY this JSON format:
 {
   "score": 1-10,
@@ -1043,7 +1065,15 @@ Return ONLY this JSON format:
   "nextQuestionType": "behavioral|technical|situational|follow_up|problem_solving|leadership|cultural_fit|closing",
   "performanceTrend": "${averagePreviousScore > 0 ? (averagePreviousScore > 5 ? 'improving' : 'stable') : 'new'}",
   "roleAlignment": "high|medium|low",
-  "culturalFit": "high|medium|low"
+  "culturalFit": "high|medium|low"${isFocusedInterview ? `,
+  "problem_solving": 1-10,
+  "communication": 1-10,
+  "depth": 1-10,
+  "relevance": 1-10` : isCollegeInterview ? `,
+  "authenticity": 1-10,
+  "passion": 1-10,
+  "clarity": 1-10,
+  "specificity": 1-10` : ''}
 }
 
 No additional text - just the JSON object.`;
@@ -1093,13 +1123,17 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
 };
 
 // Helper functions
-const getFallbackAnalysis = (response: string) => {
+const getFallbackAnalysis = (response: string, interviewType?: string) => {
   const responseLength = response.length;
   const hasSpecificExamples = /(example|instance|time|when|project|case)/i.test(response);
   const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
   const hasQuantifiableResults = /(\d+%|\d+ percent|\$\d+|\d+ people|\d+ users|\d+ customers)/i.test(response);
   const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
-    return {
+  
+  const isFocusedInterview = interviewType && interviewType !== 'college';
+  const isCollegeInterview = interviewType === 'college';
+  
+  const baseAnalysis = {
     score: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
     feedback: "Good response! Try to include more specific examples and quantifiable results to strengthen your answer.",
     strengths: ["Clear Communication", "Relevant Experience", "Professional Tone"],
@@ -1116,6 +1150,27 @@ const getFallbackAnalysis = (response: string) => {
     roleAlignment: 'medium',
     culturalFit: 'medium'
   };
+  
+  // Add specific metrics based on interview type
+  if (isFocusedInterview) {
+    return {
+      ...baseAnalysis,
+      problem_solving: Math.min(10, Math.max(1, Math.floor(response.length / 25) + 4)),
+      communication: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
+      depth: hasSpecificExamples ? 7 : 5,
+      relevance: Math.min(10, Math.max(1, Math.floor(response.length / 30) + 5))
+    };
+  } else if (isCollegeInterview) {
+    return {
+      ...baseAnalysis,
+      authenticity: showsEnthusiasm ? 8 : 6,
+      passion: showsEnthusiasm ? 8 : 5,
+      clarity: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
+      specificity: hasSpecificExamples ? 7 : 4
+    };
+  }
+  
+  return baseAnalysis;
 };
 
 const getAverageScore = (responses: InterviewResponse[]): number => {

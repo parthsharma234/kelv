@@ -217,3 +217,54 @@
 .animate-pulse {
   animation: pulse 2s infinite;
 }
+
+/* Custom scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(61, 61, 61, 0.3);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 87, 34, 0.5);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 87, 34, 0.7);
+}
+
+/* For Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 87, 34, 0.5) rgba(61, 61, 61, 0.3);
+}
+
+/* Blue theme custom scrollbar for focused interviews */
+.custom-scrollbar-blue::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar-blue::-webkit-scrollbar-track {
+  background: rgba(61, 61, 61, 0.3);
+  border-radius: 4px;
+}
+
+.custom-scrollbar-blue::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar-blue::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.7);
+}
+
+.custom-scrollbar-blue {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.5) rgba(61, 61, 61, 0.3);
+}

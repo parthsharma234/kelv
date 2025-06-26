@@ -15,8 +15,7 @@ import {
   AlertCircle,
   GraduationCap,
   Shield,
-  Star,
-  Mic
+  Star
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
 import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
@@ -146,7 +145,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
           getInterviewStats(),
           getUserStrengthsAndWeaknesses()
         ]);
-          // Calculate college interview specific metrics
+        
+        console.log('Dashboard: Loaded interview history:', {
+          total: history.length,
+          histories: history.map(h => ({
+            id: h.id,
+            interviewType: h.interviewType,
+            date: h.date,
+            status: h.status,
+            overallScore: h.overallScore
+          }))
+        });
+        
+        // Calculate college interview specific metrics
         const collegeInterviews = history.filter(interview => 
           interview.interviewType === 'college' || interview.setup.industry === 'Education'
         );
@@ -722,10 +733,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                   <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
                   <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
                 </div>
-              ) : (                <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2' : ''}`}>
+              ) : (                <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2 custom-scrollbar' : ''}`}>
                   {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5)).map((interview) => {
                     const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college';
                     const isCollegeInterview = interview.interviewType === 'college';
+                    
+                    console.log('Dashboard: Rendering interview:', {
+                      id: interview.id,
+                      interviewType: interview.interviewType,
+                      isFocused: isFocusedInterview,
+                      isCollege: isCollegeInterview,
+                      date: interview.date,
+                      status: interview.status
+                    });
                     
                     return (
                       <div
