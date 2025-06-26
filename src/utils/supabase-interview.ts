@@ -47,10 +47,7 @@ export const createInitialInterviewSession = async (sessionId: string, setup: In
       interview_type: interviewType
     };
 
-    // Only add metrics if it's a college interview (where metrics are expected)
-    if (interviewType === 'college') {
-      sessionData.metrics = null;
-    }
+
 
     const { error } = await supabase
       .from('interview_sessions')
@@ -82,8 +79,33 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
 
     // Prepare speech metrics for storage
     const speechMetrics = sessionData.speechMetrics || {};
-    const audioData = sessionData.audioData || {};    
-    
+    const audioData = sessionData.audioData || {};
+
+    // --- Aggregate voice metrics from speech_metrics array ---
+    let voiceMetricsSummary = null;
+    if (Array.isArray(sessionData.speech_metrics) && sessionData.speech_metrics.length > 0) {
+      const metricsList = sessionData.speech_metrics.map((sm: any) => sm.metrics).filter(Boolean);
+      const count = metricsList.length;
+      if (count > 0) {
+        const sum = metricsList.reduce((acc: any, m: any) => ({
+          speechRate: (acc.speechRate || 0) + (m.speechRate || 0),
+          fluencyScore: (acc.fluencyScore || 0) + (m.fluencyScore || 0),
+          voiceConfidence: (acc.voiceConfidence || 0) + (m.voiceConfidence || 0),
+          deliveryScore: (acc.deliveryScore || 0) + (m.deliveryScore || 0),
+          clarityScore: (acc.clarityScore || 0) + (m.clarityScore || 0),
+          fillerWordCount: (acc.fillerWordCount || 0) + (m.fillerWordCount || 0),
+        }), {});
+        voiceMetricsSummary = {
+          speechRate: Math.round(sum.speechRate / count),
+          fluencyScore: Math.round(sum.fluencyScore / count),
+          voiceConfidence: Math.round(sum.voiceConfidence / count),
+          deliveryScore: Math.round(sum.deliveryScore / count),
+          clarityScore: Math.round(sum.clarityScore / count),
+          fillerWordCount: Math.round(sum.fillerWordCount / count),
+        };
+      }
+    }
+
     // Prepare data for update
     const updateData: any = {
       responses: sessionData.responses,
@@ -94,19 +116,16 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       status: 'completed',
       speech_metrics: speechMetrics,
       audio_data: audioData,
-      interview_type: sessionData.type || sessionData.interviewType // Add interview type to database
+      interview_type: sessionData.type || sessionData.interviewType, // Add interview type to database
+      voice_metrics_summary: voiceMetricsSummary // <-- Save the summary here
     };
-
-    // Only add metrics if they exist (for college interviews)
-    if (sessionData.metrics) {
-      updateData.metrics = sessionData.metrics;
-    }
 
     console.log('Saving interview session with data:', {
       sessionId: sessionData.id,
       interviewType: updateData.interview_type,
       status: updateData.status,
-      metricsIncluded: !!sessionData.metrics
+      speechMetricsIncluded: !!sessionData.speechMetrics,
+      voiceMetricsSummary: voiceMetricsSummary
     });
 
     // Update the existing session record instead of inserting
@@ -560,14 +579,13 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
         speechRate: session.speech_metrics.timing?.speechRate || 0,
         voiceStability: session.speech_metrics.voice?.voiceStability || 0
       } : undefined,
-      interviewType: session.interview_type, // Add this line
-      metrics: session.metrics || undefined // Include college interview metrics
+      interviewType: session.interview_type // Add this line
     }));
 
     console.log('Transformed interview history:', transformedHistory.map(h => ({
       id: h.id,
       interviewType: h.interviewType,
-      metrics: !!h.metrics
+      speechMetricsIncluded: !!h.speechMetricsAverage
     })));
 
     return transformedHistory;

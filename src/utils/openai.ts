@@ -106,17 +106,86 @@ export const processVoiceInput = async (audioBlob: Blob): Promise<string> => {
   }
 };
 
-// Enhanced speech metrics extraction
+// Extract speech metrics using advanced speech analysis
 export const extractSpeechMetrics = async (audioBlob: Blob, transcription: string, duration: number) => {
+  try {
+    // Import the AdvancedSpeechAnalyzer
+    const { AdvancedSpeechAnalyzer } = await import('./speechAnalysis');
+    
+    // Create analyzer instance
+    const analyzer = new AdvancedSpeechAnalyzer();
+    
+    // Analyze voice metrics
+    const voiceMetrics = await analyzer.analyzeVoiceMetrics(audioBlob, transcription, duration);
+    
+    return voiceMetrics;
+  } catch (error) {
+    console.error('Error extracting speech metrics:', error);
+    // Return default metrics if analysis fails
+    return {
+      speechRate: 0,
+      fluencyScore: 0,
+      voiceConfidence: 0,
+      deliveryScore: 0,
+      clarityScore: 0,
+      fillerWordCount: 0,
+      pauseAnalysis: {
+        averagePauseLength: 0,
+        pauseFrequency: 0,
+        strategicPauses: 0
+      },
+      pitchAnalysis: {
+        averagePitch: 0,
+        pitchVariation: 0,
+        pitchStability: 0
+      },
+      energyAnalysis: {
+        averageEnergy: 0,
+        energyConsistency: 0,
+        dynamicRange: 0
+      }
+    };
+  }
+};
+
+// Enhanced speech metrics extraction
+export const extractSpeechMetricsOld = async (audioBlob: Blob, transcription: string, duration: number) => {
   try {
     // Basic metrics from transcription
     const words = transcription.toLowerCase().split(/\s+/).filter(word => word.length > 0);
     const wordCount = words.length;
     
     // Improved speech rate calculation
+    // Ensure duration is in seconds and clamp to reasonable range
+    // If duration is suspiciously small (< 1 second) or large (> 3600 seconds), assume it's in wrong units
+    let safeDuration = duration;
+    if (duration < 1) {
+      // Duration might be in milliseconds, convert to seconds
+      safeDuration = duration / 1000;
+      console.log('Duration converted from milliseconds to seconds:', duration, '->', safeDuration);
+    } else if (duration > 3600) {
+      // Duration might be in wrong units, assume it's reasonable
+      safeDuration = Math.min(duration, 300); // Cap at 5 minutes
+      console.log('Duration capped to reasonable value:', duration, '->', safeDuration);
+    }
+    
     // Account for natural pauses and hesitations in speech
-    const effectiveDuration = Math.max(duration * 0.88, duration - 1.5); // Account for natural speech pauses
-    const speechRate = Number(((wordCount / effectiveDuration) * 60).toFixed(2)); // Limit to 2 decimal places
+    safeDuration = Math.max(safeDuration * 0.88, safeDuration - 1.5);
+    
+    // Calculate WPM: (words / minutes) = (words / (seconds / 60)) = (words * 60) / seconds
+    let speechRate = (wordCount * 60) / safeDuration;
+    speechRate = Number(speechRate.toFixed(2)); // Limit to 2 decimal places
+    
+    // Clamp output to 60–250 WPM for realistic range
+    speechRate = Math.max(60, Math.min(250, speechRate));
+    
+    console.log('Speech rate calculation debug:', {
+      wordCount,
+      rawDuration: duration,
+      safeDuration,
+      calculatedWPM: (wordCount * 60) / safeDuration,
+      clampedWPM: speechRate
+    });
     
     // Enhanced filler word detection
     const fillerWords = [
@@ -1604,6 +1673,7 @@ ADMISSION PHILOSOPHY: "We seek students who will take advantage of our personali
     'public': `
 INSTITUTIONAL CONTEXT - PUBLIC UNIVERSITY:
 You represent a respected state university that:
+
 - Serves a diverse student body from various backgrounds
 - Offers excellent value and accessibility in higher education
 - Has strong programs across multiple disciplines
@@ -2104,7 +2174,7 @@ FOLLOW-UP QUESTION PRINCIPLES:
 **Natural Conversation Flow:**
 - Reference something specific they just mentioned
 - Show genuine curiosity about their experience
-- Use warm, engaging language ("That's fascinating..." "I'm curious...")
+- Use warm, engaging language ("That's fascinating..." "I'm curious about...")
 - Make it feel like you're truly interested, not interrogating
 
 **Strategic Purpose:**
@@ -2151,7 +2221,6 @@ Return a JSON object:
 Make this feel like the kind of follow-up question a caring mentor or favorite teacher would ask - genuinely interested in understanding the student better.
 
 No additional text - just the JSON object.`;
-
     const response_api = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {

@@ -1,3 +1,27 @@
+export interface VoiceMetrics {
+  speechRate: number;        // Words per minute
+  fluencyScore: number;      // 0-100 score based on flow and smoothness
+  voiceConfidence: number;   // 0-100 based on vocal characteristics
+  deliveryScore: number;     // 0-100 based on pacing and rhythm
+  clarityScore: number;      // 0-100 based on articulation and pronunciation
+  fillerWordCount: number;   // Count of filler words (um, uh, like, etc.)
+  pauseAnalysis: {
+    averagePauseLength: number;
+    pauseFrequency: number;
+    strategicPauses: number;
+  };
+  pitchAnalysis: {
+    averagePitch: number;
+    pitchVariation: number;
+    pitchStability: number;
+  };
+  energyAnalysis: {
+    averageEnergy: number;
+    energyConsistency: number;
+    dynamicRange: number;
+  };
+}
+
 export interface CollegeInterviewSetup {
   schoolType: string;
   program: string;
@@ -96,7 +120,8 @@ export interface InterviewResponse {
   questionId: string;
   response: string;
   audioBlob?: Blob; // Store audio for speech analysis
-  speechMetrics?: SpeechMetrics; // Detailed speech analysis
+  speechMetrics?: SpeechMetrics; // Detailed speech analysis (legacy)
+  voiceMetrics?: VoiceMetrics; // New advanced voice metrics
   analysis?: {
     score: number;
     feedback: string;
@@ -133,15 +158,6 @@ export interface InterviewHistory {
     voiceStability: number;
   };
   interviewType?: string; // 'technical', 'behavioral', etc. for focused interviews
-  // College interview specific metrics
-  metrics?: {
-    authenticity?: number;
-    passion?: number;
-    clarity?: number;
-    specificity?: number;
-    schoolKnowledge?: number;
-    personalGrowth?: number;
-  };
 }
 
 export interface AIInterviewerState {

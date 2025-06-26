@@ -611,19 +611,51 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       if (speechMetrics && speechMetrics.length > 0) {
         const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
         if (validMetrics.length > 0) {
+          // Calculate averages for the new VoiceMetrics structure
+          const avgSpeechRate = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2));
+          const avgFluencyScore = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length);
+          const avgVoiceConfidence = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length);
+          const avgDeliveryScore = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.deliveryScore || 0), 0) / validMetrics.length);
+          const avgClarityScore = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarityScore || 0), 0) / validMetrics.length);
+          const totalFillerWords = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length);
+          
+          // Calculate average pause analysis
+          const avgPauseLength = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.pauseAnalysis?.averagePauseLength || 0), 0) / validMetrics.length).toFixed(2));
+          const avgPauseFrequency = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.pauseAnalysis?.pauseFrequency || 0), 0) / validMetrics.length).toFixed(1));
+          const avgStrategicPauses = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseAnalysis?.strategicPauses || 0), 0) / validMetrics.length);
+          
+          // Calculate average pitch analysis
+          const avgPitch = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pitchAnalysis?.averagePitch || 0), 0) / validMetrics.length);
+          const avgPitchVariation = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.pitchAnalysis?.pitchVariation || 0), 0) / validMetrics.length).toFixed(1));
+          const avgPitchStability = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pitchAnalysis?.pitchStability || 0), 0) / validMetrics.length);
+          
+          // Calculate average energy analysis
+          const avgEnergy = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.energyAnalysis?.averageEnergy || 0), 0) / validMetrics.length).toFixed(3));
+          const avgEnergyConsistency = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.energyAnalysis?.energyConsistency || 0), 0) / validMetrics.length);
+          const avgDynamicRange = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.energyAnalysis?.dynamicRange || 0), 0) / validMetrics.length).toFixed(3));
+          
           voiceMetrics = {
-            speechRate: Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2)),
-            fluencyScore: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length),
-            voiceConfidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length),
-            fillerWordCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length),
-            averageVolume: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / validMetrics.length),
-            delivery: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / validMetrics.length),
-            clarity: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / validMetrics.length),
-            confidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.confidence || m.voiceConfidence || 0), 0) / validMetrics.length),
-            paceConsistency: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.paceConsistency || 0), 0) / validMetrics.length),
-            repetitionCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.repetitionCount || 0), 0) / validMetrics.length),
-            pauseRatio: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseRatio || 0), 0) / validMetrics.length),
-            estimatedPitch: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.estimatedPitch || 0), 0) / validMetrics.length)
+            speechRate: avgSpeechRate,
+            fluencyScore: avgFluencyScore,
+            voiceConfidence: avgVoiceConfidence,
+            deliveryScore: avgDeliveryScore,
+            clarityScore: avgClarityScore,
+            fillerWordCount: totalFillerWords,
+            pauseAnalysis: {
+              averagePauseLength: avgPauseLength,
+              pauseFrequency: avgPauseFrequency,
+              strategicPauses: avgStrategicPauses
+            },
+            pitchAnalysis: {
+              averagePitch: avgPitch,
+              pitchVariation: avgPitchVariation,
+              pitchStability: avgPitchStability
+            },
+            energyAnalysis: {
+              averageEnergy: avgEnergy,
+              energyConsistency: avgEnergyConsistency,
+              dynamicRange: avgDynamicRange
+            }
           };
         }
       }
@@ -667,19 +699,51 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       if (speechMetrics && speechMetrics.length > 0) {
         const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
         if (validMetrics.length > 0) {
+          // Calculate averages for the new VoiceMetrics structure
+          const avgSpeechRate = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2));
+          const avgFluencyScore = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length);
+          const avgVoiceConfidence = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length);
+          const avgDeliveryScore = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.deliveryScore || 0), 0) / validMetrics.length);
+          const avgClarityScore = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarityScore || 0), 0) / validMetrics.length);
+          const totalFillerWords = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length);
+          
+          // Calculate average pause analysis
+          const avgPauseLength = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.pauseAnalysis?.averagePauseLength || 0), 0) / validMetrics.length).toFixed(2));
+          const avgPauseFrequency = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.pauseAnalysis?.pauseFrequency || 0), 0) / validMetrics.length).toFixed(1));
+          const avgStrategicPauses = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseAnalysis?.strategicPauses || 0), 0) / validMetrics.length);
+          
+          // Calculate average pitch analysis
+          const avgPitch = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pitchAnalysis?.averagePitch || 0), 0) / validMetrics.length);
+          const avgPitchVariation = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.pitchAnalysis?.pitchVariation || 0), 0) / validMetrics.length).toFixed(1));
+          const avgPitchStability = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pitchAnalysis?.pitchStability || 0), 0) / validMetrics.length);
+          
+          // Calculate average energy analysis
+          const avgEnergy = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.energyAnalysis?.averageEnergy || 0), 0) / validMetrics.length).toFixed(3));
+          const avgEnergyConsistency = Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.energyAnalysis?.energyConsistency || 0), 0) / validMetrics.length);
+          const avgDynamicRange = Number((validMetrics.reduce((sum: number, m: any) => sum + (m.energyAnalysis?.dynamicRange || 0), 0) / validMetrics.length).toFixed(3));
+          
           voiceMetrics = {
-            speechRate: Number((validMetrics.reduce((sum: number, m: any) => sum + (m.speechRate || 0), 0) / validMetrics.length).toFixed(2)),
-            fluencyScore: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fluencyScore || 0), 0) / validMetrics.length),
-            voiceConfidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.voiceConfidence || 0), 0) / validMetrics.length),
-            fillerWordCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.fillerWordCount || 0), 0) / validMetrics.length),
-            averageVolume: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.averageVolume || 0), 0) / validMetrics.length),
-            delivery: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.delivery || 0), 0) / validMetrics.length),
-            clarity: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.clarity || 0), 0) / validMetrics.length),
-            confidence: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.confidence || m.voiceConfidence || 0), 0) / validMetrics.length),
-            paceConsistency: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.paceConsistency || 0), 0) / validMetrics.length),
-            repetitionCount: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.repetitionCount || 0), 0) / validMetrics.length),
-            pauseRatio: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.pauseRatio || 0), 0) / validMetrics.length),
-            estimatedPitch: Math.round(validMetrics.reduce((sum: number, m: any) => sum + (m.estimatedPitch || 0), 0) / validMetrics.length)
+            speechRate: avgSpeechRate,
+            fluencyScore: avgFluencyScore,
+            voiceConfidence: avgVoiceConfidence,
+            deliveryScore: avgDeliveryScore,
+            clarityScore: avgClarityScore,
+            fillerWordCount: totalFillerWords,
+            pauseAnalysis: {
+              averagePauseLength: avgPauseLength,
+              pauseFrequency: avgPauseFrequency,
+              strategicPauses: avgStrategicPauses
+            },
+            pitchAnalysis: {
+              averagePitch: avgPitch,
+              pitchVariation: avgPitchVariation,
+              pitchStability: avgPitchStability
+            },
+            energyAnalysis: {
+              averageEnergy: avgEnergy,
+              energyConsistency: avgEnergyConsistency,
+              dynamicRange: avgDynamicRange
+            }
           };
         }
       }

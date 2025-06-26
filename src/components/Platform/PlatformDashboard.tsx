@@ -15,7 +15,8 @@ import {
   AlertCircle,
   GraduationCap,
   Shield,
-  Star
+  Star,
+  Mic
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
 import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
@@ -114,7 +115,8 @@ interface PlatformDashboardProps {
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview, onStartCollegeInterview, onViewInterviewResults }) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
-  const [showAllInterviews, setShowAllInterviews] = useState(false);const [stats, setStats] = useState({
+  const [showAllInterviews, setShowAllInterviews] = useState(false);
+  const [stats, setStats] = useState({
     totalInterviews: 0,
     averageScore: 0,
     totalHours: 0,
@@ -150,7 +152,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
         );
         
         // Only calculate metrics if there are college interviews with metrics data
-        const collegeInterviewsWithMetrics = collegeInterviews.filter(interview => interview.metrics);
+        const collegeInterviewsWithMetrics = collegeInterviews.filter(interview => interview.speechMetricsAverage);
         
         const collegeStats = {
           collegeInterviews: collegeInterviews.length,
@@ -158,10 +160,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
             ? Math.round(collegeInterviews.reduce((sum, interview) => sum + interview.overallScore, 0) / collegeInterviews.length)
             : 0,
           collegeAuthenticity: collegeInterviewsWithMetrics.length > 0
-            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.metrics?.authenticity || 0), 0) / collegeInterviewsWithMetrics.length)
+            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.speechMetricsAverage?.overallConfidence || 0), 0) / collegeInterviewsWithMetrics.length)
             : 0,
           collegePassion: collegeInterviewsWithMetrics.length > 0
-            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.metrics?.passion || 0), 0) / collegeInterviewsWithMetrics.length)
+            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.speechMetricsAverage?.fluencyScore || 0), 0) / collegeInterviewsWithMetrics.length)
             : 0
         };
         

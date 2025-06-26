@@ -17,8 +17,7 @@ import {
   BarChart3,
   Volume2,
   Mic,
-  Repeat,
-  Pause
+  AlertCircle
 } from 'lucide-react';
 
 // Utility function to format category labels
@@ -93,14 +92,10 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
 
   // Debug logging
   console.log('CollegeInterviewResults: Received sessionData:', sessionData);
-
-  // Ensure metrics exist with default values
-  const metrics = sessionData.metrics || {
-    authenticity: 7,
-    passion: 7,
-    clarity: 7,
-    specificity: 7
-  };
+  console.log('CollegeInterviewResults: sessionData.setup:', sessionData.setup);
+  console.log('CollegeInterviewResults: sessionData.speechMetrics:', sessionData.speechMetrics);
+  console.log('CollegeInterviewResults: sessionData.voice_metrics_summary:', sessionData.voice_metrics_summary);
+  console.log('CollegeInterviewResults: sessionData.speech_metrics:', sessionData.speech_metrics);
   // Handle setup data structure - support both college format and converted format
   const rawSetup = sessionData.setup || {};
   let normalizedSetup;
@@ -128,7 +123,6 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
   // Ensure other required fields exist
   const safeSessionData = {
     ...sessionData,
-    metrics,
     overallScore: sessionData.overallScore || 70,
     responses: sessionData.responses || [],
     questions: sessionData.questions || [],
@@ -179,20 +173,51 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
         high: "Great use of specific examples and details to support your points.",
         medium: "Add more concrete examples to illustrate your experiences.",
         low: "Practice using specific stories and examples rather than general statements."
-      },      'speaking pace': {
-        high: "Excellent speaking pace - you speak at an ideal rhythm for interviews.",
-        medium: "Your speaking pace is good, but try to vary it for emphasis.",
-        low: "Work on speaking at a more natural, conversational pace."
+      },
+      'speech rate': {
+        high: "Perfect speaking pace - you speak at an ideal rhythm for interviews.",
+        medium: "Good speaking pace, try to maintain consistency throughout.",
+        low: "Adjust your speaking pace - aim for 140-170 words per minute."
       },
       'fluency': {
-        high: "Excellent fluency - you speak smoothly with minimal hesitations.",
-        medium: "Good fluency, but work on reducing filler words and hesitations.",
-        low: "Focus on speaking more smoothly and reducing pauses and fillers."
+        high: "Outstanding fluency - you speak smoothly with excellent flow.",
+        medium: "Good fluency, work on reducing minor hesitations.",
+        low: "Focus on speaking more smoothly and reducing filler words."
       },
       'voice confidence': {
-        high: "Excellent voice confidence - you project authority and are engaging to listen to.",
-        medium: "Good voice confidence, but work on projecting more authority.",
-        low: "Focus on speaking with more confidence and conviction."
+        high: "Excellent vocal confidence - you sound authoritative and engaging.",
+        medium: "Good voice confidence, project more conviction in your tone.",
+        low: "Work on speaking with more confidence and stronger vocal presence."
+      },
+      'delivery': {
+        high: "Outstanding delivery - your pacing and rhythm are perfect for interviews.",
+        medium: "Good delivery, focus on maintaining consistent energy levels.",
+        low: "Work on your vocal delivery and speaking rhythm."
+      },
+      'vocal clarity': {
+        high: "Excellent vocal clarity - you articulate words clearly and precisely.",
+        medium: "Good clarity, focus on enunciating key words more clearly.",
+        low: "Practice speaking more clearly and improving your articulation."
+      },
+      'filler words': {
+        high: "Excellent - you avoid filler words and speak with precision.",
+        medium: "Good control of filler words, continue reducing 'um' and 'uh'.",
+        low: "Focus on reducing filler words like 'um', 'uh', and 'like'."
+      },
+      'pitch stability': {
+        high: "Great pitch control - your voice has natural, engaging variation.",
+        medium: "Good pitch stability, work on adding more vocal expression.",
+        low: "Practice varying your pitch to sound more engaging and confident."
+      },
+      'energy consistency': {
+        high: "Excellent energy consistency - you maintain engagement throughout.",
+        medium: "Good energy levels, focus on maintaining enthusiasm consistently.",
+        low: "Work on maintaining consistent vocal energy and enthusiasm."
+      },
+      'pause pattern': {
+        high: "Perfect use of pauses - you use strategic pauses effectively.",
+        medium: "Good pause timing, continue using pauses for emphasis.",
+        low: "Practice using strategic pauses to enhance your communication."
       }
     };
 
@@ -319,6 +344,31 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
   const majorAdvice = getMajorAdvice(safeSessionData.setup.program);
   const nextSteps = getNextSteps(safeSessionData.overallScore);
 
+  // Helper to aggregate from speech_metrics array if summary is missing
+  function getVoiceMetricsSummary(session: any) {
+    if (session.voice_metrics_summary) return session.voice_metrics_summary;
+    if (!Array.isArray(session.speech_metrics) || session.speech_metrics.length === 0) return null;
+    const metricsList = session.speech_metrics.map((sm: any) => sm.metrics).filter(Boolean);
+    const count = metricsList.length;
+    if (count === 0) return null;
+    const sum = metricsList.reduce((acc: any, m: any) => ({
+      speechRate: (acc.speechRate || 0) + (m.speechRate || 0),
+      fluencyScore: (acc.fluencyScore || 0) + (m.fluencyScore || 0),
+      voiceConfidence: (acc.voiceConfidence || 0) + (m.voiceConfidence || 0),
+      deliveryScore: (acc.deliveryScore || 0) + (m.deliveryScore || 0),
+      clarityScore: (acc.clarityScore || 0) + (m.clarityScore || 0),
+      fillerWordCount: (acc.fillerWordCount || 0) + (m.fillerWordCount || 0),
+    }), {});
+    return {
+      speechRate: Math.round(sum.speechRate / count),
+      fluencyScore: Math.round(sum.fluencyScore / count),
+      voiceConfidence: Math.round(sum.voiceConfidence / count),
+      deliveryScore: Math.round(sum.deliveryScore / count),
+      clarityScore: Math.round(sum.clarityScore / count),
+      fillerWordCount: Math.round(sum.fillerWordCount / count),
+    };
+  }
+
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">
@@ -386,7 +436,7 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Performance Metrics */}
+            {/* Interview Performance Metrics - College Interview Fundamentals */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -395,57 +445,41 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
             >
               <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
                 <BarChart3 className="w-5 h-5 text-purple-400" />
-                Interview Performance Metrics
+                College Interview Performance
               </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">                {(() => {
-                  const baseMetrics = [
-                    { name: 'Authenticity', score: safeSessionData.metrics.authenticity, icon: Heart, color: 'from-red-500 to-pink-500' },
-                    { name: 'Passion', score: safeSessionData.metrics.passion, icon: Star, color: 'from-yellow-500 to-orange-500' },
-                    { name: 'Clarity', score: safeSessionData.metrics.clarity, icon: MessageCircle, color: 'from-blue-500 to-cyan-500' },
-                    { name: 'Specificity', score: safeSessionData.metrics.specificity, icon: Target, color: 'from-green-500 to-emerald-500' }
-                  ];                  // Add voice metrics if available (for voice mode interviews)
-                  const voiceMetrics = [];
-                  if (safeSessionData.setup.interviewMode === 'voice' && safeSessionData.voiceMetrics) {
-                    if (safeSessionData.voiceMetrics.speechRate !== undefined) {
-                      // Convert speech rate to a 0-10 scale (assuming 150 WPM is optimal = 10)
-                      const speechRateScore = Math.min(10, Math.max(0, Math.round((safeSessionData.voiceMetrics.speechRate / 150) * 10)));
-                      voiceMetrics.push({ name: 'Speaking Pace', score: speechRateScore, icon: TrendingUp, color: 'from-purple-500 to-violet-500' });
-                    }
-                    if (safeSessionData.voiceMetrics.fluencyScore !== undefined) {
-                      // Convert fluency score from 0-100 to 0-10 scale
-                      const fluencyScore = Math.round((safeSessionData.voiceMetrics.fluencyScore / 100) * 10);
-                      voiceMetrics.push({ name: 'Fluency', score: fluencyScore, icon: Volume2, color: 'from-indigo-500 to-blue-500' });
-                    }
-                    if (safeSessionData.voiceMetrics.voiceConfidence !== undefined) {
-                      // Voice confidence is already on 0-100 scale, convert to 0-10
-                      const confidenceScore = Math.round((safeSessionData.voiceMetrics.voiceConfidence / 100) * 10);
-                      voiceMetrics.push({ name: 'Voice Confidence', score: confidenceScore, icon: Mic, color: 'from-teal-500 to-cyan-500' });
-                    }
-                    // New metrics
-                    if (safeSessionData.voiceMetrics.delivery !== undefined) {
-                      voiceMetrics.push({ name: 'Delivery', score: safeSessionData.voiceMetrics.delivery, icon: CheckCircle, color: 'from-green-500 to-lime-500' });
-                    }
-                    if (safeSessionData.voiceMetrics.clarity !== undefined) {
-                      voiceMetrics.push({ name: 'Vocal Clarity', score: safeSessionData.voiceMetrics.clarity, icon: MessageCircle, color: 'from-blue-400 to-cyan-400' });
-                    }
-                    if (safeSessionData.voiceMetrics.confidence !== undefined) {
-                      voiceMetrics.push({ name: 'Spoken Confidence', score: safeSessionData.voiceMetrics.confidence, icon: Star, color: 'from-yellow-400 to-orange-400' });
-                    }
-                    if (safeSessionData.voiceMetrics.paceConsistency !== undefined) {
-                      voiceMetrics.push({ name: 'Pace Consistency', score: safeSessionData.voiceMetrics.paceConsistency, icon: TrendingUp, color: 'from-pink-500 to-fuchsia-500' });
-                    }
-                    if (safeSessionData.voiceMetrics.repetitionCount !== undefined) {
-                      voiceMetrics.push({ name: 'Repetition', score: safeSessionData.voiceMetrics.repetitionCount, icon: Repeat, color: 'from-amber-500 to-yellow-500' });
-                    }
-                    if (safeSessionData.voiceMetrics.pauseRatio !== undefined) {
-                      voiceMetrics.push({ name: 'Pause Ratio', score: safeSessionData.voiceMetrics.pauseRatio, icon: Pause, color: 'from-gray-500 to-slate-500' });
-                    }
-                    if (safeSessionData.voiceMetrics.estimatedPitch !== undefined) {
-                      voiceMetrics.push({ name: 'Pitch', score: safeSessionData.voiceMetrics.estimatedPitch, icon: Volume2, color: 'from-indigo-400 to-blue-400' });
-                    }
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {(() => {
+                  // Calculate actual scores from response analysis
+                  const responses = safeSessionData.responses || [];
+                  const validResponses = responses.filter((r: any) => r.analysis);
+                  
+                  if (validResponses.length === 0) {
+                    // Fallback to default scores if no analysis data
+                    return [
+                      { name: 'Authenticity', score: 5, icon: Heart, color: 'from-red-500 to-pink-500' },
+                      { name: 'Passion', score: 5, icon: Star, color: 'from-yellow-500 to-orange-500' },
+                      { name: 'Clarity', score: 5, icon: MessageCircle, color: 'from-blue-500 to-cyan-500' },
+                      { name: 'Specificity', score: 5, icon: Target, color: 'from-green-500 to-emerald-500' }
+                    ];
                   }
-
-                  return [...baseMetrics, ...voiceMetrics];
+                  
+                  // Calculate average scores for each metric
+                  const authenticityScores = validResponses.map((r: any) => r.analysis.authenticity || 0);
+                  const passionScores = validResponses.map((r: any) => r.analysis.passion || 0);
+                  const clarityScores = validResponses.map((r: any) => r.analysis.clarity || 0);
+                  const specificityScores = validResponses.map((r: any) => r.analysis.specificity || 0);
+                  
+                  const avgAuthenticity = Math.round(authenticityScores.reduce((a: number, b: number) => a + b, 0) / authenticityScores.length);
+                  const avgPassion = Math.round(passionScores.reduce((a: number, b: number) => a + b, 0) / passionScores.length);
+                  const avgClarity = Math.round(clarityScores.reduce((a: number, b: number) => a + b, 0) / clarityScores.length);
+                  const avgSpecificity = Math.round(specificityScores.reduce((a: number, b: number) => a + b, 0) / specificityScores.length);
+                  
+                  return [
+                    { name: 'Authenticity', score: avgAuthenticity, icon: Heart, color: 'from-red-500 to-pink-500' },
+                    { name: 'Passion', score: avgPassion, icon: Star, color: 'from-yellow-500 to-orange-500' },
+                    { name: 'Clarity', score: avgClarity, icon: MessageCircle, color: 'from-blue-500 to-cyan-500' },
+                    { name: 'Specificity', score: avgSpecificity, icon: Target, color: 'from-green-500 to-emerald-500' }
+                  ];
                 })().map((metric, index) => (
                   <motion.div
                     key={metric.name}
@@ -482,6 +516,181 @@ const CollegeInterviewResults: React.FC<CollegeInterviewResultsProps> = ({
                 ))}
               </div>
             </motion.div>
+
+            {/* Voice Analysis Section - Only show for voice interviews */}
+            {/* Advanced Voice Analysis - 6 Core Voice Metrics */}
+            {(() => {
+              // Check multiple possible locations for voice metrics
+              const hasVoiceMetrics = 
+                (Array.isArray(safeSessionData.speechMetrics) && safeSessionData.speechMetrics.length > 0 && (safeSessionData.speechMetrics[0].metrics || safeSessionData.speechMetrics[0])) ||
+                safeSessionData.voice_metrics_summary ||
+                (Array.isArray(safeSessionData.speech_metrics) && safeSessionData.speech_metrics.length > 0);
+              
+              console.log('Voice metrics check:', {
+                interviewMode: safeSessionData.setup.interviewMode,
+                hasSpeechMetrics: Array.isArray(safeSessionData.speechMetrics) && safeSessionData.speechMetrics.length > 0,
+                speechMetricsFirstElement: safeSessionData.speechMetrics?.[0],
+                hasVoiceMetricsSummary: !!safeSessionData.voice_metrics_summary,
+                hasSpeechMetricsArray: Array.isArray(safeSessionData.speech_metrics) && safeSessionData.speech_metrics.length > 0,
+                hasVoiceMetrics
+              });
+              
+              return safeSessionData.setup.interviewMode === 'voice' && hasVoiceMetrics;
+            })() && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+              >
+                <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+                  <Mic className="w-5 h-5 text-green-400" />
+                  Advanced Voice Analysis
+                  <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
+                    Voice Interview Optimized
+                  </span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(() => {
+                    // Robustly extract the metrics object, unwrapping arrays recursively
+                    function extractMetrics(obj: any) {
+                      let current = obj;
+                      // Unwrap arrays until we get an object
+                      while (Array.isArray(current) && current.length > 0) {
+                        current = current[0];
+                      }
+                      // If the object has a 'metrics' property, use it
+                      if (current && typeof current === 'object' && current.metrics) {
+                        return current.metrics;
+                      }
+                      return current || {};
+                    }
+                    const metricsObj = extractMetrics(
+                      safeSessionData.speechMetrics?.[0]?.metrics ||
+                      safeSessionData.speechMetrics?.[0] ||
+                      safeSessionData.voice_metrics_summary ||
+                      safeSessionData.speech_metrics?.[0]?.metrics ||
+                      safeSessionData.speech_metrics?.[0] ||
+                      {}
+                    );
+                    console.log('Using voice metrics from:', metricsObj);
+                    const voiceMetrics = [];
+                    // 1. Speech Rate (/10, ideal 140-170 WPM)
+                    if (metricsObj.speechRate !== undefined) {
+                      // Clamp speech rate to realistic range (80-180 WPM) for display
+                      const clampedSpeechRate = Math.max(80, Math.min(180, metricsObj.speechRate));
+                      const speechRateScore = Math.min(10, Math.max(0, 
+                        clampedSpeechRate >= 140 && clampedSpeechRate <= 170 
+                          ? Math.round(8 + (clampedSpeechRate - 140) / 30 * 2)
+                          : Math.round((clampedSpeechRate / 150) * 8)
+                      ));
+                      voiceMetrics.push({ 
+                        name: 'Speech Rate', 
+                        score: speechRateScore, 
+                        icon: TrendingUp, 
+                        color: 'from-purple-500 to-violet-500',
+                        detail: `${Math.round(clampedSpeechRate)} WPM`
+                      });
+                    }
+                    // 2. Fluency (/10)
+                    if (metricsObj.fluencyScore !== undefined) {
+                      const clampedFluencyScore = Math.max(0, Math.min(100, metricsObj.fluencyScore));
+                      const fluencyScore = Math.round((clampedFluencyScore / 100) * 10);
+                      voiceMetrics.push({ 
+                        name: 'Fluency', 
+                        score: fluencyScore, 
+                        icon: Volume2, 
+                        color: 'from-indigo-500 to-blue-500',
+                        detail: `${clampedFluencyScore}% fluency`
+                      });
+                    }
+                    // 3. Voice Confidence (/10)
+                    if (metricsObj.voiceConfidence !== undefined) {
+                      const clampedConfidence = Math.max(0, Math.min(100, metricsObj.voiceConfidence));
+                      const confidenceScore = Math.round((clampedConfidence / 100) * 10);
+                      voiceMetrics.push({ 
+                        name: 'Voice Confidence', 
+                        score: confidenceScore, 
+                        icon: Mic, 
+                        color: 'from-teal-500 to-cyan-500',
+                        detail: `${clampedConfidence}% confidence`
+                      });
+                    }
+                    // 4. Delivery Score (/10)
+                    if (metricsObj.deliveryScore !== undefined) {
+                      const clampedDeliveryScore = Math.max(0, Math.min(100, metricsObj.deliveryScore));
+                      const deliveryScore = Math.round((clampedDeliveryScore / 100) * 10);
+                      voiceMetrics.push({ 
+                        name: 'Delivery', 
+                        score: deliveryScore, 
+                        icon: CheckCircle, 
+                        color: 'from-green-500 to-lime-500',
+                        detail: `${clampedDeliveryScore}% delivery`
+                      });
+                    }
+                    // 5. Clarity Score (/10)
+                    if (metricsObj.clarityScore !== undefined) {
+                      const clampedClarityScore = Math.max(0, Math.min(100, metricsObj.clarityScore));
+                      const clarityScore = Math.round((clampedClarityScore / 100) * 10);
+                      voiceMetrics.push({ 
+                        name: 'Clarity', 
+                        score: clarityScore, 
+                        icon: MessageCircle, 
+                        color: 'from-blue-400 to-cyan-400',
+                        detail: `${clampedClarityScore}% clarity`
+                      });
+                    }
+                    // 6. Filler Words (/10, lower is better)
+                    if (metricsObj.fillerWordCount !== undefined) {
+                      const clampedFillerCount = Math.max(0, Math.min(50, metricsObj.fillerWordCount));
+                      const fillerScore = Math.max(0, Math.min(10, 10 - Math.floor(clampedFillerCount / 2)));
+                      voiceMetrics.push({ 
+                        name: 'Filler Words', 
+                        score: fillerScore, 
+                        icon: AlertCircle, 
+                        color: 'from-amber-500 to-yellow-500',
+                        detail: `${clampedFillerCount} filler words`
+                      });
+                    }
+                    return voiceMetrics;
+                  })().map((metric, index) => (
+                    <motion.div
+                      key={metric.name}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
+                          <metric.icon className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-white">{metric.name}</span>
+                            <span className="text-lg font-semibold text-white">{metric.score}/10</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mb-3">
+                        <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${metric.score * 10}%` }}
+                            transition={{ duration: 1.5, delay: 0.4 + index * 0.1 }}
+                            className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-400">{metric.detail}</p>
+                        <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {/* Interview Breakdown - Compact Layout */}
             <motion.div
