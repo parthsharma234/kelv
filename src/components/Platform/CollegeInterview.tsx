@@ -303,18 +303,18 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       }
     };
   }, []);
-  // Timer effect - 5 minute limit with natural conclusion
+  // Timer effect - 2-3 minute limit with natural conclusion
   useEffect(() => {
     if (hasStartedInterview && startTime) {
       const interval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
         setTimeElapsed(elapsed);
         
-        // Check if we're approaching the 5-minute mark (300 seconds)
-        if (elapsed >= 300) {
+        // Check if we're approaching the 3-minute mark (180 seconds)
+        if (elapsed >= 180) {
           completeInterview(responses);
-        } else if (elapsed >= 240 && !isAnalyzing) {
-          // At 4 minutes, start wrapping up if not already analyzing
+        } else if (elapsed >= 150 && !isAnalyzing) {
+          // At 2.5 minutes, start wrapping up if not already analyzing
           // The AI will naturally conclude the interview
         }
       }, 1000);
@@ -660,10 +660,10 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
       setResponses(updatedResponses);
       setUserResponse('');
 
-      // Check if we should continue or wrap up (5 minutes = 300 seconds)
+      // Check if we should continue or wrap up (3 minutes = 180 seconds)
       const elapsedTime = startTime ? (Date.now() - startTime.getTime()) / 1000 : 0;
       
-      if (elapsedTime >= 300) {
+      if (elapsedTime >= 180) {
         // Time's up - complete the interview
         await completeInterview(updatedResponses);
         return;
@@ -948,11 +948,11 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
           {hasStartedInterview && (
             <>
               <div className="flex items-center space-x-2">
-                <Clock className={`w-4 h-4 ${timeElapsed >= 240 ? 'text-orange-400' : 'text-purple-500'}`} />
-                <span className={`font-medium ${timeElapsed >= 240 ? 'text-orange-400' : 'text-white'}`}>
-                  {formatTime(timeElapsed)} / 5:00
+                <Clock className={`w-4 h-4 ${timeElapsed >= 150 ? 'text-orange-400' : 'text-purple-500'}`} />
+                <span className={`font-medium ${timeElapsed >= 150 ? 'text-orange-400' : 'text-white'}`}>
+                  {formatTime(timeElapsed)} / 3:00
                 </span>
-                {timeElapsed >= 240 && (
+                {timeElapsed >= 150 && (
                   <span className="text-xs text-orange-400 animate-pulse">
                     (Wrapping up)
                   </span>
@@ -1102,7 +1102,7 @@ const CollegeInterview: React.FC<CollegeInterviewProps> = ({
                     Session Details:
                   </h4>
                   <ul className="text-xs text-gray-400 space-y-1">
-                    <li>• Duration: 5 minutes</li>
+                    <li>• Duration: 2-3 minutes</li>
                     <li>• Questions: AI-generated based on responses</li>
                     <li>• Focus: {setup.major} at {setup.schoolType.replace('-', ' ')} institutions</li>
                     <li>• {isVoiceMode ? 'Voice interaction with speech analysis' : 'Text-based responses'}</li>
