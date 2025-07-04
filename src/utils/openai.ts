@@ -846,6 +846,33 @@ NATURAL CONVERSATION TECHNIQUES:
 - Probe deeper when they mention achievements or challenges
 - Connect their experiences to the role requirements
 
+ADVANCED INTERVIEWING TECHNIQUES:
+
+CANDIDATE PROFILE BUILDING:
+- Build on emerging themes from previous responses
+- Identify and explore unique perspectives or experiences
+- Look for patterns in values, motivations, and decision-making
+- Assess growth mindset and learning orientation
+
+CONTEXTUAL CROSS-REFERENCING:
+- "Earlier you mentioned [X], how does that connect to [current topic]?"
+- "I'm noticing a pattern of [theme] in your responses. Is that accurate?"
+- "Building on what you shared about [previous topic], how would you apply that to [new scenario]?"
+- Reference specific examples or achievements they've mentioned
+
+SOCRATIC QUESTIONING FOR DEEPER INSIGHT:
+- "What led you to that approach/conclusion?"
+- "How might someone who disagrees with you view this situation?"
+- "What assumptions were you making in that situation?"
+- "How has your thinking about this evolved over time?"
+- "What would you do differently if faced with a similar situation?"
+
+PERSONALIZED WRAP-UP PREPARATION:
+- Identify key strengths to highlight in eventual summary
+- Note areas for growth that could be addressed constructively
+- Consider how their profile fits with role requirements
+- Prepare to connect their unique value proposition to institutional needs
+
 INDUSTRY-SPECIFIC FOCUS:
 ${getIndustryContext(setup.industry)}
 
@@ -1009,6 +1036,28 @@ CULTURAL FIT (10%):
 - Values alignment with company culture
 - Team collaboration indicators
 - Problem-solving approach
+
+ADVANCED ANALYSIS TECHNIQUES:
+
+CANDIDATE PROFILE BUILDING:
+- Extract key themes, values, and motivations from this response
+- Identify unique perspectives or experiences revealed
+- Note patterns in communication style and thought processes
+- Assess growth mindset and learning orientation indicators
+
+CONTEXTUAL CROSS-REFERENCING:
+${previousResponses.length > 0 ? `
+Previous response themes to consider:
+${previousResponses.slice(-3).map((r, i) => `${i + 1}. "${r.response.substring(0, 100)}..." (Score: ${r.analysis?.score || 'N/A'})`).join('\n')}
+
+Look for consistency, evolution, or contradictions in themes, values, or examples mentioned.
+` : 'This is the first response - establish baseline profile.'}
+
+SOCRATIC EVALUATION:
+- What assumptions might the candidate be making?
+- What underlying values or principles are guiding their thinking?
+- How might they respond to gentle challenges or alternative perspectives?
+- What follow-up questions would reveal deeper insights?
 
 SCORING RUBRIC FOR ${setup.experienceLevel}:
 9-10: Exceptional - Specific examples, quantifiable results, clear structure, highly relevant, shows deep understanding
@@ -1600,29 +1649,36 @@ INTERVIEW OBJECTIVES:
 7. Assess communication skills and ability to think on their feet
 
 QUESTION GENERATION STRATEGY:
-Create a carefully sequenced interview that:
+Create a carefully sequenced interview that builds a comprehensive candidate profile and adapts dynamically:
 
 **OPENING (Questions 1-2)**: Warm, accessible questions that help the student relax
 - Start with broad, comfortable topics (background, interests)
 - Build rapport and encourage natural conversation
 - Assess basic communication skills and confidence
+- Begin building candidate profile: interests, background, communication style
 
-**EXPLORATION (Questions 3-6)**: Deeper dive into key areas
+**EXPLORATION (Questions 3-6)**: Deeper dive into key areas with adaptive questioning
 - Academic passion and intellectual engagement
 - Personal growth through challenges or failures
 - School knowledge and authentic interest ("Why us?")
 - Values and character through specific experiences
+- Use Socratic questioning to probe deeper into responses
+- Cross-reference earlier answers to build coherent narrative
 
-**INSIGHT (Questions 7-8)**: More sophisticated questions requiring reflection
+**INSIGHT (Questions 7-8)**: Sophisticated questions requiring deep reflection
 - Future vision and goal articulation
 - Ethical reasoning or hypothetical scenarios
 - Unique perspectives and potential contributions
 - Leadership philosophy or collaborative experiences
+- Challenge assumptions with thoughtful follow-ups
+- Reference candidate's earlier statements to explore consistency and growth
 
-**CLOSING (Questions 9-10)**: Memorable and forward-looking
+**CLOSING (Questions 9-10)**: Personalized wrap-up and forward-looking
 - What questions do they have for you?
 - Final chance to share something important
 - Vision for their college experience
+- Provide personalized summary of strengths and growth areas
+- Connect their profile to institutional fit and next steps
 
 QUESTION CRAFTING PRINCIPLES:
 
@@ -1644,6 +1700,9 @@ ${setup.interviewMode === 'voice' ?
 3. **School-Specific**: Include questions that show research about your institution
 4. **Growth-Oriented**: Focus on learning, development, and future potential
 5. **Authentic Voice**: Sound like a genuine conversation, not an interrogation
+6. **Socratic Method**: Use probing, open-ended questions that challenge assumptions and encourage deep reflection
+7. **Cross-Referencing**: Reference earlier responses to build coherent narrative ("Earlier you mentioned X, how does that connect to Y?")
+8. **Profile Building**: Continuously update understanding of candidate's interests, values, and potential fit
 
 **Question Types to Include (8-10 total):**
 - Academic passion and intellectual curiosity (2 questions)
@@ -1969,6 +2028,10 @@ EFFECTIVE QUESTIONING TECHNIQUES:
 - Probe for specifics: "Can you give me a concrete example?"
 - Explore learning: "What did that experience teach you?"
 - Connect to future: "How do you see that playing out in college?"
+- **Socratic Probing**: "What assumptions are you making here?" "How did you come to that conclusion?"
+- **Cross-Reference**: "Earlier you mentioned [X], how does that relate to what you're sharing now?"
+- **Challenge Gently**: "Have you ever considered an alternative perspective on that?"
+- **Build Profile**: Use responses to understand candidate's values, motivations, and potential contributions
 
 KEY EVALUATION AREAS:
 
@@ -2001,6 +2064,33 @@ KEY EVALUATION AREAS:
 - Active listening and engagement in conversation
 - Appropriate depth and insight in responses
 - Comfort with intellectual discussion
+
+**ADVANCED INTERVIEWING TECHNIQUES:**
+
+**Candidate Profile Building**: Throughout the interview, continuously build and update a mental model of the candidate:
+- Core values and motivations
+- Academic passions and intellectual curiosities
+- Leadership style and collaborative approach
+- Unique experiences and perspectives
+- Growth mindset and learning orientation
+- Institutional fit indicators
+
+**Contextual Cross-Referencing**: Actively reference and connect earlier responses:
+- "You mentioned earlier that [X] was meaningful to you. How does that connect to your interest in [Y]?"
+- "I'm hearing themes of [pattern] throughout our conversation. Is that accurate?"
+- "Building on what you shared about [previous topic], how would you apply that thinking to [new scenario]?"
+
+**Socratic Questioning for Deep Reflection**: 
+- Challenge assumptions gently: "What led you to that conclusion?"
+- Explore alternative perspectives: "How might someone who disagrees with you view this?"
+- Probe underlying values: "What principles guided your decision-making there?"
+- Encourage metacognition: "How has your thinking about this evolved over time?"
+
+**Personalized Interview Conclusion**:
+- Summarize key strengths observed during the conversation
+- Identify specific growth opportunities and next steps
+- Connect candidate's profile to institutional fit and potential contributions
+- Provide encouraging, constructive feedback that feels personal and valuable
 
 QUESTION CATEGORIES & PURPOSES:
 
@@ -2122,6 +2212,42 @@ EVALUATION FRAMEWORK FOR COLLEGE INTERVIEWS:
 - Realistic expectations about the college experience
 - Alignment between their goals and institutional offerings
 
+ADVANCED ANALYSIS TECHNIQUES:
+
+**CANDIDATE PROFILE BUILDING:**
+- Extract core values and motivations revealed in this response
+- Identify unique perspectives, experiences, or backgrounds
+- Note patterns in thinking style and decision-making approach
+- Assess evidence of growth mindset and resilience
+- Consider how their story contributes to campus diversity
+
+**SOCRATIC EVALUATION:**
+- What underlying assumptions or values guide their thinking?
+- How do they handle complexity, ambiguity, or challenge?
+- What questions might reveal deeper insights about their character?
+- How might they respond to intellectual challenges or alternative viewpoints?
+- What does their response reveal about their readiness for college-level discourse?
+
+**CROSS-REFERENCING POTENTIAL:**
+- What themes or experiences could be explored in follow-up questions?
+- How does this response connect to their stated academic interests?
+- What aspects of their background deserve deeper exploration?
+- Where might there be opportunities to assess consistency or growth?
+
+**COMMUNICATION SKILLS (15%)**
+- Clear, organized, and articulate expression
+- Appropriate depth and detail for the question
+- ${setup.interviewMode === 'voice' ? 'Natural conversational flow and verbal fluency' : 'Well-structured written communication'}
+- Engaging storytelling that holds listener's attention
+- Professional yet personable tone
+
+**INSTITUTIONAL FIT (10%)**
+- Demonstrates research and genuine interest in the school
+- Shows understanding of campus culture and values
+- Articulates how they would contribute to the community
+- Realistic expectations about the college experience
+- Alignment between their goals and institutional offerings
+
 SCORING GUIDELINES:
 - 9-10: Exceptional response that would impress any admissions officer
 - 8: Strong response that clearly demonstrates college readiness
@@ -2224,6 +2350,32 @@ STUDENT'S LATEST RESPONSE:
 YOUR GOAL AS INTERVIEWER:
 You want to help this student share their best self while gathering insights about their potential fit and contribution to your campus community. This follow-up should feel like a natural continuation of an engaging conversation.
 
+ADVANCED FOLLOW-UP STRATEGIES:
+
+**Candidate Profile Building:**
+- Explore themes, values, or experiences that emerged in their response
+- Understand their unique perspective or background more deeply
+- Assess growth mindset, resilience, and learning orientation
+- Identify potential contributions to campus community
+
+**Contextual Cross-Referencing:**
+- "Earlier you mentioned [X], and now you're talking about [Y] - how do these connect?"
+- "I'm noticing a theme of [pattern] in what you've shared - is that something that drives you?"
+- "This reminds me of what you said about [previous topic] - can you elaborate on that connection?"
+
+**Socratic Questioning for Deeper Insight:**
+- "What led you to that realization/approach?"
+- "How has your thinking about this evolved?"
+- "What assumptions were you making at the time?"
+- "How might someone with a different perspective view that situation?"
+- "What would you do differently if faced with a similar situation now?"
+
+**Personalized Exploration:**
+- Focus on what makes this student unique and interesting
+- Explore experiences that reveal character, values, or potential
+- Understand their authentic motivations and aspirations
+- Assess genuine fit with your institution's culture and opportunities
+
 FOLLOW-UP QUESTION PRINCIPLES:
 
 **Natural Conversation Flow:**
@@ -2270,7 +2422,9 @@ Return a JSON object:
   "type": "follow_up", 
   "category": "Follow-up",
   "followUpPotential": true,
-  "reasoning": "Brief explanation of what this follow-up aims to explore based on their response"
+  "reasoning": "Brief explanation of what this follow-up aims to explore based on their response",
+  "profileInsights": "Key themes, values, or unique qualities emerging from their responses",
+  "preparingWrapUp": "Notes for eventual personalized summary of their strengths and potential fit"
 }
 
 Make this feel like the kind of follow-up question a caring mentor or favorite teacher would ask - genuinely interested in understanding the student better.
