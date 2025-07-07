@@ -64,6 +64,103 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
     const speechMetrics = sessionData.speechMetrics || {};
     const audioData = sessionData.audioData || {};
 
+<<<<<<< Updated upstream
+=======
+    // --- Aggregate voice metrics from speech_metrics array ---
+    let voiceMetricsSummary = null;
+    if (Array.isArray(sessionData.speech_metrics) && sessionData.speech_metrics.length > 0) {
+      const metricsList = sessionData.speech_metrics.map((sm: any) => sm.metrics).filter(Boolean);
+      const count = metricsList.length;
+      if (count > 0) {
+        const sum = metricsList.reduce((acc: any, m: any) => ({
+          speechRate: (acc.speechRate || 0) + (m.speechRate || 0),
+          fluencyScore: (acc.fluencyScore || 0) + (m.fluencyScore || 0),
+          voiceConfidence: (acc.voiceConfidence || 0) + (m.voiceConfidence || 0),
+          deliveryScore: (acc.deliveryScore || 0) + (m.deliveryScore || 0),
+          clarityScore: (acc.clarityScore || 0) + (m.clarityScore || 0),
+          fillerWordCount: (acc.fillerWordCount || 0) + (m.fillerWordCount || 0),
+        }), {});
+        voiceMetricsSummary = {
+          speechRate: Math.round(sum.speechRate / count),
+          fluencyScore: Math.round(sum.fluencyScore / count),
+          voiceConfidence: Math.round(sum.voiceConfidence / count),
+          deliveryScore: Math.round(sum.deliveryScore / count),
+          clarityScore: Math.round(sum.clarityScore / count),
+          fillerWordCount: Math.round(sum.fillerWordCount / count),
+        };
+      }
+    }
+
+    // Calculate interview metrics based on interview type and responses
+    const calculateInterviewMetrics = (responses: any[], interviewType: string) => {
+      if (!responses || responses.length === 0) {
+        return null;
+      }
+      
+      const validResponses = responses.filter((r: any) => r.analysis);
+      if (validResponses.length === 0) {
+        return null;
+      }
+      
+      if (interviewType === 'college') {
+        // College interview metrics
+        const authenticityScores = validResponses.map((r: any) => r.analysis.authenticity || 0);
+        const passionScores = validResponses.map((r: any) => r.analysis.passion || 0);
+        const clarityScores = validResponses.map((r: any) => r.analysis.clarity || 0);
+        const specificityScores = validResponses.map((r: any) => r.analysis.specificity || 0);
+        
+        return {
+          authenticity: Math.round(authenticityScores.reduce((a: number, b: number) => a + b, 0) / authenticityScores.length),
+          passion: Math.round(passionScores.reduce((a: number, b: number) => a + b, 0) / passionScores.length),
+          clarity: Math.round(clarityScores.reduce((a: number, b: number) => a + b, 0) / clarityScores.length),
+          specificity: Math.round(specificityScores.reduce((a: number, b: number) => a + b, 0) / specificityScores.length)
+        };
+      } else {
+        // Focused interview metrics
+        const problemSolvingScores = validResponses.map((r: any) => r.analysis.problem_solving || 0);
+        const communicationScores = validResponses.map((r: any) => r.analysis.communication || 0);
+        const depthScores = validResponses.map((r: any) => r.analysis.depth || 0);
+        const relevanceScores = validResponses.map((r: any) => r.analysis.relevance || 0);
+        
+        return {
+          problem_solving: Math.round(problemSolvingScores.reduce((a: number, b: number) => a + b, 0) / problemSolvingScores.length),
+          communication: Math.round(communicationScores.reduce((a: number, b: number) => a + b, 0) / communicationScores.length),
+          depth: Math.round(depthScores.reduce((a: number, b: number) => a + b, 0) / depthScores.length),
+          relevance: Math.round(relevanceScores.reduce((a: number, b: number) => a + b, 0) / relevanceScores.length)
+        };
+      }
+    };
+    
+    const calculatedMetrics = calculateInterviewMetrics(sessionData.responses, sessionData.type || sessionData.interviewType || 'standard');
+
+    // Prepare data for update
+    const updateData: any = {
+      responses: sessionData.responses,
+      questions: sessionData.questions, // Also save questions array
+      overall_score: sessionData.overallScore,
+      duration: sessionData.duration,
+      questions_answered: sessionData.responses.length,
+      status: 'completed',
+      speech_metrics: speechMetrics,
+      audio_data: audioData,
+      interview_type: sessionData.type || sessionData.interviewType, // Add interview type to database
+      voice_metrics_summary: voiceMetricsSummary, // <-- Save the summary here
+      transcript: sessionData.transcript, // Add transcript to the session data
+      // Note: metrics column doesn't exist in current DB schema, so we don't include it
+    };
+
+    console.log('Saving interview session with data:', {
+      sessionId: sessionData.id,
+      interviewType: updateData.interview_type,
+      status: updateData.status,
+      speechMetricsIncluded: !!sessionData.speechMetrics,
+      voiceMetricsSummary: voiceMetricsSummary,
+      calculatedMetrics: calculatedMetrics,
+      responsesCount: sessionData.responses ? sessionData.responses.length : 0,
+      questionsCount: sessionData.questions ? sessionData.questions.length : 0
+    });
+
+>>>>>>> Stashed changes
     // Update the existing session record instead of inserting
     const { error } = await supabase
       .from('interview_sessions')

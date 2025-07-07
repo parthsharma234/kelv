@@ -61,6 +61,8 @@ const ScrollToTopWrapper: React.FC<{ children: React.ReactNode }> = ({ children 
 };
 
 const AppRoutes = () => {
+  const [isInterviewActive, setIsInterviewActive] = React.useState(false);
+
   return (
     <ScrollToTopWrapper>
       <Routes>
@@ -71,8 +73,8 @@ const AppRoutes = () => {
           element={
             <PlatformProtectedRoute>
               <div className="min-h-screen bg-dark-900 text-white">
-                <Navbar />
-                <PlatformContainer />
+                {!isInterviewActive && <Navbar />}
+                <PlatformContainer onInterviewStateChange={setIsInterviewActive} />
               </div>
             </PlatformProtectedRoute>
           }
