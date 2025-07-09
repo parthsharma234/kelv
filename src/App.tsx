@@ -54,6 +54,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+const PlatformRoute: React.FC = () => {
+  const [isFullScreen, setIsFullScreen] = React.useState(false);
+
+  return (
+    <div className="min-h-screen bg-dark-900 text-white">
+      {!isFullScreen && <Navbar />}
+      <PlatformContainer onFullScreenChange={setIsFullScreen} />
+    </div>
+  );
+};
+
 const ScrollToTopWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useScrollToTop();
   return <>{children}</>;
@@ -69,10 +80,7 @@ const AppRoutes = () => {
           path="/platform"
           element={
             <PlatformProtectedRoute>
-              <div className="min-h-screen bg-dark-900 text-white">
-                <Navbar />
-                <PlatformContainer />
-              </div>
+              <PlatformRoute />
             </PlatformProtectedRoute>
           }
         />

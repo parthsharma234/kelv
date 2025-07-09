@@ -11,17 +11,22 @@ import FocusedInterviewResults from './FocusedInterviewResults';
 import CollegeSetupFlow from './CollegeSetupFlow';
 import CollegeInterview from './CollegeInterview';
 import CollegeInterviewResults from './CollegeInterviewResults';
-import { InterviewSetup } from '../../types/interview';
+import RealtimeInterviewSession from './RealtimeInterviewSession';
+import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview';
 
-const PlatformContainer: React.FC = () => {
+interface PlatformContainerProps {
+  onFullScreenChange?: (isFullScreen: boolean) => void;
+}
+
+const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChange }) => {
   const { user, loading } = useAuth();
   useScrollToTop(); // Use the hook to handle scroll to top on route changes
   const [currentState, setCurrentState] = useState<PlatformState>('dashboard');
   const [dashboardKey, setDashboardKey] = useState(0); // Add key to force dashboard refresh
-  const [interviewSetup, setInterviewSetup] = useState<InterviewSetup | null>(null);
+  const [interviewSetup, setInterviewSetup] = useState<InterviewSetup | CollegeInterviewSetup | null>(null);
   const [sessionData, setSessionData] = useState<any>(null);
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
@@ -38,6 +43,18 @@ const PlatformContainer: React.FC = () => {
       behavior: 'smooth'
     });
   };
+
+  // Notify parent about full-screen state changes
+  React.useEffect(() => {
+    const isFullScreen = currentState === 'realtime-interview' || 
+                        currentState === 'realtime-focused-interview' || 
+                        currentState === 'realtime-college-interview';
+    
+    if (onFullScreenChange) {
+      onFullScreenChange(isFullScreen);
+    }
+  }, [currentState, onFullScreenChange]);
+
   // Effect for loading interview data when viewing results - moved to top level
   React.useEffect(() => {
     if ((currentState === 'view-results' || currentState === 'view-focused-results' || currentState === 'view-college-results') && viewingInterviewId) {
@@ -79,33 +96,49 @@ const PlatformContainer: React.FC = () => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
-  }  const handleStartInterview = () => {
-    setIsFocusedFlow(false);
-    setIsCollegeFlow(false);
-    setCurrentState('setup');
-    scrollToTop();
-  };
+  }
 
-  const handleStartFocusedInterview = () => {
-    setIsFocusedFlow(true);
-    setIsCollegeFlow(false);
-    setCurrentState('setup');
+  const handleStartRealtimeInterview = (type: 'standard' | 'focused' | 'college', focusedType?: string) => {
+    // Route to appropriate setup flow first
+    if (type === 'college') {
+      setIsCollegeFlow(true);
+      setIsFocusedFlow(false);
+      setCurrentState('college-setup');
+    } else if (type === 'focused') {
+      setIsFocusedFlow(true);
+      setIsCollegeFlow(false);
+      if (focusedType) {
+        setFocusedInterviewType(focusedType);
+      }
+      // Go to setup first, then selection will be handled in handleSetupComplete
+      setCurrentState('setup');
+    } else {
+      // Standard interview - go to setup
+      setIsFocusedFlow(false);
+      setIsCollegeFlow(false);
+      setCurrentState('setup');
+    }
+    
     scrollToTop();
-  };
-
-  const handleStartCollegeInterview = () => {
-    setIsFocusedFlow(false);
-    setIsCollegeFlow(true);
-    setCurrentState('college-setup');
-    scrollToTop();
-  };  const handleSetupComplete = (setup: InterviewSetup) => {
+  };  const handleSetupComplete = (setup: InterviewSetup | CollegeInterviewSetup) => {
     setInterviewSetup(setup);
+    
     if (isFocusedFlow) {
       setCurrentState('focused-selection');
     } else if (isCollegeFlow) {
-      setCurrentState('college-interview');
+      // For college interviews, check interview mode
+      if (setup.interviewMode === 'voice') {
+        setCurrentState('realtime-college-interview');
+      } else {
+        setCurrentState('college-interview');
+      }
     } else {
-      setCurrentState('interview');
+      // For standard interviews, check interview mode
+      if (setup.interviewMode === 'voice') {
+        setCurrentState('realtime-interview');
+      } else {
+        setCurrentState('interview');
+      }
     }
     scrollToTop();
   };
@@ -118,7 +151,13 @@ const PlatformContainer: React.FC = () => {
 
   const handleFocusedTypeSelect = (type: string) => {
     setFocusedInterviewType(type);
-    setCurrentState('focused-interview');
+    
+    // Route to realtime or traditional based on interview mode
+    if (interviewSetup && interviewSetup.interviewMode === 'voice') {
+      setCurrentState('realtime-focused-interview');
+    } else {
+      setCurrentState('focused-interview');
+    }
     scrollToTop();
   };
 
@@ -260,12 +299,11 @@ const PlatformContainer: React.FC = () => {
   }
 
   return (
-    <>      {currentState === 'dashboard' && (
+    <>
+      {currentState === 'dashboard' && (
         <PlatformDashboard 
           key={dashboardKey}
-          onStartInterview={handleStartInterview}
-          onStartFocusedInterview={handleStartFocusedInterview}
-          onStartCollegeInterview={handleStartCollegeInterview}
+          onStartRealtimeInterview={handleStartRealtimeInterview}
           onViewInterviewResults={handleViewInterviewResults}
         />
       )}
@@ -300,14 +338,14 @@ const PlatformContainer: React.FC = () => {
       
       {currentState === 'interview' && interviewSetup && (
         <InterviewSession 
-          setup={interviewSetup}
+          setup={interviewSetup as InterviewSetup}
           onComplete={handleInterviewComplete}
           onBack={handleBackToSetup}
         />
       )}
       
       {currentState === 'results' && sessionData && (
-        <InterviewResults 
+        <InterviewResults
           sessionData={sessionData}
           onBackToDashboard={handleBackToDashboard}
           onStartNewInterview={handleStartNewInterview}
@@ -316,7 +354,7 @@ const PlatformContainer: React.FC = () => {
 
       {currentState === 'focused-selection' && interviewSetup && (
         <FocusedInterviewSelection
-          setup={interviewSetup}
+          setup={interviewSetup as InterviewSetup}
           onSelectType={handleFocusedTypeSelect}
           onBack={handleBackToDashboard}
         />
@@ -325,7 +363,7 @@ const PlatformContainer: React.FC = () => {
       {currentState === 'focused-interview' && interviewSetup && focusedInterviewType && (
         <FocusedInterview
           interviewType={focusedInterviewType as any}
-          setup={interviewSetup}
+          setup={interviewSetup as InterviewSetup}
           onComplete={handleFocusedInterviewComplete}
           onBack={handleBackToFocusedSelection}
         />
@@ -336,6 +374,34 @@ const PlatformContainer: React.FC = () => {
           sessionData={sessionData}
           onBackToDashboard={handleBackToDashboard}
           onStartNewFocusedInterview={handleStartNewFocusedInterview}
+        />
+      )}
+
+      {/* Realtime Interview Components */}
+      {currentState === 'realtime-interview' && interviewSetup && (
+        <RealtimeInterviewSession
+          setup={interviewSetup as InterviewSetup}
+          interviewType="standard"
+          onComplete={handleInterviewComplete}
+          onBack={handleBackToDashboard}
+        />
+      )}
+
+      {currentState === 'realtime-focused-interview' && interviewSetup && focusedInterviewType && (
+        <RealtimeInterviewSession
+          setup={interviewSetup as InterviewSetup}
+          interviewType={focusedInterviewType}
+          onComplete={handleFocusedInterviewComplete}
+          onBack={handleBackToDashboard}
+        />
+      )}
+
+      {currentState === 'realtime-college-interview' && interviewSetup && (
+        <RealtimeInterviewSession
+          setup={interviewSetup as any}
+          interviewType="college"
+          onComplete={handleCollegeInterviewComplete}
+          onBack={handleBackToDashboard}
         />
       )}
     </>

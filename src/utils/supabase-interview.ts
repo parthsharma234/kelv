@@ -1,6 +1,32 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { InterviewHistory, InterviewSetup, CollegeInterviewSetup } from '../types/interview';
 
+// Realtime transcript interfaces
+export interface TranscriptChunk {
+  id: string;
+  session_id: string;
+  speaker: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+  is_partial: boolean;
+  created_at: string;
+}
+
+export interface RealtimeSessionMetadata {
+  session_id: string;
+  user_id: string;
+  setup: InterviewSetup | CollegeInterviewSetup;
+  interview_type?: string;
+  start_time: string;
+  end_time?: string;
+  status: 'active' | 'paused' | 'completed' | 'error';
+  model_type: string;
+  total_duration: number;
+  question_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Standard interview setup interface
 export interface SavedInterviewSetup {
   id: string;
@@ -1030,5 +1056,142 @@ export const getInterviewById = async (interviewId: string) => {
   } catch (error) {
     console.error('Failed to fetch interview by ID:', error);
     return null;
+  }
+};
+
+// Realtime transcript functions
+export const saveTranscriptChunk = async (chunk: Omit<TranscriptChunk, 'created_at'>): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping transcript chunk save');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('transcript_chunks')
+      .insert({
+        ...chunk,
+        created_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error saving transcript chunk:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to save transcript chunk:', error);
+    throw error;
+  }
+};
+
+export const getTranscriptBySession = async (sessionId: string): Promise<TranscriptChunk[]> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning empty transcript');
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('transcript_chunks')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching transcript:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch transcript:', error);
+    throw error;
+  }
+};
+
+export const createRealtimeSession = async (metadata: Omit<RealtimeSessionMetadata, 'created_at' | 'updated_at'>): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping realtime session creation');
+    return;
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('realtime_interview_sessions')
+      .insert({
+        ...metadata,
+        created_at: now,
+        updated_at: now
+      });
+
+    if (error) {
+      console.error('Error creating realtime session:', error);
+      throw error;
+    }
+
+    console.log('Realtime session created successfully:', metadata.session_id);
+  } catch (error) {
+    console.error('Failed to create realtime session:', error);
+    throw error;
+  }
+};
+
+export const updateRealtimeSession = async (
+  sessionId: string, 
+  updates: Partial<Pick<RealtimeSessionMetadata, 'end_time' | 'status' | 'total_duration' | 'question_count'>>
+): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping realtime session update');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('realtime_interview_sessions')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('session_id', sessionId);
+
+    if (error) {
+      console.error('Error updating realtime session:', error);
+      throw error;
+    }
+
+    console.log('Realtime session updated successfully:', sessionId);
+  } catch (error) {
+    console.error('Failed to update realtime session:', error);
+    throw error;
+  }
+};
+
+export const getRealtimeSession = async (sessionId: string): Promise<RealtimeSessionMetadata | null> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning null');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('realtime_interview_sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows found
+        return null;
+      }
+      console.error('Error fetching realtime session:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch realtime session:', error);
+    throw error;
   }
 };

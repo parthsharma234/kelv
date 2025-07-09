@@ -106,13 +106,11 @@ const formatCollegeInterviewTitle = (setup: any): string => {
 };
 
 interface PlatformDashboardProps {
-  onStartInterview: () => void;
-  onStartFocusedInterview: () => void;
-  onStartCollegeInterview: () => void;
+  onStartRealtimeInterview: (type: 'standard' | 'focused' | 'college', focusedType?: string) => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
 }
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview, onStartFocusedInterview, onStartCollegeInterview, onViewInterviewResults }) => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeInterview, onViewInterviewResults }) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
   const [showAllInterviews, setShowAllInterviews] = useState(false);
   const [stats, setStats] = useState({
@@ -526,27 +524,27 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2">Dynamic Interview</h2>
-                  <p className="text-gray-300">Experience adaptive questioning that adjusts difficulty based on your responses</p>
+                  <p className="text-gray-300">Experience adaptive voice questioning powered by advanced AI technology</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="bg-dark-800/30 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2">🧠 Smart Adaptation</h4>
-                  <p className="text-sm text-gray-400">Questions adjust difficulty based on your performance</p>
+                  <h4 className="font-medium text-white mb-2">🎙️ Voice Interaction</h4>
+                  <p className="text-sm text-gray-400">Natural voice conversation with AI interviewer</p>
                 </div>
                 <div className="bg-dark-800/30 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2">⚡ Real-time Analysis</h4>
-                  <p className="text-sm text-gray-400">Instant feedback and performance insights</p>
+                  <h4 className="font-medium text-white mb-2">⚡ Real-time Response</h4>
+                  <p className="text-sm text-gray-400">Instant AI reactions and adaptive follow-ups</p>
                 </div>
                 <div className="bg-dark-800/30 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2">🎯 Realistic Flow</h4>
-                  <p className="text-sm text-gray-400">Natural interview progression like real interviews</p>
+                  <h4 className="font-medium text-white mb-2">📝 Live Transcript</h4>
+                  <p className="text-sm text-gray-400">See conversation in real-time with speaker labels</p>
                 </div>
               </div>
               
               <button
-                onClick={onStartInterview}
+                onClick={() => onStartRealtimeInterview('standard')}
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-3 group"
               >
                 <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -563,7 +561,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2">Focused Practice</h2>
-                  <p className="text-gray-300">Quick 3-5 minute sessions targeting specific interview skills</p>
+                  <p className="text-gray-300">Quick voice sessions targeting specific interview skills</p>
                 </div>
               </div>
               
@@ -590,7 +588,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
                 </div>
               </div>
                 <button
-                onClick={onStartFocusedInterview}
+                onClick={() => onStartRealtimeInterview('focused')}
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-400 hover:to-cyan-400 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-3 group"
               >
                 <Target className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -695,7 +693,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartInterview,
               </div>
               
               <button
-                onClick={onStartCollegeInterview}
+                onClick={() => onStartRealtimeInterview('college')}
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-semibold hover:from-purple-400 hover:to-indigo-400 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-3 group relative z-10"
               >
                 <GraduationCap className="w-5 h-5 group-hover:scale-110 transition-transform" />

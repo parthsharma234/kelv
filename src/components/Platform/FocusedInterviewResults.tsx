@@ -73,7 +73,6 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
 
   // Add safety checks for sessionData
   if (!sessionData) {
-    console.error('FocusedInterviewResults: No sessionData provided');
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
         <div className="text-center">
@@ -89,16 +88,6 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
       </div>
     );
   }
-
-  // Debug logging
-  console.log('FocusedInterviewResults: Received sessionData:', sessionData);
-  console.log('FocusedInterviewResults: sessionData.setup:', sessionData.setup);
-  console.log('FocusedInterviewResults: sessionData.speechMetrics:', sessionData.speechMetrics);
-  console.log('FocusedInterviewResults: sessionData.voice_metrics_summary:', sessionData.voice_metrics_summary);
-  console.log('FocusedInterviewResults: sessionData.speech_metrics:', sessionData.speech_metrics);
-  console.log('FocusedInterviewResults: sessionData.metrics:', sessionData.metrics);
-  console.log('FocusedInterviewResults: sessionData.responses:', sessionData.responses);
-  console.log('FocusedInterviewResults: sessionData.questions:', sessionData.questions);
 
   // Handle setup data structure - support both focused format and converted format
   const rawSetup = sessionData.setup || {};
