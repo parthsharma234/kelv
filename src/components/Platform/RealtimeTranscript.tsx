@@ -53,9 +53,10 @@ const RealtimeTranscript: React.FC<RealtimeTranscriptProps> = ({
 
   return (
     <div 
-      className={`bg-gray-900/95 backdrop-blur-sm border-r border-gray-800 flex flex-col transition-all duration-300 h-full max-h-screen ${
+      className={`bg-gray-900/95 backdrop-blur-sm border-r border-gray-800 flex flex-col transition-all duration-300 ${
         isCollapsed ? 'w-12' : 'w-[28rem]'
       }`}
+      style={{ height: 'calc(100vh - 73px)' }} // Fixed height accounting for header
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
@@ -81,7 +82,7 @@ const RealtimeTranscript: React.FC<RealtimeTranscriptProps> = ({
 
       {/* Transcript content */}
       {!isCollapsed && (
-        <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Minimal status indicator */}
           {(isAISpeaking || isUserSpeaking) && (
             <div className="px-3 py-2 border-b border-gray-800/30 flex-shrink-0">
@@ -102,44 +103,76 @@ const RealtimeTranscript: React.FC<RealtimeTranscriptProps> = ({
             </div>
           )}
 
-          {/* Transcript messages */}
+          {/* Transcript messages with fixed height and custom scrollbar */}
           <div 
             ref={scrollRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto p-3 space-y-4 min-h-0"
+            className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar"
+            style={{ 
+              height: 'calc(100% - 120px)', // Fixed height minus header and status
+              maxHeight: 'calc(100% - 120px)'
+            }}
           >
             {combinedTranscript.length === 0 ? (
-              <div className="text-center text-gray-500 mt-12">
-                <MessageSquare className="w-6 h-6 mx-auto mb-2 opacity-40" />
-                <p className="text-xs">Conversation will appear here</p>
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+                <MessageSquare className="w-8 h-8 mb-2 opacity-50" />
+                <p className="text-sm">Live transcript will appear here</p>
+                <p className="text-xs mt-1 opacity-75">Start speaking to begin</p>
               </div>
             ) : (
-              combinedTranscript.map((chunk, index) => (
-                <div key={chunk.id || `chunk-${index}`} className={`flex items-end gap-2 ${chunk.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {chunk.speaker === 'assistant' && (
-                    <div className="w-8 h-8 flex-shrink-0">
-                      <RedPandaLogo size="sm" animate={isAISpeaking && chunk.isPartial} />
+              combinedTranscript.map((chunk, index) => {
+                const prevChunk = index > 0 ? combinedTranscript[index - 1] : null;
+                const nextChunk = index < combinedTranscript.length - 1 ? combinedTranscript[index + 1] : null;
+
+                const isFirstInGroup = !prevChunk || prevChunk.speaker !== chunk.speaker;
+                const isLastInGroup = !nextChunk || nextChunk.speaker !== chunk.speaker;
+
+                const messageClass = `flex items-end max-w-[85%] ${
+                  chunk.speaker === 'user' ? 'ml-auto' : 'mr-auto'
+                }`;
+
+                const bubbleClass = `px-3 py-2 rounded-xl ${
+                  chunk.speaker === 'assistant' 
+                    ? 'bg-gray-800 text-white' 
+                    : 'bg-[#FF5722] text-white'
+                } ${
+                  isFirstInGroup && isLastInGroup ? 'rounded-xl' :
+                  isFirstInGroup ? (chunk.speaker === 'user' ? 'rounded-tr-xl rounded-br-sm' : 'rounded-tl-xl rounded-bl-sm') :
+                  isLastInGroup ? (chunk.speaker === 'user' ? 'rounded-br-xl rounded-tr-sm' : 'rounded-bl-xl rounded-tl-sm') :
+                  chunk.speaker === 'user' ? 'rounded-tr-sm rounded-br-sm' : 'rounded-tl-sm rounded-bl-sm'
+                }`;
+
+                return (
+                  <div key={chunk.id || `${chunk.speaker}-${index}`} className={`${messageClass} space-x-2`}>
+                    {/* Assistant Avatar */}
+                    {chunk.speaker === 'assistant' && (
+                      <div className="w-8 flex-shrink-0">
+                        {isLastInGroup && (
+                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                            <RedPandaLogo className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Message Bubble */}
+                    <div className={bubbleClass}>
+                      <p className="text-sm leading-relaxed">{chunk.text}</p>
                     </div>
-                  )}
-                  <div 
-                    className={`max-w-xs md:max-w-md rounded-2xl px-4 py-2.5 ${
-                      chunk.speaker === 'assistant' 
-                        ? 'bg-dark-800 text-gray-200 rounded-bl-lg' 
-                        : 'bg-orange-600 text-white rounded-br-lg'
-                    } ${chunk.isPartial ? 'opacity-70' : ''}`}
-                  >
-                    <p className="text-sm leading-relaxed">
-                      {chunk.text}
-                      {chunk.isPartial && <span className="inline-block w-1 h-3 bg-gray-400 ml-1 animate-pulse" />}
-                    </p>
+
+                    {/* User Avatar */}
+                    {chunk.speaker === 'user' && (
+                      <div className="w-8 flex-shrink-0">
+                        {isLastInGroup && (
+                          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                            <User className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {chunk.speaker === 'user' && (
-                     <div className="w-8 h-8 flex-shrink-0 bg-blue-500/20 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-blue-400" />
-                    </div>
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

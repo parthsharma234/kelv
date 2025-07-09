@@ -378,7 +378,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       </div>
 
       {/* Main content area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden h-full">
         {/* Left side - Realtime transcript (replaces the question panel) */}
         <RealtimeTranscript
           transcript={state.transcript}

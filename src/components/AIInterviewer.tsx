@@ -9,6 +9,7 @@ interface AIInterviewerProps {
   isProcessing?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showStatus?: boolean;
+  videoRef?: React.RefObject<HTMLVideoElement>;
 }
 
 const AIInterviewer: React.FC<AIInterviewerProps> = ({ 
@@ -17,7 +18,8 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
   isListening = false,
   isProcessing = false,
   size = 'lg',
-  showStatus = true
+  showStatus = true,
+  videoRef
 }) => {
   const sizeClasses = {
     sm: 'w-32 h-32',
@@ -32,7 +34,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
     transition: {
       duration: 4.5,
       repeat: Infinity,
-      ease: "easeInOut"
+      ease: "easeInOut" as const
     }
   };
 
@@ -42,7 +44,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
     transition: {
       duration: 1.2,
       repeat: Infinity,
-      ease: "easeInOut"
+      ease: "easeInOut" as const
     }
   } : breathingAnimation;
 
@@ -52,7 +54,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
     transition: {
       duration: 2.5,
       repeat: Infinity,
-      ease: "easeInOut"
+      ease: "easeInOut" as const
     }
   } : speakingAnimation;
 
@@ -62,7 +64,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
     transition: {
       duration: 1.8,
       repeat: Infinity,
-      ease: "easeInOut"
+      ease: "easeInOut" as const
     }
   } : listeningAnimation;
 
@@ -72,6 +74,23 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
         className={`${sizeClasses[size]} relative`}
         animate={processingAnimation}
       >
+        {/* Video element */}
+        {videoRef && (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute w-full h-full object-cover rounded-full z-0"
+            style={{ transform: 'scaleX(-1)' }} // Mirror the video
+          />
+        )}
+
+        {/* Overlay to darken the video a bit */}
+        {videoRef && (
+          <div className="absolute inset-0 bg-black opacity-30 rounded-full z-10"></div>
+        )}
+
         {/* Background glow effect */}
         <motion.div 
           className={`absolute inset-0 rounded-full transition-all duration-500 ${
@@ -117,7 +136,7 @@ const AIInterviewer: React.FC<AIInterviewerProps> = ({
         
         {/* Use the actual red panda logo with enhanced breathing */}
         <motion.div
-          className="w-full h-full relative z-10"
+          className="w-full h-full relative z-20"
           animate={{
             rotate: isProcessing ? [0, 2, -2, 0] : 0,
           }}
