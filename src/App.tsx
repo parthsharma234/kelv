@@ -3,10 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useScrollToTop } from './hooks/useScrollToTop';
 import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import Features from './components/Features';
-import HowItWorks from './components/HowItWorks';
-import Waitlist from './components/Waitlist';
+import ScrollNarrativeHomepage from './components/ScrollNarrativeHomepage';
 import Footer from './components/Footer';
 import LoginPage from './components/Auth/LoginPage';
 import WaitlistSuccess from './components/WaitlistSuccess';
@@ -22,12 +19,7 @@ const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-dark-900 text-white">
       <Navbar />
-      <main>
-        <Hero />
-        <Features />
-        <HowItWorks />
-        <Waitlist />
-      </main>
+      <ScrollNarrativeHomepage />
       <Footer />
     </div>
   );
