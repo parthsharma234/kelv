@@ -18,6 +18,8 @@ import {
   BookOpen,
   Play
 } from 'lucide-react';
+import VoiceTimeline from './VoiceTimeline';
+import RedPandaLogo from '../RedPandaLogo';
 
 // Utility function to format category labels for focused interviews
 const formatCategoryLabel = (category: string): string => {
@@ -112,10 +114,19 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
     };
   }
 
+  // Convert score to realistic percentage (40-95% range)
+  const convertToRealisticPercentage = (score: number) => {
+    // Score comes in as 1-10 or 0-100, normalize to 0-10 range
+    const normalizedScore = score > 10 ? score / 10 : score;
+    // Map 1-10 to 40-95% range with better distribution
+    const percentage = Math.round(40 + (normalizedScore - 1) * (55 / 9));
+    return Math.max(40, Math.min(95, percentage));
+  };
+
   // Ensure other required fields exist
   const safeSessionData = {
     ...sessionData,
-    overallScore: sessionData.overallScore || 70,
+    overallScore: convertToRealisticPercentage(sessionData.overallScore || 7),
     responses: sessionData.responses || [],
     questions: sessionData.questions || [],
     setup: normalizedSetup,
@@ -132,20 +143,12 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   };
 
   const getOverallGrade = (score: number) => {
-    // Score is already a percentage (0-100)
     const percentage = score;
-    if (percentage >= 90) return { grade: 'A+', color: 'text-green-400', description: 'Outstanding performance! You\'re interview-ready for this role.' };
-    if (percentage >= 85) return { grade: 'A', color: 'text-green-400', description: 'Excellent work! Your responses show strong professional readiness.' };
-    if (percentage >= 80) return { grade: 'A-', color: 'text-green-400', description: 'Very good performance with room for minor improvements.' };
-    if (percentage >= 75) return { grade: 'B+', color: 'text-yellow-400', description: 'Good responses that demonstrate your potential.' };
-    if (percentage >= 70) return { grade: 'B', color: 'text-yellow-400', description: 'Solid foundation with opportunities for enhancement.' };
-    if (percentage >= 65) return { grade: 'B-', color: 'text-yellow-400', description: 'Decent responses that need more development.' };
-    if (percentage >= 60) return { grade: 'C+', color: 'text-orange-400', description: 'Shows promise but needs improvement.' };
-    if (percentage >= 55) return { grade: 'C', color: 'text-orange-400', description: 'Below average performance with significant room for growth.' };
-    if (percentage >= 50) return { grade: 'C-', color: 'text-red-400', description: 'Poor performance requiring substantial improvement.' };
-    if (percentage >= 45) return { grade: 'D+', color: 'text-red-400', description: 'Very poor performance needing major work.' };
-    if (percentage >= 40) return { grade: 'D', color: 'text-red-400', description: 'Failing performance requiring complete preparation overhaul.' };
-    return { grade: 'F', color: 'text-red-500', description: 'Unacceptable performance - extensive practice needed.' };
+    if (percentage >= 90) return { grade: 'A', color: 'text-green-400', description: 'Outstanding performance! You\'re interview-ready.' };
+    if (percentage >= 80) return { grade: 'B', color: 'text-green-300', description: 'Excellent work! Strong professional readiness.' };
+    if (percentage >= 70) return { grade: 'C', color: 'text-yellow-400', description: 'Good responses that demonstrate competence.' };
+    if (percentage >= 60) return { grade: 'D', color: 'text-orange-400', description: 'Shows promise but needs focused improvement.' };
+    return { grade: 'F', color: 'text-red-400', description: 'Significant improvement needed for interview readiness.' };
   };
 
   const getMetricInsight = (metric: string, score: number) => {
@@ -396,8 +399,8 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <Trophy className={`w-8 h-8 ${safeSessionData.overallScore >= 70 ? 'text-yellow-400' : 'text-gray-500'}`} />
-                {safeSessionData.overallScore >= 70 ? 'Interview Ready' : 'Needs Practice'}
+                <Trophy className={`w-8 h-8 ${safeSessionData.overallScore >= 80 ? 'text-yellow-400' : 'text-gray-500'}`} />
+                {safeSessionData.overallScore >= 80 ? 'Interview Ready' : 'Needs Practice'}
               </div>
               <p className="text-gray-400 text-sm">
                 {safeSessionData.interviewType ? 
@@ -668,17 +671,25 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
               </motion.div>
             )}
 
-            {/* Interview Breakdown - Compact Layout */}
+            {/* Question-by-Question Analysis - Compact Style with Kelv Branding */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
-              <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
-                <FileText className="w-5 h-5 text-blue-400" />
-                Question-by-Question Analysis
-              </h3>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                  <RedPandaLogo size="sm" animate={false} className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                    Question-by-Question Analysis
+                  </h3>
+                  <p className="text-gray-400 text-sm">Detailed feedback from your AI interview coach</p>
+                </div>
+              </div>
               
               <div className="space-y-3">
                 {safeSessionData.responses.map((response: any, index: number) => {
@@ -720,8 +731,7 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                         {response.analysis && (
                           <>
                             <div>
-                              <h5 className="text-xs font-medium text-blue-400 mb-1">AI Feedback</h5>
-                              <p className="text-gray-300 text-xs capitalize-first">
+                              <p className="text-gray-300 text-xs">
                                 {response.analysis.feedback.charAt(0).toUpperCase() + response.analysis.feedback.slice(1)}
                               </p>
                             </div>
@@ -918,6 +928,20 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
               </div>
             </motion.div>
           </div>
+
+          {/* Voice Timeline - For voice-based focused interviews */}
+          {safeSessionData.setup.interviewMode === 'voice' && safeSessionData.voiceTimeline && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mt-8"
+            >
+              <VoiceTimeline 
+                voiceTimeline={safeSessionData.voiceTimeline} 
+              />
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

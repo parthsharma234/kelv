@@ -86,6 +86,8 @@ export class OpenAIRealtimeClient extends EventEmitter {
   private outputGainNode: GainNode | null = null;
   private isPlayingAudio: boolean = false;
   private currentAudioSource: AudioBufferSourceNode | null = null;
+  private audioChunks: ArrayBuffer[] = []; // Store audio chunks locally for speech analysis
+  private currentResponseAudioChunks: ArrayBuffer[] = []; // Store chunks for current user response
   private isGeneratingResponse: boolean = false; // Add flag to prevent multiple responses
   private audioQueue: { delta: string, responseId: string }[] = [];
   private currentResponseId: string | null = null;
@@ -494,6 +496,10 @@ export class OpenAIRealtimeClient extends EventEmitter {
           const inputBuffer = event.inputBuffer.getChannelData(0);
           const pcm16 = this.floatTo16BitPCM(inputBuffer);
           this.sendAudioData(pcm16);
+          
+          // Store audio chunks locally for speech analysis
+          this.audioChunks.push(pcm16.slice(0)); // Create a copy
+          this.currentResponseAudioChunks.push(pcm16.slice(0));
         }
       };
 
@@ -698,6 +704,24 @@ export class OpenAIRealtimeClient extends EventEmitter {
     }
     this.audioQueue = [];
     this.isPlayingAudio = false;
+  }
+
+  // Get current response audio chunks and clear them
+  public getCurrentResponseAudioChunks(): ArrayBuffer[] {
+    const chunks = [...this.currentResponseAudioChunks];
+    this.currentResponseAudioChunks = [];
+    return chunks;
+  }
+
+  // Get all audio chunks
+  public getAllAudioChunks(): ArrayBuffer[] {
+    return [...this.audioChunks];
+  }
+
+  // Clear all audio chunks
+  public clearAudioChunks(): void {
+    this.audioChunks = [];
+    this.currentResponseAudioChunks = [];
   }
 
   public muteOutput() {

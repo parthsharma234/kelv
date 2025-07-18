@@ -23,6 +23,24 @@ export interface VoiceMetrics {
     energyConsistency: number;
     dynamicRange: number;
   };
+  timestamp: number;         // When this analysis was taken
+  duration: number;          // Duration of the analyzed segment
+}
+
+export interface VoiceTimelinePoint {
+  timestamp: number;
+  metrics: VoiceMetrics;
+  feedback: ActionableFeedback;
+  questionContext?: string;
+}
+
+export interface ActionableFeedback {
+  overall: string;
+  strengths: string[];
+  improvements: string[];
+  specificTips: string[];
+  score: number;
+  category: 'excellent' | 'good' | 'fair' | 'needs_improvement';
 }
 
 export interface AudioAnalysisResult {
@@ -37,14 +55,540 @@ export interface AudioAnalysisResult {
 
 export class AdvancedSpeechAnalyzer {
   private audioContext: AudioContext;
+  private voiceTimeline: VoiceTimelinePoint[] = [];
 
   constructor() {
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
   }
 
-  async analyzeVoiceMetrics(audioBlob: Blob, transcription: string, duration: number): Promise<VoiceMetrics> {
+  // Enhanced method for real-time voice analysis with actual audio
+  async analyzeRealtimeAudio(
+    audioBuffer: ArrayBuffer,
+    transcription: string,
+    timestamp: number,
+    questionContext?: string
+  ): Promise<VoiceTimelinePoint> {
     try {
-      // Analyze audio features
+      // Decode audio buffer
+      const audioContextForAnalysis = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioData = await audioContextForAnalysis.decodeAudioData(audioBuffer.slice(0));
+      const duration = audioData.duration;
+      
+      // Perform comprehensive audio analysis
+      const metrics = await this.analyzeAudioBuffer(audioData, transcription, timestamp, duration);
+      const feedback = this.generateActionableFeedback(metrics, transcription, questionContext);
+      
+      const timelinePoint: VoiceTimelinePoint = {
+        timestamp,
+        metrics,
+        feedback,
+        questionContext
+      };
+      
+      this.voiceTimeline.push(timelinePoint);
+      return timelinePoint;
+    } catch (error) {
+      console.error('Error analyzing realtime audio:', error);
+      // Fallback to transcription-only analysis
+      return this.analyzeVoiceSegment(new Blob(), transcription, 0, timestamp, questionContext);
+    }
+  }
+
+  // Enhanced audio buffer analysis
+  private async analyzeAudioBuffer(
+    audioBuffer: AudioBuffer,
+    transcription: string,
+    timestamp: number,
+    duration: number
+  ): Promise<VoiceMetrics> {
+    const channelData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Advanced audio feature extraction
+    const audioFeatures = this.extractAdvancedAudioFeatures(channelData, sampleRate);
+    const speechPatterns = this.analyzeSpeechPatterns(transcription, duration);
+    
+    // Calculate comprehensive metrics
+    const speechRate = speechPatterns.speechRate;
+    const fillerWordCount = speechPatterns.fillerWordCount;
+    
+    // Enhanced fluency calculation with audio features
+    const fluencyScore = this.calculateEnhancedFluencyScore(
+      speechPatterns,
+      audioFeatures,
+      fillerWordCount
+    );
+    
+    // Enhanced voice confidence with pitch and energy analysis
+    const voiceConfidence = this.calculateEnhancedVoiceConfidence(
+      audioFeatures,
+      speechRate,
+      speechPatterns.hesitations
+    );
+    
+    // Enhanced delivery score with timing analysis
+    const deliveryScore = this.calculateEnhancedDeliveryScore(
+      speechRate,
+      audioFeatures,
+      speechPatterns.pauseAnalysis
+    );
+    
+    // Enhanced clarity score with spectral analysis
+    const clarityScore = this.calculateEnhancedClarityScore(
+      audioFeatures,
+      fillerWordCount,
+      speechPatterns.wordCount
+    );
+    
+    // Advanced pitch analysis
+    const pitchAnalysis = this.analyzeAdvancedPitch(audioFeatures.pitch, sampleRate);
+    
+    // Advanced energy analysis
+    const energyAnalysis = this.analyzeAdvancedEnergy(audioFeatures.energy);
+    
+    return {
+      speechRate,
+      fluencyScore,
+      voiceConfidence,
+      deliveryScore,
+      clarityScore,
+      fillerWordCount,
+      pauseAnalysis: speechPatterns.pauseAnalysis,
+      pitchAnalysis,
+      energyAnalysis,
+      timestamp,
+      duration
+    };
+  }
+
+  // Extract advanced audio features from real audio data
+  private extractAdvancedAudioFeatures(channelData: Float32Array, sampleRate: number) {
+    const frameSize = 1024;
+    const hopSize = 512;
+    const features = {
+      pitch: [] as number[],
+      energy: [] as number[],
+      spectralCentroid: [] as number[],
+      spectralRolloff: [] as number[],
+      mfcc: [] as number[][],
+      zcr: [] as number[],
+      rms: [] as number[],
+      spectralFlux: [] as number[],
+      fundamentalFrequency: [] as number[]
+    };
+    
+    // Process audio in overlapping frames
+    for (let i = 0; i < channelData.length - frameSize; i += hopSize) {
+      const frame = channelData.slice(i, i + frameSize);
+      
+      // Extract features for this frame
+      const energy = this.calculateFrameEnergy(frame);
+      const spectralCentroid = this.calculateSpectralCentroid(frame, sampleRate);
+      const spectralRolloff = this.calculateSpectralRolloff(frame, sampleRate);
+      const mfcc = this.calculateMFCC(frame);
+      const zcr = this.calculateZCR(frame);
+      const rms = this.calculateRMS(frame);
+      const pitch = this.calculatePitchYIN(frame, sampleRate); // More accurate pitch detection
+      const fundamentalFreq = this.calculateFundamentalFrequency(frame, sampleRate);
+      
+      features.energy.push(energy);
+      features.spectralCentroid.push(spectralCentroid);
+      features.spectralRolloff.push(spectralRolloff);
+      features.mfcc.push(mfcc);
+      features.zcr.push(zcr);
+      features.rms.push(rms);
+      features.pitch.push(pitch);
+      features.fundamentalFrequency.push(fundamentalFreq);
+      
+      // Calculate spectral flux (measure of spectral change)
+      if (i > 0) {
+        const prevFrame = channelData.slice(i - hopSize, i - hopSize + frameSize);
+        const spectralFlux = this.calculateSpectralFlux(prevFrame, frame);
+        features.spectralFlux.push(spectralFlux);
+      }
+    }
+    
+    return features;
+  }
+
+  // YIN algorithm for more accurate pitch detection
+  private calculatePitchYIN(frame: Float32Array, sampleRate: number): number {
+    const yinBuffer = new Float32Array(frame.length / 2);
+    const threshold = 0.15;
+    
+    // Calculate difference function
+    for (let tau = 1; tau < yinBuffer.length; tau++) {
+      let sum = 0;
+      for (let i = 0; i < yinBuffer.length; i++) {
+        const delta = frame[i] - frame[i + tau];
+        sum += delta * delta;
+      }
+      yinBuffer[tau] = sum;
+    }
+    
+    // Calculate cumulative mean normalized difference
+    yinBuffer[0] = 1;
+    let runningSum = 0;
+    for (let tau = 1; tau < yinBuffer.length; tau++) {
+      runningSum += yinBuffer[tau];
+      yinBuffer[tau] *= tau / runningSum;
+    }
+    
+    // Find the first minimum below threshold
+    for (let tau = 1; tau < yinBuffer.length; tau++) {
+      if (yinBuffer[tau] < threshold) {
+        // Parabolic interpolation for better accuracy
+        let betterTau = tau;
+        if (tau > 0 && tau < yinBuffer.length - 1) {
+          const x0 = yinBuffer[tau - 1];
+          const x1 = yinBuffer[tau];
+          const x2 = yinBuffer[tau + 1];
+          betterTau = tau + (x2 - x0) / (2 * (2 * x1 - x2 - x0));
+        }
+        return sampleRate / betterTau;
+      }
+    }
+    
+    return 0; // No pitch detected
+  }
+
+  // Calculate fundamental frequency using harmonic analysis
+  private calculateFundamentalFrequency(frame: Float32Array, sampleRate: number): number {
+    const fft = this.calculateFFT(frame);
+    const spectrum = new Float32Array(fft.length / 2);
+    
+    // Calculate magnitude spectrum
+    for (let i = 0; i < spectrum.length; i++) {
+      const real = fft[i * 2];
+      const imag = fft[i * 2 + 1];
+      spectrum[i] = Math.sqrt(real * real + imag * imag);
+    }
+    
+    // Find peaks in the spectrum
+    const peaks = this.findSpectralPeaks(spectrum);
+    
+    // Identify fundamental frequency as the lowest significant peak
+    const frequencyResolution = sampleRate / frame.length;
+    let fundamentalFreq = 0;
+    let maxMagnitude = 0;
+    
+    for (const peak of peaks) {
+      const frequency = peak * frequencyResolution;
+      if (frequency >= 80 && frequency <= 400 && spectrum[peak] > maxMagnitude) {
+        fundamentalFreq = frequency;
+        maxMagnitude = spectrum[peak];
+      }
+    }
+    
+    return fundamentalFreq;
+  }
+
+  // Find peaks in spectral data
+  private findSpectralPeaks(spectrum: Float32Array): number[] {
+    const peaks: number[] = [];
+    const threshold = Math.max(...spectrum) * 0.1; // 10% of max magnitude
+    
+    for (let i = 1; i < spectrum.length - 1; i++) {
+      if (spectrum[i] > spectrum[i - 1] && 
+          spectrum[i] > spectrum[i + 1] && 
+          spectrum[i] > threshold) {
+        peaks.push(i);
+      }
+    }
+    
+    return peaks;
+  }
+
+  // Calculate spectral flux (measure of spectral change)
+  private calculateSpectralFlux(prevFrame: Float32Array, currentFrame: Float32Array): number {
+    const fft1 = this.calculateFFT(prevFrame);
+    const fft2 = this.calculateFFT(currentFrame);
+    
+    let flux = 0;
+    for (let i = 0; i < Math.min(fft1.length, fft2.length); i += 2) {
+      const mag1 = Math.sqrt(fft1[i] * fft1[i] + fft1[i + 1] * fft1[i + 1]);
+      const mag2 = Math.sqrt(fft2[i] * fft2[i] + fft2[i + 1] * fft2[i + 1]);
+      const diff = mag2 - mag1;
+      flux += diff > 0 ? diff : 0; // Only positive changes
+    }
+    
+    return flux;
+  }
+
+  // Enhanced fluency calculation with audio features
+  private calculateEnhancedFluencyScore(
+    speechPatterns: any,
+    audioFeatures: any,
+    fillerWordCount: number
+  ): number {
+    const baseScore = this.calculateFluencyScore(
+      speechPatterns.wordCount,
+      fillerWordCount,
+      speechPatterns.repetitions,
+      speechPatterns.hesitations,
+      speechPatterns.speechRate
+    );
+    
+    // Audio-based adjustments
+    const energyConsistency = this.calculateStandardDeviation(audioFeatures.energy);
+    const energyBonus = energyConsistency < 0.3 ? 10 : energyConsistency < 0.5 ? 5 : 0;
+    
+    // Spectral flux consistency (smooth transitions)
+    const fluxConsistency = this.calculateStandardDeviation(audioFeatures.spectralFlux || []);
+    const fluxBonus = fluxConsistency < 0.2 ? 5 : 0;
+    
+    return Math.min(100, baseScore + energyBonus + fluxBonus);
+  }
+
+  // Enhanced voice confidence with advanced audio analysis
+  private calculateEnhancedVoiceConfidence(
+    audioFeatures: any,
+    speechRate: number,
+    hesitations: number
+  ): number {
+    const baseScore = this.calculateVoiceConfidence(audioFeatures, speechRate, hesitations);
+    
+    // Pitch stability indicates confidence
+    const pitchStability = 100 - (this.calculateStandardDeviation(audioFeatures.pitch) * 2);
+    const pitchBonus = pitchStability > 80 ? 10 : pitchStability > 60 ? 5 : 0;
+    
+    // Consistent fundamental frequency indicates steady voice
+    const fundamentalConsistency = 100 - (this.calculateStandardDeviation(audioFeatures.fundamentalFrequency) * 3);
+    const fundamentalBonus = fundamentalConsistency > 85 ? 5 : 0;
+    
+    // Strong energy levels indicate confidence
+    const avgEnergy = this.calculateAverage(audioFeatures.energy);
+    const energyBonus = avgEnergy > 0.3 ? 10 : avgEnergy > 0.2 ? 5 : 0;
+    
+    return Math.min(100, baseScore + pitchBonus + fundamentalBonus + energyBonus);
+  }
+
+  // Enhanced delivery score with timing analysis
+  private calculateEnhancedDeliveryScore(
+    speechRate: number,
+    audioFeatures: any,
+    pauseAnalysis: any
+  ): number {
+    const baseScore = this.calculateDeliveryScore(speechRate, audioFeatures.energy, pauseAnalysis);
+    
+    // Analyze rhythm and pacing through energy patterns
+    const energyPeaks = this.findEnergyPeaks(audioFeatures.energy);
+    const rhythmScore = this.analyzeRhythm(energyPeaks);
+    const rhythmBonus = rhythmScore > 0.7 ? 10 : rhythmScore > 0.5 ? 5 : 0;
+    
+    // Spectral centroid consistency indicates good articulation
+    const centroidConsistency = 100 - (this.calculateStandardDeviation(audioFeatures.spectralCentroid) / 100);
+    const articulationBonus = centroidConsistency > 80 ? 5 : 0;
+    
+    return Math.min(100, baseScore + rhythmBonus + articulationBonus);
+  }
+
+  // Enhanced clarity score with spectral analysis
+  private calculateEnhancedClarityScore(
+    audioFeatures: any,
+    fillerWordCount: number,
+    wordCount: number
+  ): number {
+    const baseScore = this.calculateClarityScore(
+      audioFeatures.spectralCentroid,
+      audioFeatures.zcr,
+      fillerWordCount,
+      wordCount
+    );
+    
+    // High-frequency content indicates clear articulation
+    const avgSpectralRolloff = this.calculateAverage(audioFeatures.spectralRolloff);
+    const clarityBonus = avgSpectralRolloff > 4000 ? 10 : avgSpectralRolloff > 3000 ? 5 : 0;
+    
+    // Consistent MFCC features indicate clear speech
+    const mfccConsistency = this.analyzeMFCCConsistency(audioFeatures.mfcc);
+    const mfccBonus = mfccConsistency > 0.8 ? 5 : 0;
+    
+    return Math.min(100, baseScore + clarityBonus + mfccBonus);
+  }
+
+  // Analyze rhythm patterns in speech
+  private analyzeRhythm(energyPeaks: number[]): number {
+    if (energyPeaks.length < 3) return 0;
+    
+    const intervals = [];
+    for (let i = 1; i < energyPeaks.length; i++) {
+      intervals.push(energyPeaks[i] - energyPeaks[i - 1]);
+    }
+    
+    const avgInterval = this.calculateAverage(intervals);
+    const intervalVariance = this.calculateVariance(intervals);
+    
+    // Good rhythm has consistent intervals
+    return Math.max(0, 1 - (intervalVariance / (avgInterval * avgInterval)));
+  }
+
+  // Find energy peaks for rhythm analysis
+  private findEnergyPeaks(energy: number[]): number[] {
+    const peaks: number[] = [];
+    const threshold = this.calculateAverage(energy) * 1.2;
+    
+    for (let i = 1; i < energy.length - 1; i++) {
+      if (energy[i] > energy[i - 1] && 
+          energy[i] > energy[i + 1] && 
+          energy[i] > threshold) {
+        peaks.push(i);
+      }
+    }
+    
+    return peaks;
+  }
+
+  // Analyze MFCC consistency for speech clarity
+  private analyzeMFCCConsistency(mfccFrames: number[][]): number {
+    if (mfccFrames.length < 2) return 0;
+    
+    let totalConsistency = 0;
+    const numCoefficients = mfccFrames[0].length;
+    
+    for (let coeff = 0; coeff < numCoefficients; coeff++) {
+      const coeffValues = mfccFrames.map(frame => frame[coeff]);
+      const variance = this.calculateVariance(coeffValues);
+      const mean = this.calculateAverage(coeffValues);
+      const consistency = Math.max(0, 1 - (variance / (mean * mean + 1)));
+      totalConsistency += consistency;
+    }
+    
+    return totalConsistency / numCoefficients;
+  }
+
+  // Get the complete voice timeline for the interview
+  getVoiceTimeline(): VoiceTimelinePoint[] {
+    return [...this.voiceTimeline];
+  }
+
+  // Reset timeline for new interview
+  resetTimeline(): void {
+    this.voiceTimeline = [];
+  }
+
+  // Generate comprehensive feedback based on voice metrics
+  private generateActionableFeedback(
+    metrics: VoiceMetrics, 
+    transcription: string,
+    questionContext?: string
+  ): ActionableFeedback {
+    const strengths: string[] = [];
+    const improvements: string[] = [];
+    const specificTips: string[] = [];
+    
+    // Analyze speech rate
+    if (metrics.speechRate >= 140 && metrics.speechRate <= 180) {
+      strengths.push("Perfect speaking pace - clear and engaging");
+    } else if (metrics.speechRate < 120) {
+      improvements.push("Speaking pace is too slow");
+      specificTips.push("Try to speak a bit faster to maintain interviewer engagement");
+    } else if (metrics.speechRate > 200) {
+      improvements.push("Speaking too quickly");
+      specificTips.push("Slow down and take deliberate pauses between key points");
+    }
+
+    // Analyze fluency
+    if (metrics.fluencyScore >= 80) {
+      strengths.push("Excellent fluency and smooth delivery");
+    } else if (metrics.fluencyScore >= 60) {
+      improvements.push("Some hesitation in speech flow");
+      specificTips.push("Practice your key points beforehand to reduce hesitation");
+    } else {
+      improvements.push("Significant disfluency affecting clarity");
+      specificTips.push("Take a breath before answering and organize your thoughts");
+    }
+
+    // Analyze voice confidence
+    if (metrics.voiceConfidence >= 75) {
+      strengths.push("Strong, confident vocal presence");
+    } else if (metrics.voiceConfidence >= 50) {
+      improvements.push("Voice could project more confidence");
+      specificTips.push("Speak from your diaphragm and maintain steady volume");
+    } else {
+      improvements.push("Voice lacks confidence and authority");
+      specificTips.push("Practice power poses before speaking and focus on breathing deeply");
+    }
+
+    // Analyze filler words
+    const fillerRatio = metrics.fillerWordCount / (transcription.split(' ').length || 1);
+    if (fillerRatio < 0.02) {
+      strengths.push("Minimal use of filler words - very professional");
+    } else if (fillerRatio < 0.05) {
+      improvements.push("Some filler words present");
+      specificTips.push("Replace 'um' and 'uh' with brief pauses for better impact");
+    } else {
+      improvements.push("Too many filler words disrupting message clarity");
+      specificTips.push("Practice speaking more slowly to reduce filler word dependency");
+    }
+
+    // Analyze energy and pitch variation
+    if (metrics.energyAnalysis.dynamicRange > 0.3 && metrics.pitchAnalysis.pitchVariation > 0.2) {
+      strengths.push("Great vocal variety and engaging delivery");
+    } else if (metrics.energyAnalysis.dynamicRange < 0.15) {
+      improvements.push("Voice lacks energy and enthusiasm");
+      specificTips.push("Vary your tone and energy level to emphasize key points");
+    }
+
+    // Analyze pauses
+    if (metrics.pauseAnalysis.strategicPauses > 2) {
+      strengths.push("Good use of strategic pauses for emphasis");
+    } else if (metrics.pauseAnalysis.averagePauseLength > 2.0) {
+      improvements.push("Pauses are too long, affecting flow");
+      specificTips.push("Keep pauses brief (1-2 seconds) to maintain momentum");
+    }
+
+    // Calculate overall score and category
+    const overallScore = Math.round(
+      (metrics.fluencyScore + metrics.voiceConfidence + metrics.deliveryScore + metrics.clarityScore) / 4
+    );
+
+    let category: ActionableFeedback['category'];
+    let overall: string;
+
+    if (overallScore >= 85) {
+      category = 'excellent';
+      overall = "Outstanding vocal performance! Your voice projects confidence and professionalism.";
+    } else if (overallScore >= 70) {
+      category = 'good';
+      overall = "Good vocal performance with room for minor improvements.";
+    } else if (overallScore >= 55) {
+      category = 'fair';
+      overall = "Fair vocal performance. Focus on the suggested improvements to strengthen your delivery.";
+    } else {
+      category = 'needs_improvement';
+      overall = "Your vocal delivery needs significant improvement. Practice the specific tips to build confidence.";
+    }
+
+    // Add context-specific feedback
+    if (questionContext) {
+      if (questionContext.toLowerCase().includes('leadership')) {
+        specificTips.push("For leadership questions, project authority through steady, measured speech");
+      } else if (questionContext.toLowerCase().includes('technical')) {
+        specificTips.push("For technical answers, speak clearly and pause after complex concepts");
+      } else if (questionContext.toLowerCase().includes('behavioral')) {
+        specificTips.push("Use vocal variety to make your stories more engaging and memorable");
+      }
+    }
+
+    return {
+      overall,
+      strengths,
+      improvements,
+      specificTips,
+      score: overallScore,
+      category
+    };
+  }
+
+  async analyzeVoiceMetrics(audioBlob: Blob, transcription: string, duration: number, timestamp: number): Promise<VoiceMetrics> {
+    try {
+      // If no audio data is available, analyze based on transcription only
+      if (audioBlob.size === 0) {
+        return this.analyzeFromTranscriptionOnly(transcription, duration, timestamp);
+      }
+
+      // Analyze audio features if audio is available
       const audioAnalysis = await this.analyzeAudioFeatures(audioBlob);
       
       // Analyze speech patterns from transcription
@@ -100,12 +644,93 @@ export class AdvancedSpeechAnalyzer {
         fillerWordCount,
         pauseAnalysis: speechPatterns.pauseAnalysis,
         pitchAnalysis,
-        energyAnalysis
+        energyAnalysis,
+        timestamp,
+        duration
       };
     } catch (error) {
       console.error('Error analyzing voice metrics:', error);
       return this.getDefaultMetrics();
     }
+  }
+
+  // Analyze voice metrics based on transcription only (fallback when no audio available)
+  private analyzeFromTranscriptionOnly(transcription: string, duration: number, timestamp: number): VoiceMetrics {
+    const words = transcription.split(' ').filter(word => word.length > 0);
+    const wordCount = words.length;
+    
+    // Calculate speech rate
+    const speechRate = duration > 0 ? (wordCount / duration) * 60 : 0;
+    
+    // Analyze filler words
+    const fillerWords = ['um', 'uh', 'like', 'you know', 'so', 'well', 'actually', 'basically'];
+    const fillerWordCount = words.filter(word => 
+      fillerWords.includes(word.toLowerCase().replace(/[.,!?]/g, ''))
+    ).length;
+    
+    // Calculate metrics based on transcription analysis
+    const fillerRatio = wordCount > 0 ? fillerWordCount / wordCount : 0;
+    
+    // Estimate fluency based on filler ratio and response length
+    const fluencyScore = Math.max(0, Math.min(100, 
+      100 - (fillerRatio * 50) + Math.min(wordCount / 20, 1) * 20
+    ));
+    
+    // Estimate confidence based on word choice and length
+    const confidenceWords = ['confident', 'certain', 'definitely', 'absolutely', 'strong', 'successful'];
+    const uncertainWords = ['maybe', 'perhaps', 'possibly', 'might', 'unsure', 'probably'];
+    
+    const confidenceBoosts = words.filter(word => 
+      confidenceWords.some(cw => word.toLowerCase().includes(cw))
+    ).length;
+    const uncertaintyPenalties = words.filter(word => 
+      uncertainWords.some(uw => word.toLowerCase().includes(uw))
+    ).length;
+    
+    const voiceConfidence = Math.max(0, Math.min(100,
+      70 + (confidenceBoosts * 5) - (uncertaintyPenalties * 10) - (fillerRatio * 30)
+    ));
+    
+    // Estimate delivery score
+    const deliveryScore = Math.max(0, Math.min(100,
+      (speechRate >= 120 && speechRate <= 180 ? 80 : 60) + 
+      (wordCount > 10 ? 15 : 0) + 
+      (fillerRatio < 0.05 ? 15 : 0) - 
+      (fillerRatio * 40)
+    ));
+    
+    // Estimate clarity based on sentence structure
+    const sentences = transcription.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const avgSentenceLength = sentences.length > 0 ? wordCount / sentences.length : 0;
+    const clarityScore = Math.max(0, Math.min(100,
+      80 + (avgSentenceLength > 5 && avgSentenceLength < 20 ? 15 : -10) - (fillerRatio * 30)
+    ));
+    
+    return {
+      speechRate,
+      fluencyScore,
+      voiceConfidence,
+      deliveryScore,
+      clarityScore,
+      fillerWordCount,
+      pauseAnalysis: {
+        averagePauseLength: 1.0, // Estimated
+        pauseFrequency: Math.max(0, sentences.length - 1),
+        strategicPauses: Math.floor(sentences.length / 2)
+      },
+      pitchAnalysis: {
+        averagePitch: 150, // Default estimate
+        pitchVariation: 0.3,
+        pitchStability: 0.7
+      },
+      energyAnalysis: {
+        averageEnergy: 0.6,
+        energyConsistency: 0.8,
+        dynamicRange: 0.4
+      },
+      timestamp,
+      duration
+    };
   }
 
   private async analyzeAudioFeatures(audioBlob: Blob): Promise<AudioAnalysisResult> {
@@ -493,7 +1118,9 @@ export class AdvancedSpeechAnalyzer {
         averageEnergy: 0,
         energyConsistency: 0,
         dynamicRange: 0
-      }
+      },
+      timestamp: Date.now(),
+      duration: 0
     };
   }
 
@@ -599,6 +1226,74 @@ export class AdvancedSpeechAnalyzer {
     }
     
     return result;
+  }
+
+  // Main method for real-time voice analysis (fallback for when no audio buffer is available)
+  async analyzeVoiceSegment(
+    audioBlob: Blob, 
+    transcription: string, 
+    duration: number, 
+    timestamp: number,
+    questionContext?: string
+  ): Promise<VoiceTimelinePoint> {
+    const metrics = await this.analyzeVoiceMetrics(audioBlob, transcription, duration, timestamp);
+    const feedback = this.generateActionableFeedback(metrics, transcription, questionContext);
+    
+    const timelinePoint: VoiceTimelinePoint = {
+      timestamp,
+      metrics,
+      feedback,
+      questionContext
+    };
+    
+    this.voiceTimeline.push(timelinePoint);
+    return timelinePoint;
+  }
+
+  // Advanced pitch analysis
+  private analyzeAdvancedPitch(pitchArray: number[], sampleRate: number) {
+    const validPitches = pitchArray.filter(p => p > 0 && p < sampleRate / 2);
+    
+    if (validPitches.length === 0) {
+      return {
+        averagePitch: 0,
+        pitchVariation: 0,
+        pitchStability: 0
+      };
+    }
+    
+    const averagePitch = this.calculateAverage(validPitches);
+    const pitchStdDev = this.calculateStandardDeviation(validPitches);
+    const pitchVariation = pitchStdDev / averagePitch;
+    const pitchStability = Math.max(0, 100 - (pitchVariation * 100));
+    
+    return {
+      averagePitch,
+      pitchVariation,
+      pitchStability
+    };
+  }
+
+  // Advanced energy analysis
+  private analyzeAdvancedEnergy(energyArray: number[]) {
+    if (energyArray.length === 0) {
+      return {
+        averageEnergy: 0,
+        energyConsistency: 0,
+        dynamicRange: 0
+      };
+    }
+    
+    const averageEnergy = this.calculateAverage(energyArray);
+    const energyStdDev = this.calculateStandardDeviation(energyArray);
+    const energyConsistency = Math.max(0, 100 - (energyStdDev / averageEnergy * 100));
+    const dynamicRange = Math.max(...energyArray) - Math.min(...energyArray);
+    
+    return {
+      averageEnergy,
+      energyConsistency,
+      dynamicRange
+    };
   }
 }
 

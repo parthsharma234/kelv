@@ -2,9 +2,17 @@ import { useEffect, useCallback, useRef } from 'react';
 import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
 import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt } from '../utils/promptTemplates';
 import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
-import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk } from '../utils/supabase-interview';
+import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
+import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
+import { pcmToWav } from '../utils/audio';
+
+// Simple interface for speech metrics in realtime interviews
+interface SpeechMetricEntry {
+  questionId?: string;
+  metrics: any;
+}
 
 // Generate a simple UUID v4
 const generateUUID = () => {
@@ -66,6 +74,10 @@ export function useRealtimeInterview({
   const startTimeRef = useRef<Date | null>(null);
   const performanceScoresRef = useRef<number[]>([]);
   const candidateResponsesRef = useRef<string[]>([]);
+  const speechMetricsRef = useRef<SpeechMetricEntry[]>([]);
+  const currentQuestionRef = useRef<string>('');
+  const questionTimestampRef = useRef<number | null>(null);
+  const responseTimesRef = useRef<number[]>([]);
 
   // Generate adaptive system prompt
   const generateAdaptiveInstructions = useCallback((
@@ -137,7 +149,7 @@ export function useRealtimeInterview({
     }
   }, [generateAdaptiveInstructions, state.questionCount]);
 
-  const handleCompleteTranscriptChunk = useCallback((chunk: TranscriptChunk) => {
+  const handleCompleteTranscriptChunk = useCallback(async (chunk: TranscriptChunk) => {
     // Save complete chunks to Supabase
     if (state.sessionId) {
       saveTranscriptChunk({
@@ -152,7 +164,13 @@ export function useRealtimeInterview({
       });
     }
 
-    // Analyze user responses for adaptive behavior
+    // Track current question context for voice analysis
+    if (chunk.speaker === 'assistant' && chunk.text.trim().endsWith('?')) {
+      currentQuestionRef.current = chunk.text;
+      questionTimestampRef.current = Date.now();
+    }
+
+    // Analyze user responses for adaptive behavior and voice metrics
     if (chunk.speaker === 'user' && chunk.text.trim().length > 10) {
       const responseLength = chunk.text.split(' ').length;
       const hasKeywords = ['experience', 'project', 'team', 'challenge', 'solution'].some(
@@ -162,8 +180,10 @@ export function useRealtimeInterview({
         (responseLength > 20 ? 7 : 5) + (hasKeywords ? 2 : 0)
       ));
       updateInterviewerBehavior(chunk.text, estimatedScore);
+
+      // Voice metrics will be processed post-interview.
     }
-  }, [state.sessionId, updateInterviewerBehavior]);
+  }, [state.sessionId, updateInterviewerBehavior, setup.interviewMode]);
 
 
   // Initialize realtime client with adaptive prompting
@@ -321,6 +341,11 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
       clientRef.current.on('input_audio_buffer.speech_started', () => {
         setSpeakerStatus('user', true);
+        if (questionTimestampRef.current) {
+          const responseTime = (Date.now() - questionTimestampRef.current) / 1000;
+          responseTimesRef.current.push(responseTime);
+          questionTimestampRef.current = null; // Reset for next question
+        }
         // Handle interruption - stop AI audio playback
         if (clientRef.current) {
           clientRef.current.stopPlayback();
@@ -342,17 +367,18 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         handleAssistantResponse('', true);
       });
 
-      // This listener is now redundant because transcript.update handles assistant messages.
-      // Keeping it for debugging or specific cases might be useful, but for now,
-      // the primary logic is consolidated in 'transcript.update'.
-      clientRef.current.on('response.text.delta', (event: any) => {
-        // Some APIs may send the text as event.delta, others as event.text or directly as event
-        const aiText = event?.delta ?? event?.text ?? (typeof event === 'string' ? event : undefined);
-        if (aiText) {
-          // The 'transcript.update' event is now the primary source of truth.
-          // This console.log can remain for debugging purposes.
-          console.log('[Realtime] Raw Response Text Delta (AI):', aiText);
+      clientRef.current.on('response.audio.delta', (event: any) => {
+        // Store audio chunks for voice analysis
+        if (event.delta) {
+          // Audio delta is handled by the OpenAI client internally
+          // We'll retrieve audio chunks directly from the client when needed
+          console.log('Audio delta received from assistant');
         }
+      });
+
+      clientRef.current.on('input_audio_buffer.committed', () => {
+        // User audio is committed, we can analyze it
+        console.log('[Realtime] User audio committed');
       });
 
     } catch (error) {
@@ -393,6 +419,101 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+  }, []);
+
+  // Parse transcript into structured Q&A pairs for analysis
+  const parseTranscriptIntoQAPairs = useCallback(async (transcriptChunks: TranscriptChunk[]) => {
+    const questions: Array<{ id: string; text: string; category: string }> = [];
+    const responses: Array<{ questionId: string; response: string; analysis: any }> = [];
+    
+    // Convert transcript chunks to text and group by speaker
+    let currentQuestion = '';
+    let currentQuestionId = '';
+    let currentResponse = '';
+    let isCollectingResponse = false;
+    
+    for (let i = 0; i < transcriptChunks.length; i++) {
+      const chunk = transcriptChunks[i];
+      
+      if (chunk.speaker === 'assistant') {
+        // If we were collecting a response, save it before starting new question
+        if (isCollectingResponse && currentResponse.trim() && currentQuestionId) {
+          const analysis = await analyzeResponseWithAI(
+            { text: currentQuestion, type: 'behavioral', id: `q${Date.now()}` },
+            currentResponse.trim(),
+            'jobType' in setup ? setup : {
+              jobType: 'General',
+              experienceLevel: 'Mid-level',
+              industry: 'Technology',
+              interviewMode: setup.interviewMode
+            },
+            [],
+            focusedType || 'default'
+          );
+          responses.push({
+            questionId: currentQuestionId,
+            response: currentResponse.trim(),
+            analysis: analysis
+          });
+          currentResponse = '';
+          isCollectingResponse = false;
+        }
+        
+        // Start new question
+        currentQuestion = chunk.text.trim();
+        currentQuestionId = `q_${questions.length + 1}_${Date.now()}`;
+        
+        // Determine category based on question content
+        let category = 'behavioral';
+        const questionLower = currentQuestion.toLowerCase();
+        if (questionLower.includes('technical') || questionLower.includes('code') ||
+            questionLower.includes('algorithm') || questionLower.includes('programming')) {
+          category = 'technical';
+        } else if (questionLower.includes('situation') || questionLower.includes('challenge') ||
+                   questionLower.includes('conflict') || questionLower.includes('time when')) {
+          category = 'situational';
+        } else if (questionLower.includes('goal') || questionLower.includes('future') ||
+                   questionLower.includes('career') || questionLower.includes('plan')) {
+          category = 'goals';
+        } else if (questionLower.includes('team') || questionLower.includes('collaboration')) {
+          category = 'teamwork';
+        }
+        
+        questions.push({
+          id: currentQuestionId,
+          text: currentQuestion,
+          category: category
+        });
+        
+      } else if (chunk.speaker === 'user' && currentQuestionId) {
+        // Collect user response
+        currentResponse += ' ' + chunk.text;
+        isCollectingResponse = true;
+      }
+    }
+    
+    // Handle the last response if exists
+    if (isCollectingResponse && currentResponse.trim() && currentQuestionId) {
+      const analysis = await analyzeResponseWithAI(
+        { text: currentQuestion, type: 'behavioral', id: `q${Date.now()}` },
+        currentResponse.trim(),
+        'jobType' in setup ? setup : {
+          jobType: 'General',
+          experienceLevel: 'Mid-level',
+          industry: 'Technology',
+          interviewMode: setup.interviewMode
+        },
+        [],
+        focusedType || 'default'
+      );
+      responses.push({
+        questionId: currentQuestionId,
+        response: currentResponse.trim(),
+        analysis: analysis
+      });
+    }
+    
+    return { questions, responses };
   }, []);
 
   // Public interface methods
@@ -474,44 +595,174 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     }
   }, [startTimer, state.sessionId, setStatus]);
 
-  const endInterview = useCallback(async () => {
-    stopTimer();
-    
-    if (clientRef.current) {
-      clientRef.current.disconnect();
+  const getSpeechMetrics = useCallback(() => {
+    return speechMetricsRef.current;
+  }, []);
+
+  const resetSpeechMetrics = useCallback(() => {
+    speechMetricsRef.current = [];
+  }, []);
+
+  const processVoiceAnalytics = useCallback(async (): Promise<SpeechMetricEntry[] | null> => {
+    if (setup.interviewMode !== 'voice' || !clientRef.current) {
+      return null;
     }
-    
-    setStatus('completed');
-    
-    // Update realtime session in Supabase with final data
-    if (state.sessionId) {
-      try {
-        await updateRealtimeSession(state.sessionId, {
-          end_time: new Date().toISOString(),
-          status: 'completed',
-          total_duration: state.duration,
-          question_count: state.questionCount
-        });
-      } catch (supabaseError) {
-        console.error('Failed to update realtime session in Supabase:', supabaseError);
-        // Continue with completion even if Supabase fails
+
+    try {
+      const allAudioChunks = clientRef.current.getAllAudioChunks();
+      if (allAudioChunks.length === 0) {
+        console.warn('No audio chunks recorded for post-interview analysis.');
+        return null;
       }
+
+      // Combine all ArrayBuffer chunks into a single Float32Array
+      const totalLength = allAudioChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+      const combinedBuffer = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of allAudioChunks) {
+        combinedBuffer.set(new Uint8Array(chunk), offset);
+        offset += chunk.byteLength;
+      }
+      const combinedPcm = new Float32Array(combinedBuffer.buffer);
+
+      // Convert the raw PCM data to a WAV file
+      const fullAudioBlob = pcmToWav(combinedPcm, 16000); // Assuming 16kHz sample rate
+      const fullTranscription = state.transcript.filter(t => t.speaker === 'user').map(t => t.text).join(' ');
+      const duration = state.duration;
+
+      console.log('Processing voice analytics post-interview...');
+            const metrics = await extractSpeechMetrics(fullAudioBlob, fullTranscription, duration, responseTimesRef.current);
+
+      console.log('Post-interview voice metrics:', metrics);
+      return metrics ? [{ questionId: 'summary', metrics }] : [];
+    } catch (error) {
+      console.error('Error processing voice analytics:', error);
+      return null;
     }
-    
-    // Prepare session data for completion
-    const sessionData = {
-      sessionId: state.sessionId,
-      setup,
-      transcript: state.transcript,
-      duration: state.duration,
-      questionCount: state.questionCount,
-      interviewType,
-      focusedType,
-      completedAt: new Date().toISOString()
-    };
-    
-    onComplete?.(sessionData);
-  }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus]);
+  }, [setup.interviewMode, state.transcript, state.duration]);
+
+  const endInterview = useCallback(async () => {
+    console.log('Ending realtime interview...');
+    stopTimer();
+    setStatus('processing');
+
+    try {
+      let voiceMetrics: SpeechMetricEntry[] | null = null;
+      try {
+        console.log('Starting voice analytics processing...');
+        voiceMetrics = await processVoiceAnalytics();
+        console.log('Voice analytics processing finished.');
+      } catch (error) {
+        console.error('Error during voice analytics processing:', error);
+        // Continue without voice metrics if processing fails
+      }
+      
+      if (clientRef.current) {
+        clientRef.current.disconnect();
+      }
+      
+      setStatus('completed');
+      
+      // Update realtime session in Supabase with final data
+      if (state.sessionId) {
+        try {
+          console.log('Updating realtime session in Supabase...');
+          await updateRealtimeSession(state.sessionId, {
+            end_time: new Date().toISOString(),
+            status: 'completed',
+            total_duration: state.duration,
+            question_count: state.questionCount
+          });
+
+          // Parse transcript into structured Q&A pairs for analysis
+          console.log('Parsing transcript into Q&A pairs...');
+          const { questions, responses } = await parseTranscriptIntoQAPairs(state.transcript);
+          
+          // Calculate overall score from responses
+          const overallScore = responses.length > 0 
+            ? Math.round(responses.reduce((sum: number, r: any) => sum + r.analysis.score, 0) / responses.length * 10)
+            : 70;
+          
+          // Prepare session data for completion
+          const finalSpeechMetrics = voiceMetrics || getSpeechMetrics();
+          console.log('Speech metrics collected:', finalSpeechMetrics.length, 'entries');
+          
+          const sessionData = {
+            sessionId: state.sessionId,
+            setup,
+            transcript: state.transcript,
+            duration: state.duration,
+            questionCount: state.questionCount,
+            questionsAnswered: responses.length,
+            overallScore,
+            questions, // Add structured questions
+            responses, // Add structured responses with analysis
+            interviewType,
+            focusedType,
+            completedAt: new Date().toISOString(),
+            speechMetrics: finalSpeechMetrics, // Include speech metrics like college interviews
+            voice_metrics_summary: finalSpeechMetrics.length > 0 ? finalSpeechMetrics[0].metrics : null,
+            responseTimes: responseTimesRef.current
+          };
+
+          // Save structured interview data for viewing in recent interviews
+          try {
+            console.log('Saving realtime interview session...');
+            await saveRealtimeInterviewSession(sessionData);
+          } catch (saveError) {
+            console.error('Failed to save realtime interview session:', saveError);
+            // Continue even if save fails
+          }
+
+          console.log('Calling onComplete with session data...');
+          onComplete?.(sessionData);
+        } catch (supabaseError) {
+          console.error('Failed to update realtime session in Supabase:', supabaseError);
+          // Continue with completion even if Supabase fails
+          const fallbackData = {
+            sessionId: state.sessionId,
+            setup,
+            transcript: state.transcript,
+            duration: state.duration,
+            questionCount: state.questionCount,
+            interviewType,
+            focusedType,
+            completedAt: new Date().toISOString(),
+            speechMetrics: getSpeechMetrics()
+          };
+          console.log('Calling onComplete with fallback data...');
+          onComplete?.(fallbackData);
+        }
+      } else {
+        console.warn('No session ID found, calling onComplete with minimal data...');
+        const minimalData = {
+          setup,
+          transcript: state.transcript,
+          duration: state.duration,
+          questionCount: state.questionCount,
+          interviewType,
+          focusedType,
+          completedAt: new Date().toISOString(),
+          speechMetrics: getSpeechMetrics()
+        };
+        onComplete?.(minimalData);
+      }
+    } catch (error) {
+      console.error('Unhandled error in endInterview, calling onComplete with fallback data to prevent UI freeze:', error);
+      const fallbackData = {
+        setup,
+        transcript: state.transcript,
+        duration: state.duration,
+        questionCount: state.questionCount,
+        interviewType,
+        focusedType,
+        completedAt: new Date().toISOString(),
+        speechMetrics: getSpeechMetrics(),
+        error: 'An unexpected error occurred during interview finalization.'
+      };
+      onComplete?.(fallbackData);
+    }
+  }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
 
   const startRecording = useCallback(async () => {
     if (!clientRef.current || state.status !== 'interviewing') {
@@ -569,8 +820,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      // Reset voice analysis
+      resetSpeechMetrics();
     };
-  }, []);
+  }, [resetSpeechMetrics]);
 
   return {
     state,
@@ -582,6 +835,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     endInterview,
     startRecording,
     stopRecording,
-    sendTextMessage
+    sendTextMessage,
+    getSpeechMetrics,
+    resetSpeechMetrics
   };
 }

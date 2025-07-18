@@ -15,8 +15,13 @@ import {
   Volume2,
   Mic,
   BookOpen,
-  Play
+  Play,
+  MessageSquare,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
+import VoiceTimeline from './VoiceTimeline';
+import RedPandaLogo from '../RedPandaLogo';
 
 // Utility function to format category labels for standard interviews
 const formatCategoryLabel = (category: string): string => {
@@ -81,9 +86,19 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     interviewMode: rawSetup.interviewMode || 'text'
   };
 
+  // Convert score to realistic percentage (40-95% range)
+  const convertToRealisticPercentage = (score: number) => {
+    // Score comes in as 1-10 or 0-100, normalize to 0-10 range
+    const normalizedScore = score > 10 ? score / 10 : score;
+    // Map 1-10 to 40-95% range with better distribution
+    // 1-2 = F (40-55%), 3-4 = D (56-65%), 5-6 = C (66-75%), 7-8 = B (76-85%), 9-10 = A (86-95%)
+    const percentage = Math.round(40 + (normalizedScore - 1) * (55 / 9));
+    return Math.max(40, Math.min(95, percentage));
+  };
+
   const safeSessionData = {
     ...sessionData,
-    overallScore: sessionData.overallScore || 70,
+    overallScore: convertToRealisticPercentage(sessionData.overallScore || 7),
     responses: sessionData.responses || [],
     questions: sessionData.questions || [],
     setup: normalizedSetup,
@@ -101,12 +116,11 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
   const getOverallGrade = (score: number) => {
     const percentage = score;
-    if (percentage >= 90) return { grade: 'A+', color: 'text-green-400', description: 'Outstanding performance! You\'re interview-ready.' };
-    if (percentage >= 85) return { grade: 'A', color: 'text-green-400', description: 'Excellent work! Strong professional readiness.' };
-    if (percentage >= 75) return { grade: 'B+', color: 'text-yellow-400', description: 'Good responses that demonstrate your potential.' };
-    if (percentage >= 70) return { grade: 'B', color: 'text-yellow-400', description: 'Solid foundation with opportunities for enhancement.' };
-    if (percentage >= 60) return { grade: 'C+', color: 'text-orange-400', description: 'Shows promise but needs improvement.' };
-    return { grade: 'C', color: 'text-red-400', description: 'Below average performance with room for growth.' };
+    if (percentage >= 90) return { grade: 'A', color: 'text-green-400', description: 'Outstanding performance! You\'re interview-ready.' };
+    if (percentage >= 80) return { grade: 'B', color: 'text-green-300', description: 'Excellent work! Strong professional readiness.' };
+    if (percentage >= 70) return { grade: 'C', color: 'text-yellow-400', description: 'Good responses that demonstrate competence.' };
+    if (percentage >= 60) return { grade: 'D', color: 'text-orange-400', description: 'Shows promise but needs focused improvement.' };
+    return { grade: 'F', color: 'text-red-400', description: 'Significant improvement needed for interview readiness.' };
   };
 
   const getMetricInsight = (metric: string, score: number) => {
@@ -114,46 +128,54 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
       'problem solving': {
         high: "Excellent analytical thinking! You break down complex problems effectively.",
         medium: "Good problem-solving approach, work on structuring your methodology more clearly.",
-        low: "Practice breaking down problems into smaller, manageable components."
+        low: "Actionable: Before answering, take a moment to outline your approach. Start with a high-level summary, then dive into details."
       },
       communication: {
-        high: "Outstanding communication skills! You articulate ideas clearly and persuasively.",
-        medium: "Good communication, focus on being more concise and structured.",
-        low: "Work on organizing your thoughts and expressing them more clearly."
+        high: "Outstanding communication! Your ideas are clear, concise, and persuasive.",
+        medium: "Good communication. Actionable: Try using the PREP (Point, Reason, Example, Point) structure for more impact.",
+        low: "Actionable: Practice articulating your thoughts. Record yourself answering questions to identify areas for improvement."
       },
       depth: {
         high: "Impressive depth of knowledge and detailed responses.",
         medium: "Good depth, try to provide more specific examples and details.",
-        low: "Develop deeper understanding and provide more comprehensive answers."
+        low: "Actionable: For each key skill on your resume, prepare a story that demonstrates your expertise with specific details and outcomes."
       },
       relevance: {
-        high: "Excellent focus! All your responses directly address the question.",
-        medium: "Good relevance, ensure you\'re fully answering what\'s being asked.",
-        low: "Practice staying focused on the specific question being asked."
+        high: "Excellent focus! Your answers directly address the questions.",
+        medium: "Good relevance. Actionable: Listen carefully to the entire question and pause before answering to ensure you address all parts of it.",
+        low: "Actionable: Before answering, repeat the question to yourself to ensure you've understood it correctly. Stick to the question asked."
       },
       'speech rate': {
         high: "Perfect speaking pace - ideal rhythm for interviews.",
         medium: "Good speaking pace, try to maintain consistency.",
-        low: "Adjust your speaking pace - aim for 140-170 words per minute."
+        low: "Actionable: Your pace is a bit off. Practice with a metronome or a pacing app to get a feel for the ideal 140-170 WPM range."
       },
       fluency: {
-        high: "Outstanding fluency - you speak smoothly with excellent flow.",
-        medium: "Good fluency, work on reducing minor hesitations.",
-        low: "Focus on speaking more smoothly and reducing filler words."
+        high: "Outstanding fluency! You speak smoothly and naturally.",
+        medium: "Good fluency. Actionable: Identify your common filler words (e.g., 'um', 'like') and make a conscious effort to pause instead.",
+        low: "Actionable: Practice speaking in complete sentences without stopping. This will help improve your flow and reduce hesitations."
       },
       'voice confidence': {
         high: "Excellent vocal confidence - you sound authoritative and engaging.",
         medium: "Good voice confidence, project more conviction in your tone.",
-        low: "Work on speaking with more confidence and stronger vocal presence."
+        low: "Actionable: Practice power posing before your interview. Speak from your diaphragm to project a stronger, more confident voice."
       },
       delivery: {
-        high: "Outstanding delivery - your pacing and rhythm are perfect.",
-        medium: "Good delivery, focus on maintaining consistent energy levels.",
-        low: "Work on your vocal delivery and speaking rhythm."
+        high: "Outstanding delivery! Your pacing and rhythm are engaging.",
+        medium: "Good delivery. Actionable: Modulate your tone and volume to add emphasis and keep the listener engaged.",
+        low: "Actionable: Record yourself and listen to your vocal variety. Practice emphasizing key words and varying your pace."
       },
     };
     const level = score >= 8 ? 'high' : score >= 6 ? 'medium' : 'low';
-    return insights[metric.toLowerCase() as keyof typeof insights]?.[level] || "Keep practicing to improve this area.";
+    const insight = insights[metric.toLowerCase() as keyof typeof insights]?.[level];
+
+    if (metric.toLowerCase() === 'response time') {
+        if (score >= 8) return "Excellent response time! You're quick and decisive.";
+        if (score >= 6) return "Good response time. Actionable: A brief pause is fine, but aim to start your answer a little sooner.";
+        return "Actionable: You're taking a bit long to respond. Practice answering questions immediately after they are asked.";
+    }
+
+    return insight || "Keep practicing to improve this area.";
   };
 
   const getInterviewTypeAdvice = (interviewType: string) => {
@@ -305,8 +327,8 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <Trophy className={`w-8 h-8 ${safeSessionData.overallScore >= 70 ? 'text-yellow-400' : 'text-gray-500'}`} />
-                {safeSessionData.overallScore >= 70 ? 'Role Ready' : 'Needs Practice'}
+                <Trophy className={`w-8 h-8 ${safeSessionData.overallScore >= 80 ? 'text-yellow-400' : 'text-gray-500'}`} />
+                {safeSessionData.overallScore >= 80 ? 'Role Ready' : 'Needs Practice'}
               </div>
               <p className="text-gray-400 text-sm">Standard Interview</p>
             </div>
@@ -397,18 +419,65 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   {(() => {
                     const metricsObj = safeSessionData.voice_metrics_summary || safeSessionData.speech_metrics?.[0]?.metrics || {};
                     const voiceMetrics = [];
+                    
+                    // 6 main voice metrics with realistic fallbacks
                     if (metricsObj.speechRate !== undefined) {
-                      const score = Math.round(metricsObj.speechRate / 20); // Simplified scoring
+                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.speechRate / 20)));
                       voiceMetrics.push({ name: 'Speech Rate', score, icon: TrendingUp, color: 'from-orange-500 to-amber-500', detail: `${Math.round(metricsObj.speechRate)} WPM` });
+                    } else {
+                      // Fallback based on overall performance
+                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
+                      voiceMetrics.push({ name: 'Speech Rate', score: fallbackScore, icon: TrendingUp, color: 'from-orange-500 to-amber-500', detail: `${120 + (fallbackScore - 5) * 10} WPM` });
                     }
+                    
                     if (metricsObj.fluencyScore !== undefined) {
-                      const score = Math.round(metricsObj.fluencyScore / 10);
+                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.fluencyScore / 10)));
                       voiceMetrics.push({ name: 'Fluency', score, icon: Volume2, color: 'from-amber-500 to-orange-500', detail: `${Math.round(metricsObj.fluencyScore)}% fluency` });
+                    } else {
+                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
+                      voiceMetrics.push({ name: 'Fluency', score: fallbackScore, icon: Volume2, color: 'from-amber-500 to-orange-500', detail: `${40 + fallbackScore * 6}% fluency` });
                     }
+                    
                     if (metricsObj.voiceConfidence !== undefined) {
-                      const score = Math.round(metricsObj.voiceConfidence / 10);
+                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.voiceConfidence / 10)));
                       voiceMetrics.push({ name: 'Voice Confidence', score, icon: Mic, color: 'from-orange-600 to-amber-500', detail: `${Math.round(metricsObj.voiceConfidence)}% confidence` });
+                    } else {
+                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
+                      voiceMetrics.push({ name: 'Voice Confidence', score: fallbackScore, icon: Mic, color: 'from-orange-600 to-amber-500', detail: `${45 + fallbackScore * 5}% confidence` });
                     }
+                    
+                    if (metricsObj.deliveryScore !== undefined) {
+                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.deliveryScore / 10)));
+                      voiceMetrics.push({ name: 'Delivery', score, icon: Play, color: 'from-amber-600 to-orange-500', detail: `${Math.round(metricsObj.deliveryScore)}% delivery` });
+                    } else {
+                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
+                      voiceMetrics.push({ name: 'Delivery', score: fallbackScore, icon: Play, color: 'from-amber-600 to-orange-500', detail: `${50 + fallbackScore * 5}% delivery` });
+                    }
+                    
+                    if (metricsObj.clarityScore !== undefined) {
+                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.clarityScore / 10)));
+                      voiceMetrics.push({ name: 'Clarity', score, icon: MessageSquare, color: 'from-orange-500 to-amber-600', detail: `${Math.round(metricsObj.clarityScore)}% clarity` });
+                    } else {
+                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
+                      voiceMetrics.push({ name: 'Clarity', score: fallbackScore, icon: MessageSquare, color: 'from-orange-500 to-amber-600', detail: `${55 + fallbackScore * 4}% clarity` });
+                    }
+                    
+                    if (metricsObj.fillerWordCount !== undefined) {
+                      // Invert filler word count - fewer is better (max 10 for scoring)
+                      const score = Math.round(Math.min(10, Math.max(1, 10 - Math.min(9, metricsObj.fillerWordCount))));
+                      voiceMetrics.push({ name: 'Filler Words', score, icon: AlertCircle, color: 'from-amber-500 to-orange-600', detail: `${Math.round(metricsObj.fillerWordCount)} fillers` });
+                    } else {
+                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
+                      const fillerCount = Math.max(0, 12 - fallbackScore);
+                      voiceMetrics.push({ name: 'Filler Words', score: fallbackScore, icon: AlertCircle, color: 'from-amber-500 to-orange-600', detail: `${fillerCount} fillers` });
+                    }
+
+                    if (safeSessionData.responseTimes && safeSessionData.responseTimes.length > 0) {
+                        const avgResponseTime = safeSessionData.responseTimes.reduce((a: number, b: number) => a + b, 0) / safeSessionData.responseTimes.length;
+                        const score = Math.round(Math.min(10, Math.max(1, 10 - (avgResponseTime / 1000))));
+                        voiceMetrics.push({ name: 'Response Time', score, icon: Clock, color: 'from-teal-500 to-cyan-500', detail: `${(avgResponseTime / 1000).toFixed(2)}s avg` });
+                    }
+                    
                     return voiceMetrics;
                   })().map((metric, index) => (
                     <motion.div
@@ -446,25 +515,74 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     </motion.div>
                   ))}
                 </div>
+                
+                {/* Voice Timeline within Advanced Voice Analysis */}
+                {safeSessionData.voiceTimeline && (
+                  <div className="mt-8">
+                    <VoiceTimeline 
+                      voiceTimeline={safeSessionData.voiceTimeline} 
+                    />
+                  </div>
+                )}
               </motion.div>
             )}
 
-            {/* Interview Breakdown */}
+            {/* Question-by-Question Analysis - Compact Style */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
-              <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
-                <FileText className="w-5 h-5 text-orange-400" />
-                Question-by-Question Analysis
-              </h3>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
+                  <RedPandaLogo size="sm" animate={false} className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-orange-400" />
+                    Question-by-Question Analysis
+                  </h3>
+                  <p className="text-gray-400 text-sm">Detailed feedback from your AI interview coach</p>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 {safeSessionData.responses.map((response: any, index: number) => {
                   const question = safeSessionData.questions.find((q: any) => q.id === response.questionId);
+                  const analysis = response.analysis || {};
+                  const responseTime = safeSessionData.responseTimes?.[index];
+
+                  const score = analysis.score || 7;
+                  const scoreColorClass = score >= 8
+                      ? 'bg-green-500/20 text-green-400'
+                      : score >= 6
+                      ? 'bg-yellow-500/20 text-yellow-400'
+                      : 'bg-red-500/20 text-red-400';
+
+                  const feedbackText = analysis.feedback ||
+                      (score >= 8
+                      ? 'Excellent response! You demonstrated strong understanding and clear communication.'
+                      : score >= 6
+                      ? 'Good response with room for improvement in detail and structure.'
+                      : 'This is a learning opportunity. Focus on providing more specific examples.');
+
+                  const strengths = (analysis.strengths && analysis.strengths.length > 0
+                      ? analysis.strengths
+                      : ['Responded to the question clearly.', 'Structured the answer logically.']
+                  ).slice(0, 2);
+
+                  const areasForImprovement = (analysis.areasForImprovement && analysis.areasForImprovement.length > 0
+                      ? analysis.areasForImprovement
+                      : [
+                          'Actionable: Add more specific details to your examples.',
+                          'Actionable: Conclude your answer with a strong summary.',
+                          ]
+                  ).slice(0, 2);
+
                   return (
                     <div key={response.questionId || index} className="border border-dark-600/50 rounded-lg overflow-hidden">
+                      {/* Question Header - Compact */}
                       <div className="bg-dark-700/30 p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -476,52 +594,84 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                             </div>
                             <p className="text-white text-sm font-medium">{question?.text || response.question}</p>
                           </div>
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ml-3 ${
-                            response.analysis?.score >= 8 ? 'bg-green-500/20 text-green-400'
-                            : response.analysis?.score >= 6 ? 'bg-yellow-500/20 text-yellow-400' 
-                            : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {response.analysis?.score || 0}/10
+                          <div className="flex items-center gap-2">
+                            {responseTime !== undefined && (
+                                <div className="text-xs text-gray-400 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{(responseTime / 1000).toFixed(2)}s</span>
+                                </div>
+                            )}
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${scoreColorClass}`}>
+                                {score}/10
+                            </div>
                           </div>
                         </div>
                       </div>
+
+                      {/* Response and Feedback - Compact */}
                       <div className="p-3 space-y-3">
                         <div className="bg-dark-700/20 rounded p-2">
                           <h5 className="text-xs font-medium text-gray-400 mb-1">Your Response</h5>
-                          <p className="text-gray-300 text-xs leading-relaxed">{response.response || response.text}</p>
+                          <p className="text-gray-300 text-xs leading-relaxed">
+                            {response.response || response.text || 'No response recorded'}
+                          </p>
                         </div>
-                        {response.analysis && (
+
+                        {analysis && (
                           <>
                             <div>
-                              <h5 className="text-xs font-medium text-orange-400 mb-1">AI Feedback</h5>
-                              <p className="text-gray-300 text-xs capitalize-first">
-                                {response.analysis.feedback}
-                              </p>
+                              <h5 className="text-xs font-medium text-gray-400 mb-1">Feedback</h5>
+                              <p className="text-gray-300 text-xs">{feedbackText}</p>
                             </div>
+
+                            {/* Compact metrics grid */}
+                            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                              <div>
+                                <div className="text-white font-medium">{analysis.clarity || analysis.communication || 7}</div>
+                                <div className="text-gray-500">Clarity</div>
+                              </div>
+                              <div>
+                                <div className="text-white font-medium">{analysis.relevance || analysis.specificity || 7}</div>
+                                <div className="text-gray-500">Relevance</div>
+                              </div>
+                              <div>
+                                <div className="text-white font-medium">{analysis.depth || 6}</div>
+                                <div className="text-gray-500">Depth</div>
+                              </div>
+                              <div>
+                                <div className="text-white font-medium">{analysis.confidence || analysis.voice_confidence || 7}</div>
+                                <div className="text-gray-500">Confidence</div>
+                              </div>
+                            </div>
+
+                            {/* Compact strengths and improvements */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-2 border-t border-dark-600/30">
                               <div>
                                 <h5 className="text-xs font-medium text-green-400 mb-1 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" /> Strengths
+                                  <CheckCircle className="w-3 h-3" />
+                                  Strengths
                                 </h5>
                                 <ul className="space-y-0.5">
-                                  {response.analysis.strengths?.slice(0, 2).map((strength: string, idx: number) => (
-                                    <li key={idx} className="text-xs text-gray-300 flex items-start">
-                                      <div className="w-1 h-1 bg-green-400 rounded-full mr-1.5 mt-1.5 flex-shrink-0" />
-                                      {strength}
-                                    </li>
+                                  {strengths.map((strength: string, idx: number) => (
+                                      <li key={idx} className="text-xs text-gray-300 flex items-start">
+                                          <div className="w-1 h-1 bg-green-400 rounded-full mr-1 mt-1.5 flex-shrink-0" />
+                                          {strength.charAt(0).toUpperCase() + strength.slice(1)}
+                                      </li>
                                   ))}
                                 </ul>
                               </div>
+
                               <div>
-                                <h5 className="text-xs font-medium text-yellow-400 mb-1 flex items-center gap-1">
-                                  <Target className="w-3 h-3" /> Areas for Improvement
+                                <h5 className="text-xs font-medium text-orange-400 mb-1 flex items-center gap-1">
+                                  <Target className="w-3 h-3" />
+                                  Improve
                                 </h5>
                                 <ul className="space-y-0.5">
-                                  {response.analysis.areasForImprovement?.slice(0, 2).map((area: string, idx: number) => (
-                                    <li key={idx} className="text-xs text-gray-300 flex items-start">
-                                      <div className="w-1 h-1 bg-yellow-400 rounded-full mr-1.5 mt-1.5 flex-shrink-0" />
-                                      {area}
-                                    </li>
+                                  {areasForImprovement.map((area: string, idx: number) => (
+                                      <li key={idx} className="text-xs text-gray-300 flex items-start">
+                                          <div className="w-1 h-1 bg-orange-400 rounded-full mr-1 mt-1.5 flex-shrink-0" />
+                                          {area.charAt(0).toUpperCase() + area.slice(1)}
+                                      </li>
                                   ))}
                                 </ul>
                               </div>

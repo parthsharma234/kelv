@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, Brain } from 'lucide-react';
+import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, Brain, MessageCircle, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
 import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
@@ -12,6 +12,128 @@ interface RealtimeInterviewSessionProps {
   onComplete: (sessionData: any) => void;
   onBack: () => void;
 }
+
+function extractVoiceMetrics(sessionData: any) {
+  if (!sessionData) return null;
+  // Prefer summary if available
+  const metricsObj = sessionData.voice_metrics_summary || (Array.isArray(sessionData.speechMetrics) && sessionData.speechMetrics[0]?.metrics) || sessionData.speechMetrics?.[0] || null;
+  if (!metricsObj) return null;
+  // Build metrics array for display (same as before)
+  const voiceMetrics = [];
+  if (metricsObj.speechRate !== undefined) {
+    const clampedSpeechRate = Math.max(80, Math.min(180, metricsObj.speechRate));
+    const speechRateScore = Math.min(10, Math.max(0,
+      clampedSpeechRate >= 140 && clampedSpeechRate <= 170
+        ? Math.round(8 + (clampedSpeechRate - 140) / 30 * 2)
+        : Math.round((clampedSpeechRate / 150) * 8)
+    ));
+    voiceMetrics.push({
+      name: 'Speech Rate',
+      score: speechRateScore,
+      icon: TrendingUp,
+      color: 'from-blue-500 to-cyan-500',
+      detail: `${Math.round(clampedSpeechRate)} WPM`
+    });
+  }
+  if (metricsObj.fluencyScore !== undefined) {
+    const clampedFluencyScore = Math.max(0, Math.min(100, metricsObj.fluencyScore));
+    const fluencyScore = Math.round((clampedFluencyScore / 100) * 10);
+    voiceMetrics.push({
+      name: 'Fluency',
+      score: fluencyScore,
+      icon: Volume2,
+      color: 'from-cyan-500 to-blue-500',
+      detail: `${clampedFluencyScore}% fluency`
+    });
+  }
+  if (metricsObj.voiceConfidence !== undefined) {
+    const clampedConfidence = Math.max(0, Math.min(100, metricsObj.voiceConfidence));
+    const confidenceScore = Math.round((clampedConfidence / 100) * 10);
+    voiceMetrics.push({
+      name: 'Voice Confidence',
+      score: confidenceScore,
+      icon: Mic,
+      color: 'from-blue-600 to-indigo-500',
+      detail: `${clampedConfidence}% confidence`
+    });
+  }
+  if (metricsObj.deliveryScore !== undefined) {
+    const clampedDeliveryScore = Math.max(0, Math.min(100, metricsObj.deliveryScore));
+    const deliveryScore = Math.round((clampedDeliveryScore / 100) * 10);
+    voiceMetrics.push({
+      name: 'Delivery',
+      score: deliveryScore,
+      icon: CheckCircle,
+      color: 'from-indigo-500 to-blue-600',
+      detail: `${clampedDeliveryScore}% delivery`
+    });
+  }
+  if (metricsObj.clarityScore !== undefined) {
+    const clampedClarityScore = Math.max(0, Math.min(100, metricsObj.clarityScore));
+    const clarityScore = Math.round((clampedClarityScore / 100) * 10);
+    voiceMetrics.push({
+      name: 'Clarity',
+      score: clarityScore,
+      icon: MessageCircle,
+      color: 'from-blue-400 to-cyan-400',
+      detail: `${clampedClarityScore}% clarity`
+    });
+  }
+  if (metricsObj.fillerWordCount !== undefined) {
+    const clampedFillerCount = Math.max(0, Math.min(50, metricsObj.fillerWordCount));
+    const fillerScore = Math.max(0, Math.min(10, 10 - Math.floor(clampedFillerCount / 2)));
+    voiceMetrics.push({
+      name: 'Filler Words',
+      score: fillerScore,
+      icon: AlertCircle,
+      color: 'from-blue-300 to-cyan-300',
+      detail: `${clampedFillerCount} filler words`
+    });
+  }
+  return voiceMetrics;
+}
+
+const getMetricInsight = (metric: string, score: number) => {
+  const insights = {
+    'speech rate': {
+      high: "Perfect speaking pace - you speak at an ideal rhythm for interviews.",
+      medium: "Good speaking pace, try to maintain consistency throughout.",
+      low: "Adjust your speaking pace - aim for 140-170 words per minute."
+    },
+    fluency: {
+      high: "Outstanding fluency - you speak smoothly with excellent flow.",
+      medium: "Good fluency, work on reducing minor hesitations.",
+      low: "Focus on speaking more smoothly and reducing filler words."
+    },
+    'voice confidence': {
+      high: "Excellent vocal confidence - you sound authoritative and engaging.",
+      medium: "Good voice confidence, project more conviction in your tone.",
+      low: "Work on speaking with more confidence and stronger vocal presence."
+    },
+    delivery: {
+      high: "Outstanding delivery - your pacing and rhythm are perfect for interviews.",
+      medium: "Good delivery, focus on maintaining consistent energy levels.",
+      low: "Work on your vocal delivery and speaking rhythm."
+    },
+    'vocal clarity': {
+      high: "Excellent vocal clarity - you articulate words clearly and precisely.",
+      medium: "Good clarity, focus on enunciating key words more clearly.",
+      low: "Practice speaking more clearly and improving your articulation."
+    },
+    'clarity': {
+      high: "Excellent vocal clarity - you articulate words clearly and precisely.",
+      medium: "Good clarity, focus on enunciating key words more clearly.",
+      low: "Practice speaking more clearly and improving your articulation."
+    },
+    'filler words': {
+      high: "Excellent - you avoid filler words and speak with precision.",
+      medium: "Good control of filler words, continue reducing 'um' and 'uh'.",
+      low: "Focus on reducing filler words like 'um', 'uh', and 'like'."
+    }
+  };
+  const level = score >= 8 ? 'high' : score >= 6 ? 'medium' : 'low';
+  return insights[metric.toLowerCase() as keyof typeof insights]?.[level] || "Keep practicing to improve this area.";
+};
 
 const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   setup,
@@ -26,6 +148,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [sessionData, setSessionData] = useState<any>(null); // Store final session data after completion
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -36,17 +159,22 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const actualInterviewType = isFocusedInterview ? 'focused' : interviewType;
 
   // Memoize the hook options to prevent recreation on each render
+  const handleComplete = useCallback((data: any) => {
+    setSessionData(data);
+    onComplete(data);
+  }, [onComplete]);
+
   const hookOptions = useMemo(() => ({
     setup,
     interviewType: actualInterviewType,
     focusedType,
     mediaStream: stream, // Pass the media stream to avoid duplicate audio streams
-    onComplete,
+    onComplete: handleComplete,
     onError: (error: string) => {
       console.error('Realtime interview error:', error);
       setCameraError(error);
     }
-  }), [setup, actualInterviewType, focusedType, stream, onComplete]);
+  }), [setup, actualInterviewType, focusedType, stream, handleComplete]);
 
   const { 
     state, 
@@ -506,6 +634,42 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           </div>
         </div>
       </div>
+      {sessionData && sessionData.setup && sessionData.setup.interviewMode === 'voice' && !!extractVoiceMetrics(sessionData) && (
+        <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 mt-8 max-w-2xl mx-auto">
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+            <Mic className="w-5 h-5 text-blue-400" />
+            Advanced Voice Analysis
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {extractVoiceMetrics(sessionData)!.map((metric: any, index: number) => (
+              <div
+                key={metric.name}
+                className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
+                    <metric.icon className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-white">{metric.name}</span>
+                      <span className="text-lg font-semibold text-white">{metric.score}/10</span>
+                    </div>
+                    <div className="text-xs text-gray-400">{metric.detail}</div>
+                  </div>
+                </div>
+                <div className="h-2 bg-dark-600 rounded-full overflow-hidden mb-3">
+                  <div
+                    className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                    style={{ width: `${metric.score * 10}%`, transition: 'width 1.5s' }}
+                  />
+                </div>
+                <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

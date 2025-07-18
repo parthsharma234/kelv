@@ -12,10 +12,11 @@ import CollegeSetupFlow from './CollegeSetupFlow';
 import CollegeInterview from './CollegeInterview';
 import CollegeInterviewResults from './CollegeInterviewResults';
 import RealtimeInterviewSession from './RealtimeInterviewSession';
+import InterviewProcessing from './InterviewProcessing';
 import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview' | 'processing' | 'processing-focused' | 'processing-college';
 
 interface PlatformContainerProps {
   onFullScreenChange?: (isFullScreen: boolean) => void;
@@ -145,7 +146,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleInterviewComplete = (data: any) => {
     setSessionData(data);
-    setCurrentState('results');
+    setCurrentState('processing');
     scrollToTop();
   };
 
@@ -163,7 +164,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleFocusedInterviewComplete = (data: any) => {
     setSessionData(data);
-    setCurrentState('focused-results');
+    setCurrentState('processing-focused');
     scrollToTop();
   };  const handleBackToDashboard = () => {
     setCurrentState('dashboard');
@@ -206,7 +207,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleCollegeInterviewComplete = (data: any) => {
     setSessionData(data);
-    setCurrentState('college-results');
+    setCurrentState('processing-college');
     scrollToTop();
   };
 
@@ -402,6 +403,24 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           interviewType="college"
           onComplete={handleCollegeInterviewComplete}
           onBack={handleBackToDashboard}
+        />
+      )}
+
+      {currentState === 'processing' && (
+        <InterviewProcessing
+          onComplete={() => setCurrentState('results')}
+        />
+      )}
+
+      {currentState === 'processing-focused' && (
+        <InterviewProcessing
+          onComplete={() => setCurrentState('focused-results')}
+        />
+      )}
+
+      {currentState === 'processing-college' && (
+        <InterviewProcessing
+          onComplete={() => setCurrentState('college-results')}
         />
       )}
     </>

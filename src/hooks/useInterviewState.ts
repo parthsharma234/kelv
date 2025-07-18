@@ -11,7 +11,7 @@ const generateUUID = () => {
 };
 
 export interface RealtimeInterviewState {
-  status: 'idle' | 'connecting' | 'connected' | 'interviewing' | 'paused' | 'completed' | 'error';
+  status: 'idle' | 'connecting' | 'connected' | 'interviewing' | 'paused' | 'completed' | 'error' | 'processing';
   transcript: TranscriptChunk[];
   currentQuestion: string;
   isAISpeaking: boolean;

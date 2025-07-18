@@ -36,9 +36,9 @@ const interviewModes = [
   {
     id: 'voice',
     title: 'Voice Interview',
-    description: 'Full voice interaction with speech analysis',
+    description: 'Advanced voice interaction with AI interviewer',
     icon: Mic,
-    features: ['Real-time speech analysis', 'Natural conversation flow', 'Voice confidence metrics', 'Pronunciation assessment'],
+    features: ['Real-time voice conversation', 'Instant AI responses', 'Live transcript display', 'Natural speech analysis'],
     recommended: true
   },
   {

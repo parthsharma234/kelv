@@ -107,20 +107,46 @@ export const processVoiceInput = async (audioBlob: Blob): Promise<string> => {
 };
 
 // Extract speech metrics using advanced speech analysis
-export const extractSpeechMetrics = async (audioBlob: Blob, transcription: string, duration: number) => {
+export const extractSpeechMetrics = async (audioBlob: Blob, transcription: string, duration: number, responseTimes?: number[]) => {
   try {
-    // Import the AdvancedSpeechAnalyzer
-    const { AdvancedSpeechAnalyzer } = await import('./speechAnalysis');
+    // Import the enhanced speech analyzer
+    const { analyzeEnhancedVoiceMetrics } = await import('./enhancedSpeech');
     
-    // Create analyzer instance
-    const analyzer = new AdvancedSpeechAnalyzer();
+    // Analyze voice metrics using the enhanced system
+        const voiceMetrics = await analyzeEnhancedVoiceMetrics(audioBlob, transcription, duration, Date.now(), responseTimes);
+
     
-    // Analyze voice metrics
-    const voiceMetrics = await analyzer.analyzeVoiceMetrics(audioBlob, transcription, duration);
-    
-    return voiceMetrics;
+    // Return enhanced metrics with legacy compatibility
+    return {
+      speechRate: voiceMetrics.speechRate,
+      fluencyScore: voiceMetrics.fluencyScore || voiceMetrics.fluency * 10,
+      voiceConfidence: voiceMetrics.voiceConfidence,
+      deliveryScore: voiceMetrics.deliveryScore || voiceMetrics.delivery * 10,
+      clarityScore: voiceMetrics.clarityScore || voiceMetrics.clarity * 10,
+      fillerWordCount: voiceMetrics.fillerWordCount,
+      pauseAnalysis: voiceMetrics.pauseAnalysis || {
+        averagePauseLength: 0,
+        pauseFrequency: 0,
+        strategicPauses: 0
+      },
+      pitchAnalysis: voiceMetrics.pitchAnalysis || {
+        averagePitch: 0,
+        pitchVariation: 0,
+        pitchStability: 0
+      },
+      energyAnalysis: voiceMetrics.energyAnalysis || {
+        averageEnergy: 0,
+        energyConsistency: 0,
+        dynamicRange: 0
+      },
+      timestamp: voiceMetrics.timestamp,
+      // Include enhanced metrics for future use
+      fluency: voiceMetrics.fluency,
+      delivery: voiceMetrics.delivery,
+      clarity: voiceMetrics.clarity
+    };
   } catch (error) {
-    console.error('Error extracting speech metrics:', error);
+    console.error('Error extracting enhanced speech metrics:', error);
     // Return default metrics if analysis fails
     return {
       speechRate: 0,
@@ -1174,6 +1200,7 @@ export const synthesizeSpeech = async (text: string): Promise<HTMLAudioElement |
 // Helper functions
 const getFallbackAnalysis = (response: string, interviewType?: string) => {
   const responseLength = response.length;
+  const wordCount = response.trim().split(/\s+/).length;
   const hasSpecificExamples = /(example|instance|time|when|project|case)/i.test(response);
   const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
   const hasQuantifiableResults = /(\d+%|\d+ percent|\$\d+|\d+ people|\d+ users|\d+ customers)/i.test(response);
@@ -1182,40 +1209,75 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
   const isFocusedInterview = interviewType && interviewType !== 'college';
   const isCollegeInterview = interviewType === 'college';
   
+  // More realistic confidence scoring based on response quality
+  let confidenceScore = 1;
+  if (responseLength < 20) {
+    // Very brief responses get very low confidence
+    confidenceScore = 1;
+  } else if (responseLength < 50) {
+    // Short responses get low confidence
+    confidenceScore = 2;
+  } else if (responseLength < 100) {
+    // Medium responses get moderate confidence
+    confidenceScore = showsEnthusiasm ? 4 : 3;
+  } else {
+    // Longer responses get higher confidence, but still depend on content quality
+    confidenceScore = showsEnthusiasm ? 6 : 4;
+    if (hasSpecificExamples) confidenceScore += 1;
+    if (hasSTARStructure) confidenceScore += 1;
+    if (hasQuantifiableResults) confidenceScore += 1;
+  }
+  
+  // Determine feedback and strengths based on response quality
+  let feedback, strengths, areasForImprovement;
+  if (responseLength < 20) {
+    feedback = "The response was extremely brief and did not address the question. Please provide more detail about your background and interest, using specific examples to demonstrate your enthusiasm and understanding.";
+    strengths = ["Concise"];
+    areasForImprovement = ["Provide Much More Detail", "Address the Question Directly", "Include Specific Examples", "Show Enthusiasm and Interest"];
+  } else if (responseLength < 50) {
+    feedback = "The response was too brief and lacked detail. Try to provide specific examples and elaborate on your experience and interests.";
+    strengths = ["Clear Communication"];
+    areasForImprovement = ["Add Much More Detail", "Include Specific Examples", "Show More Enthusiasm"];
+  } else {
+    feedback = "Good response! Try to include more specific examples and quantifiable results to strengthen your answer.";
+    strengths = ["Clear Communication", "Relevant Experience", "Professional Tone"];
+    areasForImprovement = ["Add Specific Examples", "Include Quantifiable Results", "Provide More Detail"];
+  }
+  
   const baseAnalysis = {
-    score: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
-    feedback: "Good response! Try to include more specific examples and quantifiable results to strengthen your answer.",
-    strengths: ["Clear Communication", "Relevant Experience", "Professional Tone"],
-    areasForImprovement: ["Add Specific Examples", "Include Quantifiable Results", "Provide More Detail"],
+    score: Math.min(10, Math.max(1, Math.floor(response.length / 20) + (wordCount > 5 ? 2 : 1))),
+    feedback,
+    strengths,
+    areasForImprovement,
     confidenceIndicators: {
       responseLength: responseLength,
       specificExamples: hasSpecificExamples,
       structuredAnswer: hasSTARStructure,
-      enthusiasm: showsEnthusiasm ? 7 : 5,
+      enthusiasm: confidenceScore,
       quantifiableResults: hasQuantifiableResults
     },
     nextQuestionType: 'behavioral',
     performanceTrend: 'stable',
-    roleAlignment: 'medium',
-    culturalFit: 'medium'
+    roleAlignment: responseLength < 50 ? 'low' : 'medium',
+    culturalFit: responseLength < 50 ? 'low' : 'medium'
   };
   
   // Add specific metrics based on interview type
   if (isFocusedInterview) {
     return {
       ...baseAnalysis,
-      problem_solving: Math.min(10, Math.max(1, Math.floor(response.length / 25) + 4)),
-      communication: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
-      depth: hasSpecificExamples ? 7 : 5,
-      relevance: Math.min(10, Math.max(1, Math.floor(response.length / 30) + 5))
+      problem_solving: Math.min(10, Math.max(1, responseLength < 20 ? 1 : Math.floor(response.length / 25) + 2)),
+      communication: Math.min(10, Math.max(1, responseLength < 20 ? 1 : Math.floor(response.length / 20) + 1)),
+      depth: responseLength < 20 ? 1 : (hasSpecificExamples ? 6 : 3),
+      relevance: Math.min(10, Math.max(1, responseLength < 20 ? 1 : Math.floor(response.length / 30) + 2))
     };
   } else if (isCollegeInterview) {
     return {
       ...baseAnalysis,
-      authenticity: showsEnthusiasm ? 8 : 6,
-      passion: showsEnthusiasm ? 8 : 5,
-      clarity: Math.min(10, Math.max(1, Math.floor(response.length / 20) + 3)),
-      specificity: hasSpecificExamples ? 7 : 4
+      authenticity: responseLength < 20 ? 2 : (showsEnthusiasm ? 7 : 4),
+      passion: responseLength < 20 ? 1 : (showsEnthusiasm ? 7 : 3),
+      clarity: Math.min(10, Math.max(1, responseLength < 20 ? 1 : Math.floor(response.length / 20) + 1)),
+      specificity: responseLength < 20 ? 1 : (hasSpecificExamples ? 6 : 2)
     };
   }
   

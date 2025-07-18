@@ -1195,3 +1195,136 @@ export const getRealtimeSession = async (sessionId: string): Promise<RealtimeSes
     throw error;
   }
 };
+
+// Save voice timeline data for realtime interviews
+export const saveVoiceTimelineData = async (sessionId: string, voiceTimeline: any[], voiceMetrics: any) => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping voice timeline save');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('interview_sessions')
+      .update({
+        speech_metrics: {
+          timeline: voiceTimeline,
+          summary: voiceMetrics,
+          analyzed_at: new Date().toISOString()
+        }
+      })
+      .eq('id', sessionId);
+
+    if (error) {
+      console.error('Error saving voice timeline:', error);
+      throw error;
+    }
+    
+    console.log('Voice timeline saved successfully for session:', sessionId);
+  } catch (error) {
+    console.error('Failed to save voice timeline:', error);
+    throw error;
+  }
+};
+
+// Get voice timeline data for a session
+export const getVoiceTimelineData = async (sessionId: string) => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning empty timeline');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('interview_sessions')
+      .select('speech_metrics')
+      .eq('id', sessionId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching voice timeline:', error);
+      return null;
+    }
+
+    return data?.speech_metrics || null;
+  } catch (error) {
+    console.error('Failed to fetch voice timeline:', error);
+    return null;
+  }
+};
+
+// Save complete realtime interview session with structured Q&A data
+export const saveRealtimeInterviewSession = async (sessionData: any): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping realtime interview save');
+    return;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('saveRealtimeInterviewSession: User not authenticated');
+      throw new Error('User not authenticated');
+    }
+
+    console.log('saveRealtimeInterviewSession: User authenticated:', user.id);
+
+    // Calculate metrics from responses
+    let metrics = null;
+    if (sessionData.responses && sessionData.responses.length > 0) {
+      const validResponses = sessionData.responses.filter((r: any) => r.analysis);
+      if (validResponses.length > 0) {
+        const avgClarity = Math.round(validResponses.reduce((sum: number, r: any) => sum + (r.analysis.clarity || 0), 0) / validResponses.length);
+        const avgRelevance = Math.round(validResponses.reduce((sum: number, r: any) => sum + (r.analysis.relevance || 0), 0) / validResponses.length);
+        const avgDepth = Math.round(validResponses.reduce((sum: number, r: any) => sum + (r.analysis.depth || 0), 0) / validResponses.length);
+        const avgConfidence = Math.round(validResponses.reduce((sum: number, r: any) => sum + (r.analysis.confidence || 0), 0) / validResponses.length);
+        const avgStructure = Math.round(validResponses.reduce((sum: number, r: any) => sum + (r.analysis.structure || 0), 0) / validResponses.length);
+
+        metrics = {
+          clarity: avgClarity,
+          relevance: avgRelevance,
+          depth: avgDepth,
+          confidence: avgConfidence,
+          structure: avgStructure,
+          problem_solving: Math.round((avgDepth + avgStructure) / 2),
+          communication: Math.round((avgClarity + avgConfidence) / 2)
+        };
+      }
+    }
+
+    // Save to interview_sessions table (like standard interviews)
+    const { error } = await supabase
+      .from('interview_sessions')
+      .insert({
+        user_id: user.id,
+        interview_type: sessionData.interviewType || 'general',
+        setup: sessionData.setup || {},
+        questions: sessionData.questions || [],
+        responses: sessionData.responses || [],
+        overall_score: sessionData.overallScore || 70,
+        duration: sessionData.duration || 0,
+        questions_answered: sessionData.questionsAnswered || 0,
+        metrics: metrics,
+        voice_metrics_summary: sessionData.voiceMetrics,
+        voice_timeline: sessionData.voiceTimeline,
+        session_metadata: {
+          session_id: sessionData.sessionId,
+          is_realtime: true,
+          model_type: 'gpt-4o-realtime-preview',
+          focused_type: sessionData.focusedType,
+          transcript: sessionData.transcript
+        },
+        created_at: sessionData.completedAt || new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error saving realtime interview session:', error);
+      throw error;
+    }
+
+    console.log('Realtime interview session saved successfully');
+  } catch (error) {
+    console.error('Failed to save realtime interview session:', error);
+    throw error;
+  }
+};

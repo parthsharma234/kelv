@@ -1,21 +1,26 @@
 export interface VoiceMetrics {
   speechRate: number;        // Words per minute
-  fluencyScore: number;      // 0-100 score based on flow and smoothness
-  voiceConfidence: number;   // 0-100 based on vocal characteristics
-  deliveryScore: number;     // 0-100 based on pacing and rhythm
-  clarityScore: number;      // 0-100 based on articulation and pronunciation
+  fluency: number;           // 0-10 score based on flow and smoothness (enhanced)
+  fluencyScore?: number;     // Legacy 0-100 score for backward compatibility
+  voiceConfidence: number;   // 0-10 based on vocal characteristics (enhanced)
+  delivery: number;          // 0-10 based on pacing and rhythm (enhanced)
+  deliveryScore?: number;    // Legacy 0-100 score for backward compatibility
+  clarity: number;           // 0-10 based on articulation and pronunciation (enhanced)
+  clarityScore?: number;     // Legacy 0-100 score for backward compatibility
   fillerWordCount: number;   // Count of filler words (um, uh, like, etc.)
-  pauseAnalysis: {
+  timestamp: number;         // Timestamp when metrics were calculated
+  responseTime?: number;     // Time in seconds from question to user response
+  pauseAnalysis?: {
     averagePauseLength: number;
     pauseFrequency: number;
     strategicPauses: number;
   };
-  pitchAnalysis: {
+  pitchAnalysis?: {
     averagePitch: number;
     pitchVariation: number;
     pitchStability: number;
   };
-  energyAnalysis: {
+  energyAnalysis?: {
     averageEnergy: number;
     energyConsistency: number;
     dynamicRange: number;
