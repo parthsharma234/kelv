@@ -113,9 +113,8 @@ export const extractSpeechMetrics = async (audioBlob: Blob, transcription: strin
     const { analyzeEnhancedVoiceMetrics } = await import('./enhancedSpeech');
     
     // Analyze voice metrics using the enhanced system
-        const voiceMetrics = await analyzeEnhancedVoiceMetrics(audioBlob, transcription, duration, Date.now(), responseTimes);
+    const voiceMetrics = await analyzeEnhancedVoiceMetrics(audioBlob, transcription, duration, Date.now(), responseTimes);
 
-    
     // Return enhanced metrics with legacy compatibility
     return {
       speechRate: voiceMetrics.speechRate,
@@ -143,7 +142,8 @@ export const extractSpeechMetrics = async (audioBlob: Blob, transcription: strin
       // Include enhanced metrics for future use
       fluency: voiceMetrics.fluency,
       delivery: voiceMetrics.delivery,
-      clarity: voiceMetrics.clarity
+      clarity: voiceMetrics.clarity,
+      duration: typeof voiceMetrics.duration === 'number' ? voiceMetrics.duration : duration
     };
   } catch (error) {
     console.error('Error extracting enhanced speech metrics:', error);
@@ -169,7 +169,8 @@ export const extractSpeechMetrics = async (audioBlob: Blob, transcription: strin
         averageEnergy: 0,
         energyConsistency: 0,
         dynamicRange: 0
-      }
+      },
+      duration
     };
   }
 };
@@ -1067,7 +1068,7 @@ ADVANCED ANALYSIS TECHNIQUES:
 
 CANDIDATE PROFILE BUILDING:
 - Extract key themes, values, and motivations from this response
-- Identify unique perspectives or experiences revealed
+- Identify unique perspectives, experiences, or backgrounds
 - Note patterns in communication style and thought processes
 - Assess growth mindset and learning orientation indicators
 

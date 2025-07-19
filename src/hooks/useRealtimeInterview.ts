@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
+import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetricEntry {
@@ -78,6 +79,15 @@ export function useRealtimeInterview({
   const currentQuestionRef = useRef<string>('');
   const questionTimestampRef = useRef<number | null>(null);
   const responseTimesRef = useRef<number[]>([]);
+  // Add a ref to store per-response segments for the voice timeline
+  const voiceTimelineSegmentsRef = useRef<Array<{
+    transcript: string;
+    startTimestamp: number;
+    endTimestamp: number;
+    questionContext?: string;
+  }>>([]);
+  // Add a ref to collect transcript chunks for the current user response
+  const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
 
   // Generate adaptive system prompt
   const generateAdaptiveInstructions = useCallback((
@@ -167,7 +177,12 @@ export function useRealtimeInterview({
     // Track current question context for voice analysis
     if (chunk.speaker === 'assistant' && chunk.text.trim().endsWith('?')) {
       currentQuestionRef.current = chunk.text;
-      questionTimestampRef.current = Date.now();
+      questionTimestampRef.current = chunk.timestamp;
+    }
+
+    // Collect user transcript chunks for accurate timing
+    if (chunk.speaker === 'user') {
+      currentUserChunksRef.current.push(chunk);
     }
 
     // Analyze user responses for adaptive behavior and voice metrics
@@ -181,7 +196,21 @@ export function useRealtimeInterview({
       ));
       updateInterviewerBehavior(chunk.text, estimatedScore);
 
-      // Voice metrics will be processed post-interview.
+      // --- Voice Timeline Segmentation (fixed timestamps) ---
+      // Use the first and last chunk timestamps for this response
+      const userChunks = [...currentUserChunksRef.current];
+      if (userChunks.length > 0) {
+        const startTimestamp = userChunks[0].timestamp;
+        const endTimestamp = userChunks[userChunks.length - 1].timestamp;
+        voiceTimelineSegmentsRef.current.push({
+          transcript: userChunks.map(c => c.text).join(' '),
+          startTimestamp,
+          endTimestamp,
+          questionContext: currentQuestionRef.current || undefined
+        });
+      }
+      currentUserChunksRef.current = [];
+      // --- End Voice Timeline Segmentation ---
     }
   }, [state.sessionId, updateInterviewerBehavior, setup.interviewMode]);
 
@@ -648,6 +677,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
     try {
       let voiceMetrics: SpeechMetricEntry[] | null = null;
+      let voiceTimeline: VoiceTimelinePoint[] = [];
       try {
         console.log('Starting voice analytics processing...');
         voiceMetrics = await processVoiceAnalytics();
@@ -656,7 +686,109 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         console.error('Error during voice analytics processing:', error);
         // Continue without voice metrics if processing fails
       }
-      
+
+      // --- Voice Timeline Metrics Extraction ---
+      if (setup.interviewMode === 'voice' && clientRef.current) {
+        const allAudioChunks = clientRef.current.getAllAudioChunks();
+        const sampleRate = 24000;
+        // Flatten all audio chunks into a single Float32Array
+        let totalSamples = 0;
+        for (const arr of allAudioChunks) totalSamples += arr.byteLength / 2;
+        const fullAudio = new Float32Array(totalSamples);
+        let offset = 0;
+        for (const arr of allAudioChunks) {
+          const view = new DataView(arr);
+          for (let i = 0; i < arr.byteLength; i += 2) {
+            fullAudio[offset++] = view.getInt16(i, true) / 32768;
+          }
+        }
+        // Interview start time
+        const interviewStart = startTimeRef.current ? startTimeRef.current.getTime() : (voiceTimelineSegmentsRef.current[0]?.startTimestamp || 0);
+        // If >5 segments, use per-response segmentation
+        if (voiceTimelineSegmentsRef.current.length > 5) {
+          for (const segment of voiceTimelineSegmentsRef.current) {
+            const segStartSec = (segment.startTimestamp - interviewStart) / 1000;
+            const segEndSec = (segment.endTimestamp - interviewStart) / 1000;
+            const startSample = Math.max(0, Math.floor(segStartSec * sampleRate));
+            const endSample = Math.min(fullAudio.length, Math.ceil(segEndSec * sampleRate));
+            const segmentAudio = fullAudio.slice(startSample, endSample);
+            const segmentBlob = pcmToWav(segmentAudio, sampleRate);
+            let metrics = null;
+            try {
+              metrics = await extractSpeechMetrics(segmentBlob, segment.transcript, segEndSec - segStartSec);
+              if (metrics && typeof metrics.duration === 'undefined') {
+                metrics.duration = segEndSec - segStartSec;
+              }
+            } catch (err) {
+              console.error('Failed to extract metrics for segment', segment, err);
+            }
+            if (metrics) {
+              metrics = { ...metrics, duration: segEndSec - segStartSec } as import('../utils/speechAnalysis').VoiceMetrics;
+              let feedback: ActionableFeedback = {
+                overall: '', strengths: [], improvements: [], specificTips: [], score: 0, category: 'fair'
+              };
+              try {
+                feedback = generateActionableFeedback(metrics, segment.transcript, segment.questionContext);
+              } catch {}
+              voiceTimeline.push({
+                timestamp: segment.endTimestamp,
+                metrics,
+                feedback,
+                questionContext: segment.questionContext
+              });
+            }
+          }
+        } else {
+          // <=5 segments: segment into 5-second windows
+          // Gather all user transcript chunks
+          const allUserChunks = state.transcript.filter((c: any) => c.speaker === 'user');
+          if (!allUserChunks.length) return;
+          const firstTs = allUserChunks[0].timestamp;
+          const lastTs = allUserChunks[allUserChunks.length - 1].timestamp;
+          const totalDurationSec = Math.ceil((lastTs - firstTs) / 1000);
+          const numWindows = Math.max(1, Math.ceil(totalDurationSec / 5));
+          for (let i = 0; i < numWindows; i++) {
+            const windowStart = firstTs + i * 5000;
+            const windowEnd = windowStart + 5000;
+            // Get transcript in this window
+            const windowChunks = allUserChunks.filter(c => c.timestamp >= windowStart && c.timestamp < windowEnd);
+            if (!windowChunks.length) continue;
+            const transcript = windowChunks.map(c => c.text).join(' ');
+            const segStartSec = (windowStart - interviewStart) / 1000;
+            const segEndSec = (windowEnd - interviewStart) / 1000;
+            const startSample = Math.max(0, Math.floor(segStartSec * sampleRate));
+            const endSample = Math.min(fullAudio.length, Math.ceil(segEndSec * sampleRate));
+            const segmentAudio = fullAudio.slice(startSample, endSample);
+            const segmentBlob = pcmToWav(segmentAudio, sampleRate);
+            let metrics = null;
+            try {
+              metrics = await extractSpeechMetrics(segmentBlob, transcript, segEndSec - segStartSec);
+              if (metrics && typeof metrics.duration === 'undefined') {
+                metrics.duration = segEndSec - segStartSec;
+              }
+            } catch (err) {
+              console.error('Failed to extract metrics for 5s segment', err);
+            }
+            if (metrics) {
+              metrics = { ...metrics, duration: segEndSec - segStartSec } as import('../utils/speechAnalysis').VoiceMetrics;
+              let feedback: ActionableFeedback = {
+                overall: '', strengths: [], improvements: [], specificTips: [], score: 0, category: 'fair'
+              };
+              try {
+                feedback = generateActionableFeedback(metrics, transcript, undefined);
+              } catch {}
+              voiceTimeline.push({
+                timestamp: windowEnd,
+                metrics,
+                feedback,
+                questionContext: undefined
+              });
+            }
+          }
+        }
+      }
+      // --- End Voice Timeline Metrics Extraction ---
+
       if (clientRef.current) {
         clientRef.current.disconnect();
       }
@@ -702,7 +834,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             completedAt: new Date().toISOString(),
             speechMetrics: finalSpeechMetrics, // Include speech metrics like college interviews
             voice_metrics_summary: finalSpeechMetrics.length > 0 ? finalSpeechMetrics[0].metrics : null,
-            responseTimes: responseTimesRef.current
+            responseTimes: responseTimesRef.current,
+            voiceTimeline // <-- Add the timeline here
           };
 
           // Save structured interview data for viewing in recent interviews
@@ -728,7 +861,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             interviewType,
             focusedType,
             completedAt: new Date().toISOString(),
-            speechMetrics: getSpeechMetrics()
+            speechMetrics: getSpeechMetrics(),
+            voiceTimeline
           };
           console.log('Calling onComplete with fallback data...');
           onComplete?.(fallbackData);
@@ -743,7 +877,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           interviewType,
           focusedType,
           completedAt: new Date().toISOString(),
-          speechMetrics: getSpeechMetrics()
+          speechMetrics: getSpeechMetrics(),
+          voiceTimeline
         };
         onComplete?.(minimalData);
       }
@@ -758,7 +893,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         focusedType,
         completedAt: new Date().toISOString(),
         speechMetrics: getSpeechMetrics(),
-        error: 'An unexpected error occurred during interview finalization.'
+        error: 'An unexpected error occurred during interview finalization.',
+        voiceTimeline: []
       };
       onComplete?.(fallbackData);
     }
