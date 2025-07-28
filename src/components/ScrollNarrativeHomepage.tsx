@@ -1026,13 +1026,14 @@ const ScrollNarrativeHomepage: React.FC = () => {
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
   
   // Transform values for hero section - fade out very quickly when scrolling starts
-  const heroOpacity = useTransform(smoothProgress, [0, 0.05], [1, 0]);
+  const heroOpacity = useTransform(smoothProgress, [0, 0.1], [1, 0]);
+  const heroPointerEvents = useTransform(heroOpacity, (v) => (v > 0 ? 'auto' : 'none'));
   
   return (
     <div className="relative">
       {/* Hero Section - Fullscreen sticky intro */}
       <motion.section 
-        style={{ opacity: heroOpacity }}
+        style={{ opacity: heroOpacity, pointerEvents: heroPointerEvents }}
         className="fixed inset-0 flex items-center justify-center bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900 z-10"
       >
         <WormholePortal />
@@ -1105,9 +1106,7 @@ const ScrollNarrativeHomepage: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.4 }}
           >
-            <div style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}>
-              <WaitlistForm />
-            </div>
+            <WaitlistForm />
           </motion.div>
         </div>
       </section>
@@ -1116,4 +1115,3 @@ const ScrollNarrativeHomepage: React.FC = () => {
 };
 
 export default ScrollNarrativeHomepage;
-
