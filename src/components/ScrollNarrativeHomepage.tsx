@@ -1105,7 +1105,9 @@ const ScrollNarrativeHomepage: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.4 }}
           >
-            <WaitlistForm />
+            <div style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}>
+              <WaitlistForm />
+            </div>
           </motion.div>
         </div>
       </section>
