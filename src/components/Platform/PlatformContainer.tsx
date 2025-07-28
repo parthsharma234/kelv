@@ -15,6 +15,7 @@ import RealtimeInterviewSession from './RealtimeInterviewSession';
 import InterviewProcessing from './InterviewProcessing';
 import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import UnifiedInterviewResults from './UnifiedInterviewResults';
 
 type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview' | 'processing' | 'processing-focused' | 'processing-college';
 
@@ -221,7 +222,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     if (interviewType === 'college') {
       // It's a college interview - route to college results
       setCurrentState('view-college-results');
-    } else if (interviewType) {
+    } else if (interviewType && interviewType !== 'standard') {
       // It's a focused interview - set the type and route to focused results
       setFocusedInterviewType(interviewType);
       setCurrentState('view-focused-results');
@@ -291,7 +292,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       );
     }
     return (
-      <InterviewResults
+      <UnifiedInterviewResults
         sessionData={viewingSessionData}
         onBackToDashboard={handleBackToDashboard}
         onStartNewInterview={handleStartNewInterview}
@@ -346,7 +347,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       )}
       
       {currentState === 'results' && sessionData && (
-        <InterviewResults
+        <UnifiedInterviewResults
           sessionData={sessionData}
           onBackToDashboard={handleBackToDashboard}
           onStartNewInterview={handleStartNewInterview}

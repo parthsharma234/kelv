@@ -39,5 +39,8 @@ export const supabase = createClient(
 
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
+  const configured = isValidUrl(supabaseUrl) && isValidKey(supabaseAnonKey);
+  console.log('Supabase configured:', configured, 'URL valid:', isValidUrl(supabaseUrl), 'Key valid:', isValidKey(supabaseAnonKey));
+  return configured;
   return isValidUrl(supabaseUrl) && isValidKey(supabaseAnonKey);
 };

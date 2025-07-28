@@ -1409,6 +1409,19 @@ export class FastTranscription {
 }
 
 // Exported feedback generator for use with enhanced metrics
+// Export function for enhanced voice metrics analysis (for compatibility with openai.ts)
+export async function analyzeEnhancedVoiceMetrics(
+  audioBlob: Blob,
+  transcription: string,
+  duration: number,
+  timestamp: number = Date.now(),
+  responseTimes?: number[]
+): Promise<VoiceMetrics> {
+  const analyzer = new AdvancedSpeechAnalyzer();
+  const timelinePoint = await analyzer.analyzeVoiceSegment(audioBlob, transcription, duration, timestamp);
+  return timelinePoint.metrics;
+}
+
 export function generateActionableFeedback(
   metrics: VoiceMetrics,
   transcription: string,

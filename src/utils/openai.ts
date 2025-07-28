@@ -110,7 +110,7 @@ export const processVoiceInput = async (audioBlob: Blob): Promise<string> => {
 export const extractSpeechMetrics = async (audioBlob: Blob, transcription: string, duration: number, responseTimes?: number[]) => {
   try {
     // Import the enhanced speech analyzer
-    const { analyzeEnhancedVoiceMetrics } = await import('./enhancedSpeech');
+    const { analyzeEnhancedVoiceMetrics } = await import('./speechAnalysis');
     
     // Analyze voice metrics using the enhanced system
     const voiceMetrics = await analyzeEnhancedVoiceMetrics(audioBlob, transcription, duration, Date.now(), responseTimes);
@@ -118,10 +118,10 @@ export const extractSpeechMetrics = async (audioBlob: Blob, transcription: strin
     // Return enhanced metrics with legacy compatibility
     return {
       speechRate: voiceMetrics.speechRate,
-      fluencyScore: voiceMetrics.fluencyScore || voiceMetrics.fluency * 10,
+      fluencyScore: voiceMetrics.fluencyScore,
       voiceConfidence: voiceMetrics.voiceConfidence,
-      deliveryScore: voiceMetrics.deliveryScore || voiceMetrics.delivery * 10,
-      clarityScore: voiceMetrics.clarityScore || voiceMetrics.clarity * 10,
+      deliveryScore: voiceMetrics.deliveryScore,
+      clarityScore: voiceMetrics.clarityScore,
       fillerWordCount: voiceMetrics.fillerWordCount,
       pauseAnalysis: voiceMetrics.pauseAnalysis || {
         averagePauseLength: 0,
@@ -139,10 +139,6 @@ export const extractSpeechMetrics = async (audioBlob: Blob, transcription: strin
         dynamicRange: 0
       },
       timestamp: voiceMetrics.timestamp,
-      // Include enhanced metrics for future use
-      fluency: voiceMetrics.fluency,
-      delivery: voiceMetrics.delivery,
-      clarity: voiceMetrics.clarity,
       duration: typeof voiceMetrics.duration === 'number' ? voiceMetrics.duration : duration
     };
   } catch (error) {

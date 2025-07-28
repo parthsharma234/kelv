@@ -1,6 +1,35 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { InterviewHistory, InterviewSetup, CollegeInterviewSetup } from '../types/interview';
 
+// 🧠 Behavioral Insights Interfaces
+export interface BehavioralInsight {
+  id?: string;
+  session_id: string;
+  response: string;
+  score: number;
+  response_time: number;
+  confidence: 'high' | 'medium' | 'low';
+  engagement: 'high' | 'medium' | 'low';
+  communication_style: 'structured' | 'conversational' | 'formal' | 'casual';
+  stress_indicators: boolean;
+  question_context: string;
+  timestamp: number;
+  created_at?: string;
+}
+
+export interface BehavioralSummary {
+  session_id: string;
+  total_responses: number;
+  average_confidence: number;
+  average_engagement: number;
+  dominant_communication_style: string;
+  stress_indicators_count: number;
+  confidence_trend: 'improving' | 'declining' | 'stable';
+  engagement_trend: 'improving' | 'declining' | 'stable';
+  overall_behavioral_score: number;
+  created_at?: string;
+}
+
 // Realtime transcript interfaces
 export interface TranscriptChunk {
   id: string;
@@ -671,27 +700,39 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('interview_sessions')
-      .select('*')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false });
+    // Fetch from both interview_sessions and realtime_interview_sessions
+    const [standardSessionsResult, realtimeSessionsResult] = await Promise.all([
+      supabase
+        .from('interview_sessions')
+        .select('*')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('realtime_interview_sessions')
+        .select('*')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+    ]);
 
-    if (error) {
-      console.error('Error fetching interview history:', error);
-      // Fallback to localStorage
-      const localHistory = localStorage.getItem('kelv-interview-history');
-      return localHistory ? JSON.parse(localHistory) : [];
-    }    
+    if (standardSessionsResult.error) {
+      console.error('Error fetching standard interview history:', standardSessionsResult.error);
+    }
+
+    if (realtimeSessionsResult.error) {
+      console.error('Error fetching realtime interview history:', realtimeSessionsResult.error);
+    }
+
+    const standardSessions = standardSessionsResult.data || [];
+    const realtimeSessions = realtimeSessionsResult.data || [];
 
     console.log('Fetched interview history from Supabase:', {
-      total: data.length,
-      collegeInterviews: data.filter(s => s.interview_type === 'college').length,
-      interviewTypes: data.map(s => s.interview_type)
+      standardSessions: standardSessions.length,
+      realtimeSessions: realtimeSessions.length,
+      total: standardSessions.length + realtimeSessions.length
     });
 
-    // Transform Supabase data to InterviewHistory format
-    const transformedHistory = data.map(session => ({
+    // Transform standard sessions to InterviewHistory format
+    const transformedStandardHistory = standardSessions.map(session => ({
       id: session.id,
       date: new Date(session.created_at),
       setup: session.setup,
@@ -705,16 +746,41 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
         speechRate: session.speech_metrics.timing?.speechRate || 0,
         voiceStability: session.speech_metrics.voice?.voiceStability || 0
       } : undefined,
-      interviewType: session.interview_type // Add this line
+      interviewType: session.interview_type,
+      isRealtime: false
     }));
 
-    console.log('Transformed interview history:', transformedHistory.map(h => ({
+    // Transform realtime sessions to InterviewHistory format
+    const transformedRealtimeHistory = realtimeSessions.map(session => ({
+      id: session.session_id, // Use session_id as the ID for realtime sessions
+      date: new Date(session.created_at),
+      setup: session.setup,
+      overallScore: session.overall_score || 0,
+      duration: session.total_duration || 0,
+      questionsAnswered: session.questions_answered || 0,
+      status: 'completed' as const,
+      speechMetricsAverage: session.speech_metrics ? {
+        overallConfidence: session.speech_metrics.confidence?.overallConfidence || 0,
+        fluencyScore: session.speech_metrics.fluency?.fluencyScore || 0,
+        speechRate: session.speech_metrics.timing?.speechRate || 0,
+        voiceStability: session.speech_metrics.voice?.voiceStability || 0
+      } : undefined,
+      interviewType: session.interview_type === 'college' ? 'college' : (session.focused_type ? session.focused_type : 'standard'),
+      isRealtime: true
+    }));
+
+    // Merge and sort by date (most recent first)
+    const allHistory = [...transformedStandardHistory, ...transformedRealtimeHistory]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    console.log('Transformed interview history:', allHistory.map(h => ({
       id: h.id,
       interviewType: h.interviewType,
+      isRealtime: h.isRealtime,
       speechMetricsIncluded: !!h.speechMetricsAverage
     })));
 
-    return transformedHistory;
+    return allHistory;
 
   } catch (error) {
     console.error('Failed to fetch interview history:', error);
@@ -768,42 +834,61 @@ export const getInterviewStats = async () => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('interview_sessions')
-      .select('overall_score, duration, created_at, speech_metrics, responses, interview_type')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: true });
+    // Fetch from both tables
+    const [standardResult, realtimeResult] = await Promise.all([
+      supabase
+        .from('interview_sessions')
+        .select('overall_score, duration, created_at, speech_metrics, responses, interview_type')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('realtime_interview_sessions')
+        .select('overall_score, total_duration, created_at, speech_metrics, responses, interview_type')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: true })
+    ]);
 
-    if (error) {
-      console.error('Error fetching interview stats:', error);
-      return { 
-        totalInterviews: 0, 
-        averageScore: 0, 
-        totalHours: 0, 
-        improvement: 0, 
-        focusedInterviews: 0,
-        focusedAverageScore: 0,
-        mostPracticedType: '',
-        speechMetrics: null 
-      };
+    if (standardResult.error) {
+      console.error('Error fetching standard interview stats:', standardResult.error);
     }
 
-    const totalInterviews = data.length;
-    const averageScore = data.reduce((sum, session) => sum + session.overall_score, 0) / totalInterviews || 0;
-    const totalHours = data.reduce((sum, session) => sum + session.duration, 0) / 3600;
+    if (realtimeResult.error) {
+      console.error('Error fetching realtime interview stats:', realtimeResult.error);
+    }
+
+    const standardData = standardResult.data || [];
+    const realtimeData = realtimeResult.data || [];
+
+    // Combine and normalize data
+    const allData = [
+      ...standardData.map(session => ({
+        ...session,
+        duration: session.duration,
+        isRealtime: false
+      })),
+      ...realtimeData.map(session => ({
+        ...session,
+        duration: session.total_duration || 0,
+        isRealtime: true
+      }))
+    ];
+
+    const totalInterviews = allData.length;
+    const averageScore = allData.reduce((sum, session) => sum + (session.overall_score || 0), 0) / totalInterviews || 0;
+    const totalHours = allData.reduce((sum, session) => sum + session.duration, 0) / 3600;
     
     let improvement = 0;
     if (totalInterviews >= 6) {
-      const recent = data.slice(-3).reduce((sum, session) => sum + session.overall_score, 0) / 3;
-      const initial = data.slice(0, 3).reduce((sum, session) => sum + session.overall_score, 0) / 3;
+      const recent = allData.slice(-3).reduce((sum, session) => sum + (session.overall_score || 0), 0) / 3;
+      const initial = allData.slice(0, 3).reduce((sum, session) => sum + (session.overall_score || 0), 0) / 3;
       improvement = ((recent - initial) / initial) * 100;
     }
 
-    // Calculate focused interview stats
-    const focusedSessions = data.filter(session => session.interview_type);
+    // Calculate focused interview stats (including realtime focused interviews)
+    const focusedSessions = allData.filter(session => session.interview_type && session.interview_type !== 'college');
     const focusedInterviews = focusedSessions.length;
     const focusedAverageScore = focusedSessions.length > 0 
-      ? focusedSessions.reduce((sum, session) => sum + session.overall_score, 0) / focusedSessions.length 
+      ? focusedSessions.reduce((sum, session) => sum + (session.overall_score || 0), 0) / focusedSessions.length 
       : 0;
     
     // Find most practiced type
@@ -816,7 +901,7 @@ export const getInterviewStats = async () => {
     const mostPracticedType = Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
 
     // Calculate speech metrics averages
-    const sessionsWithSpeech = data.filter(session => 
+    const sessionsWithSpeech = allData.filter(session => 
       session.speech_metrics && Object.keys(session.speech_metrics).length > 0
     );
 
@@ -1010,34 +1095,55 @@ export const getInterviewById = async (interviewId: string) => {
   }
   try {
     console.log('Querying Supabase for interview ID:', interviewId);
-    const { data, error } = await supabase
-      .from('interview_sessions')
-      .select('*')
-      .eq('id', interviewId)
-      .single();
+    
+    // Try to find the interview in both tables
+    const [standardResult, realtimeResult] = await Promise.all([
+      supabase
+        .from('interview_sessions')
+        .select('*')
+        .eq('id', interviewId)
+        .single(),
+      supabase
+        .from('realtime_interview_sessions')
+        .select('*')
+        .eq('session_id', interviewId)
+        .single()
+    ]);
 
-    if (error) {
-      console.error('Error fetching interview by ID:', error);
+    let data = null;
+    let isRealtime = false;
+
+    if (standardResult.data) {
+      data = standardResult.data;
+      isRealtime = false;
+      console.log('Found interview in standard sessions table');
+    } else if (realtimeResult.data) {
+      data = realtimeResult.data;
+      isRealtime = true;
+      console.log('Found interview in realtime sessions table');
+    } else {
+      console.log('Interview not found in either table');
       return null;
     }
 
-    console.log('Supabase data found:', !!data, data ? data.interview_type : 'N/A');
+    console.log('Supabase data found:', !!data, data ? data.interview_type : 'N/A', 'isRealtime:', isRealtime);
 
     // Transform Supabase data to sessionData format expected by results components
     const transformedData = {
-      id: data.id,
+      id: isRealtime ? data.session_id : data.id,
       setup: data.setup,
-      overallScore: data.overall_score,
-      duration: data.duration,
-      questionsAnswered: data.questions_answered,
+      overallScore: data.overall_score || 0,
+      duration: isRealtime ? data.total_duration : data.duration,
+      questionsAnswered: data.questions_answered || 0,
       status: data.status as 'completed' | 'incomplete',
       responses: data.responses || [],
       questions: data.questions || [],
-      interviewType: data.interview_type,
+      interviewType: data.interview_type || 'realtime',
       speechMetrics: data.speech_metrics ? [data.speech_metrics] : [],
       date: new Date(data.created_at),
       startTime: new Date(data.created_at),
-      endTime: data.created_at ? new Date(new Date(data.created_at).getTime() + data.duration * 1000) : undefined,
+      endTime: isRealtime && data.end_time ? new Date(data.end_time) : 
+               data.created_at ? new Date(new Date(data.created_at).getTime() + (isRealtime ? data.total_duration : data.duration) * 1000) : undefined,
       speechMetricsAverage: data.speech_metrics ? {
         overallConfidence: data.speech_metrics.confidence?.overallConfidence || 0,
         fluencyScore: data.speech_metrics.fluency?.fluencyScore || 0,
@@ -1047,7 +1153,11 @@ export const getInterviewById = async (interviewId: string) => {
       // Include metrics for college interviews
       metrics: data.metrics || undefined,
       // Include voice metrics if present
-      voiceMetrics: data.speech_metrics || undefined
+      voiceMetrics: data.voice_metrics_summary || data.speech_metrics || undefined,
+      // Include realtime-specific data
+      isRealtime: isRealtime,
+      transcript: data.transcript || undefined,
+      sessionMetadata: data.session_metadata || undefined
     };
     
     console.log('Transformed Supabase data:', transformedData);
@@ -1292,21 +1402,22 @@ export const saveRealtimeInterviewSession = async (sessionData: any): Promise<vo
       }
     }
 
-    // Save to interview_sessions table (like standard interviews)
+    // Update the existing realtime session with complete data
     const { error } = await supabase
-      .from('interview_sessions')
-      .insert({
-        user_id: user.id,
-        interview_type: sessionData.interviewType || 'general',
-        setup: sessionData.setup || {},
+      .from('realtime_interview_sessions')
+      .update({
+        end_time: new Date().toISOString(),
+        status: 'completed',
+        total_duration: sessionData.duration || 0,
+        question_count: sessionData.questionCount || 0,
         questions: sessionData.questions || [],
         responses: sessionData.responses || [],
         overall_score: sessionData.overallScore || 70,
-        duration: sessionData.duration || 0,
         questions_answered: sessionData.questionsAnswered || 0,
-        metrics: metrics,
+        speech_metrics: sessionData.speechMetrics || {},
         voice_metrics_summary: sessionData.voiceMetrics,
         voice_timeline: sessionData.voiceTimeline,
+        metrics: metrics,
         session_metadata: {
           session_id: sessionData.sessionId,
           is_realtime: true,
@@ -1314,8 +1425,10 @@ export const saveRealtimeInterviewSession = async (sessionData: any): Promise<vo
           focused_type: sessionData.focusedType,
           transcript: sessionData.transcript
         },
-        created_at: sessionData.completedAt || new Date().toISOString()
-      });
+        transcript: sessionData.transcript,
+        updated_at: new Date().toISOString()
+      })
+      .eq('session_id', sessionData.sessionId);
 
     if (error) {
       console.error('Error saving realtime interview session:', error);
@@ -1327,4 +1440,193 @@ export const saveRealtimeInterviewSession = async (sessionData: any): Promise<vo
     console.error('Failed to save realtime interview session:', error);
     throw error;
   }
+};
+
+// 🧠 BEHAVIORAL INSIGHTS FUNCTIONS
+
+export const saveBehavioralInsight = async (insight: Omit<BehavioralInsight, 'id' | 'created_at'>): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping behavioral insight save');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('behavioral_insights')
+      .insert(insight);
+
+    if (error) {
+      console.error('Error saving behavioral insight:', error);
+      // Don't throw error - just log it and continue
+      return;
+    }
+
+    console.log('Behavioral insight saved successfully');
+  } catch (error) {
+    console.error('Failed to save behavioral insight:', error);
+    // Don't throw error - just log it and continue
+    return;
+  }
+};
+
+export const saveBehavioralSummary = async (summary: Omit<BehavioralSummary, 'created_at'>): Promise<void> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping behavioral summary save');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('behavioral_summaries')
+      .insert(summary);
+
+    if (error) {
+      console.error('Error saving behavioral summary:', error);
+      // Don't throw error - just log it and continue
+      return;
+    }
+
+    console.log('Behavioral summary saved successfully');
+  } catch (error) {
+    console.error('Failed to save behavioral summary:', error);
+    // Don't throw error - just log it and continue
+    return;
+  }
+};
+
+export const getBehavioralInsightsBySession = async (sessionId: string): Promise<BehavioralInsight[]> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning empty behavioral insights');
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('behavioral_insights')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching behavioral insights:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch behavioral insights:', error);
+    return [];
+  }
+};
+
+export const getBehavioralSummaryBySession = async (sessionId: string): Promise<BehavioralSummary | null> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, returning null behavioral summary');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('behavioral_summaries')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching behavioral summary:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch behavioral summary:', error);
+    return null;
+  }
+};
+
+export const calculateBehavioralSummary = (insights: BehavioralInsight[]): Omit<BehavioralSummary, 'session_id' | 'created_at'> => {
+  if (insights.length === 0) {
+    return {
+      total_responses: 0,
+      average_confidence: 0,
+      average_engagement: 0,
+      dominant_communication_style: 'conversational',
+      stress_indicators_count: 0,
+      confidence_trend: 'stable',
+      engagement_trend: 'stable',
+      overall_behavioral_score: 0
+    };
+  }
+
+  // Calculate averages
+  const confidenceScores = insights.map(i => {
+    switch (i.confidence) {
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 2;
+    }
+  });
+  
+  const engagementScores = insights.map(i => {
+    switch (i.engagement) {
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 2;
+    }
+  });
+
+  const averageConfidence = confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length;
+  const averageEngagement = engagementScores.reduce((sum, score) => sum + score, 0) / engagementScores.length;
+
+  // Find dominant communication style
+  const styleCounts = insights.reduce((acc, insight) => {
+    acc[insight.communication_style] = (acc[insight.communication_style] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const dominantStyle = Object.entries(styleCounts)
+    .sort(([,a], [,b]) => b - a)[0]?.[0] || 'conversational';
+
+  // Count stress indicators
+  const stressIndicatorsCount = insights.filter(i => i.stress_indicators).length;
+
+  // Calculate trends
+  const midPoint = Math.floor(insights.length / 2);
+  const earlyConfidence = confidenceScores.slice(0, midPoint);
+  const lateConfidence = confidenceScores.slice(midPoint);
+  const earlyEngagement = engagementScores.slice(0, midPoint);
+  const lateEngagement = engagementScores.slice(midPoint);
+
+  const earlyAvgConfidence = earlyConfidence.length > 0 ? 
+    earlyConfidence.reduce((sum, score) => sum + score, 0) / earlyConfidence.length : 2;
+  const lateAvgConfidence = lateConfidence.length > 0 ? 
+    lateConfidence.reduce((sum, score) => sum + score, 0) / lateConfidence.length : 2;
+  const earlyAvgEngagement = earlyEngagement.length > 0 ? 
+    earlyEngagement.reduce((sum, score) => sum + score, 0) / earlyEngagement.length : 2;
+  const lateAvgEngagement = lateEngagement.length > 0 ? 
+    lateEngagement.reduce((sum, score) => sum + score, 0) / lateEngagement.length : 2;
+
+  const confidenceTrend = lateAvgConfidence > earlyAvgConfidence + 0.3 ? 'improving' :
+                         lateAvgConfidence < earlyAvgConfidence - 0.3 ? 'declining' : 'stable';
+  
+  const engagementTrend = lateAvgEngagement > earlyAvgEngagement + 0.3 ? 'improving' :
+                         lateAvgEngagement < earlyAvgEngagement - 0.3 ? 'declining' : 'stable';
+
+  // Calculate overall behavioral score (0-100)
+  const overallBehavioralScore = Math.round(
+    ((averageConfidence / 3) * 0.4 + (averageEngagement / 3) * 0.4 + (1 - stressIndicatorsCount / insights.length) * 0.2) * 100
+  );
+
+  return {
+    total_responses: insights.length,
+    average_confidence: Math.round(averageConfidence * 10) / 10,
+    average_engagement: Math.round(averageEngagement * 10) / 10,
+    dominant_communication_style: dominantStyle,
+    stress_indicators_count: stressIndicatorsCount,
+    confidence_trend: confidenceTrend,
+    engagement_trend: engagementTrend,
+    overall_behavioral_score: overallBehavioralScore
+  };
 };

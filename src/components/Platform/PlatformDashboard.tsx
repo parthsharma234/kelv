@@ -733,7 +733,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                 </div>
               ) : (                <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2 custom-scrollbar' : ''}`}>
                   {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5)).map((interview) => {
-                    const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college';
+                    const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college' && interview.interviewType !== 'standard';
                     const isCollegeInterview = interview.interviewType === 'college';
                     
                     console.log('Dashboard: Rendering interview:', {

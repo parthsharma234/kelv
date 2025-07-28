@@ -10,7 +10,7 @@ interface InterviewProcessingProps {
 
 const InterviewProcessing: React.FC<InterviewProcessingProps> = ({ 
   onComplete, 
-  processingTimeMs = 3000 
+  processingTimeMs = 2000 // Optimized for voice analytics processing
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -208,6 +208,18 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
         >
           {Math.round(progress)}% Complete
         </motion.p>
+
+        {/* Timeout Warning */}
+        {progress > 80 && (
+          <motion.p 
+            className="text-orange-400 text-xs mt-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            Processing voice analytics... This may take a few moments
+          </motion.p>
+        )}
       </div>
     </div>
   );
