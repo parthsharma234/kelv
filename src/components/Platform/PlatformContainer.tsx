@@ -470,6 +470,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           setup={interviewSetup as InterviewSetup}
           interviewType="standard"
           onComplete={handleInterviewComplete}
+          onProcessingStart={() => { setCurrentState('processing'); scrollToTop(); }}
           onBack={handleBackToDashboard}
         />
       )}
@@ -479,6 +480,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           setup={interviewSetup as InterviewSetup}
           interviewType={focusedInterviewType}
           onComplete={handleFocusedInterviewComplete}
+          onProcessingStart={() => { setCurrentState('processing-focused'); scrollToTop(); }}
           onBack={handleBackToDashboard}
         />
       )}
@@ -488,6 +490,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           setup={interviewSetup as any}
           interviewType="college"
           onComplete={handleCollegeInterviewComplete}
+          onProcessingStart={() => { setCurrentState('processing-college'); scrollToTop(); }}
           onBack={handleBackToDashboard}
         />
       )}

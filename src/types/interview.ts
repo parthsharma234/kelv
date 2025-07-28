@@ -9,6 +9,7 @@ export interface VoiceMetrics {
   clarityScore?: number;     // Legacy 0-100 score for backward compatibility
   fillerWordCount: number;   // Count of filler words (um, uh, like, etc.)
   timestamp: number;         // Timestamp when metrics were calculated
+  duration: number;          // Duration of the analyzed segment (required)
   responseTime?: number;     // Time in seconds from question to user response
   pauseAnalysis?: {
     averagePauseLength: number;

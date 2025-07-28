@@ -10,6 +10,7 @@ interface RealtimeInterviewSessionProps {
   interviewType?: string;
   sessionId?: string;
   onComplete: (sessionData: any) => void;
+  onProcessingStart?: () => void;
   onBack: () => void;
 }
 
@@ -139,6 +140,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   setup,
   interviewType,
   onComplete,
+  onProcessingStart,
   onBack
 }) => {
   
@@ -275,8 +277,11 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
   // End interview
   const handleEndInterview = useCallback(async () => {
+    if (typeof onProcessingStart === 'function') {
+      onProcessingStart();
+    }
     await endInterview();
-  }, [endInterview]);
+  }, [endInterview, onProcessingStart]);
 
   // Send text message
   const handleSendMessage = useCallback(() => {

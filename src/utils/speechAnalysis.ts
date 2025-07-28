@@ -1407,3 +1407,152 @@ export class FastTranscription {
     return chunks;
   }
 }
+
+// Exported feedback generator for use with enhanced metrics
+export function generateActionableFeedback(
+  metrics: VoiceMetrics,
+  transcription: string,
+  questionContext?: string
+): ActionableFeedback {
+  const strengths: string[] = [];
+  const improvements: string[] = [];
+  const specificTips: string[] = [];
+
+  // --- Speech Rate ---
+  let speechRateMsg = '';
+  if (metrics.speechRate >= 140 && metrics.speechRate <= 180) {
+    strengths.push("Perfect speaking pace - ideal rhythm for interviews.");
+    speechRateMsg = "Your pace is excellent. Keep maintaining this rhythm for clear communication.";
+  } else if (metrics.speechRate < 120) {
+    improvements.push("Your speaking pace is a bit slow.");
+    specificTips.push("Try to speak a bit faster to maintain interviewer engagement.");
+    speechRateMsg = "Try to increase your pace slightly to sound more engaged and confident.";
+  } else if (metrics.speechRate > 200) {
+    improvements.push("You're speaking a bit too quickly.");
+    specificTips.push("Slow down and take deliberate pauses between key points.");
+    speechRateMsg = "Try to slow down a little to ensure your message is clear and easy to follow.";
+  } else {
+    speechRateMsg = "Your pace is generally good, but monitor for consistency throughout the interview.";
+  }
+
+  // --- Fluency ---
+  let fluencyMsg = '';
+  if (metrics.fluencyScore >= 80) {
+    strengths.push("Excellent fluency and smooth delivery.");
+    fluencyMsg = "Your speech flows smoothly, which helps keep the listener engaged.";
+  } else if (metrics.fluencyScore >= 60) {
+    improvements.push("Some hesitation in your speech flow.");
+    specificTips.push("Practice your key points beforehand to reduce hesitation.");
+    fluencyMsg = "Work on reducing minor hesitations for an even smoother delivery.";
+  } else {
+    improvements.push("Significant disfluency affecting clarity.");
+    specificTips.push("Take a breath before answering and organize your thoughts.");
+    fluencyMsg = "Focus on organizing your thoughts before speaking to improve your fluency.";
+  }
+
+  // --- Voice Confidence ---
+  let confidenceMsg = '';
+  if (metrics.voiceConfidence >= 75) {
+    strengths.push("Strong, confident vocal presence.");
+    confidenceMsg = "You sound confident and assertive, which is great for interviews.";
+  } else if (metrics.voiceConfidence >= 50) {
+    improvements.push("Your voice could project more confidence.");
+    specificTips.push("Speak from your diaphragm and maintain steady volume.");
+    confidenceMsg = "Try to project your voice a bit more to convey confidence.";
+  } else {
+    improvements.push("Your voice lacks confidence and authority.");
+    specificTips.push("Practice power poses before speaking and focus on breathing deeply.");
+    confidenceMsg = "Practice power poses and deep breathing to boost your vocal confidence.";
+  }
+
+  // --- Filler Words ---
+  const fillerRatio = metrics.fillerWordCount / (transcription.split(' ').length || 1);
+  let fillerMsg = '';
+  if (fillerRatio < 0.02) {
+    strengths.push("Minimal use of filler words - very professional.");
+    fillerMsg = "You use very few filler words, which makes your speech sound polished.";
+  } else if (fillerRatio < 0.05) {
+    improvements.push("Some filler words present.");
+    specificTips.push("Replace 'um' and 'uh' with brief pauses for better impact.");
+    fillerMsg = "Try to reduce filler words further for an even more professional impression.";
+  } else {
+    improvements.push("Too many filler words disrupting message clarity.");
+    specificTips.push("Practice speaking more slowly to reduce filler word dependency.");
+    fillerMsg = "Focus on pausing instead of using filler words to improve clarity.";
+  }
+
+  // --- Energy and Pitch Variation ---
+  let energyMsg = '';
+  if (metrics.energyAnalysis.dynamicRange > 0.3 && metrics.pitchAnalysis.pitchVariation > 0.2) {
+    strengths.push("Great vocal variety and engaging delivery.");
+    energyMsg = "Your vocal variety keeps the listener engaged. Well done!";
+  } else if (metrics.energyAnalysis.dynamicRange < 0.15) {
+    improvements.push("Voice lacks energy and enthusiasm.");
+    specificTips.push("Vary your tone and energy level to emphasize key points.");
+    energyMsg = "Try to add more energy and variation to your voice to keep your audience interested.";
+  } else {
+    energyMsg = "Aim for a bit more vocal variety to make your delivery even more engaging.";
+  }
+
+  // --- Pauses ---
+  let pauseMsg = '';
+  if (metrics.pauseAnalysis.strategicPauses > 2) {
+    strengths.push("Good use of strategic pauses for emphasis.");
+    pauseMsg = "You use pauses effectively to emphasize key points.";
+  } else if (metrics.pauseAnalysis.averagePauseLength > 2.0) {
+    improvements.push("Pauses are too long, affecting flow.");
+    specificTips.push("Keep pauses brief (1-2 seconds) to maintain momentum.");
+    pauseMsg = "Try to keep your pauses shorter to maintain a steady flow.";
+  } else {
+    pauseMsg = "Consider using strategic pauses to highlight important ideas.";
+  }
+
+  // --- Compose overall message ---
+  let overall = '';
+  const improvementMsgs = [speechRateMsg, fluencyMsg, confidenceMsg, fillerMsg, energyMsg, pauseMsg].filter(Boolean);
+
+  // If mostly strengths, give a positive summary
+  if (improvements.length === 0) {
+    overall = "Excellent vocal performance! You demonstrate strong communication skills across all key areas.";
+  } else if (improvements.length <= 2) {
+    overall = `Great job overall. Here are a few areas to focus on: ${improvementMsgs.join(' ')}`;
+  } else {
+    overall = `Priority Improvements: ${improvementMsgs.join(' ')}`;
+  }
+
+  // --- Score and category ---
+  const overallScore = Math.round(
+    (metrics.fluencyScore + metrics.voiceConfidence + metrics.deliveryScore + metrics.clarityScore) / 4
+  );
+
+  let category: ActionableFeedback['category'];
+  if (overallScore >= 85) {
+    category = 'excellent';
+  } else if (overallScore >= 70) {
+    category = 'good';
+  } else if (overallScore >= 55) {
+    category = 'fair';
+  } else {
+    category = 'needs_improvement';
+  }
+
+  // --- Context-specific tips ---
+  if (questionContext) {
+    if (questionContext.toLowerCase().includes('leadership')) {
+      specificTips.push("For leadership questions, project authority through steady, measured speech.");
+    } else if (questionContext.toLowerCase().includes('technical')) {
+      specificTips.push("For technical answers, speak clearly and pause after complex concepts.");
+    } else if (questionContext.toLowerCase().includes('behavioral')) {
+      specificTips.push("Use vocal variety to make your stories more engaging and memorable.");
+    }
+  }
+
+  return {
+    overall,
+    strengths,
+    improvements,
+    specificTips,
+    score: overallScore,
+    category
+  };
+}
