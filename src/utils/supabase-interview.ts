@@ -1047,7 +1047,8 @@ export const getInterviewById = async (interviewId: string) => {
       // Include metrics for college interviews
       metrics: data.metrics || undefined,
       // Include voice metrics if present
-      voiceMetrics: data.speech_metrics || undefined
+      voiceMetrics: data.speech_metrics || undefined,
+      transcript: data.transcript || [] // <-- Read transcript from its own column
     };
     
     console.log('Transformed Supabase data:', transformedData);
@@ -1307,12 +1308,13 @@ export const saveRealtimeInterviewSession = async (sessionData: any): Promise<vo
         metrics: metrics,
         voice_metrics_summary: sessionData.voiceMetrics,
         voice_timeline: sessionData.voiceTimeline,
+        transcript: sessionData.transcript, // <-- Save transcript directly
         session_metadata: {
           session_id: sessionData.sessionId,
           is_realtime: true,
           model_type: 'gpt-4o-realtime-preview',
-          focused_type: sessionData.focusedType,
-          transcript: sessionData.transcript
+          focused_type: sessionData.focusedType
+          // transcript: sessionData.transcript // <-- Remove this
         },
         created_at: sessionData.completedAt || new Date().toISOString()
       });

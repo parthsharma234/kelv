@@ -15,7 +15,8 @@ import {
   AlertCircle,
   GraduationCap,
   Shield,
-  Star
+  Star,
+  MessageSquare
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
 import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
@@ -132,6 +133,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
     categories: {} as { [key: string]: number }
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [interviewTypeFilter, setInterviewTypeFilter] = useState<string | null>(null);
 
   useEffect(() => {
     // Scroll to top when component mounts
@@ -214,7 +216,143 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
           <h1 className="text-4xl font-bold gradient-text mb-4">Interview Platform</h1>
           <p className="text-gray-400 text-lg">Practice with dynamic interviews that adapt to your responses in real-time.</p>
         </motion.div>
-
+        {/* Filter Buttons */}
+        <div className="flex flex-wrap gap-4 mb-8">
+          <button
+            className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'focused' ? 'bg-blue-600 text-white border-blue-700' : 'bg-dark-800 text-blue-400 border-blue-700 hover:bg-blue-900/40'}`}
+            onClick={() => setInterviewTypeFilter('focused')}
+          >
+            View Focused Practice
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'college' ? 'bg-purple-600 text-white border-purple-700' : 'bg-dark-800 text-purple-400 border-purple-700 hover:bg-purple-900/40'}`}
+            onClick={() => setInterviewTypeFilter('college')}
+          >
+            View College Interviews
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'dynamic' ? 'bg-orange-600 text-white border-orange-700' : 'bg-dark-800 text-orange-400 border-orange-700 hover:bg-orange-900/40'}`}
+            onClick={() => setInterviewTypeFilter('dynamic')}
+          >
+            View Dynamic Interviews
+          </button>
+          {interviewTypeFilter && (
+            <button
+              className="px-4 py-2 rounded-lg font-semibold border bg-gray-700 text-gray-200 border-gray-600 hover:bg-gray-800 transition-colors"
+              onClick={() => setInterviewTypeFilter(null)}
+            >
+              Clear Filter
+            </button>
+          )}
+        </div>
+        {/* Recent Interviews - moved to top */}
+        <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold text-white flex items-center gap-3">
+              <BarChart3 className="w-5 h-5 text-orange-400" />
+              Recent Interviews
+            </h3>
+            {interviewHistory.length > 5 && (
+              <button 
+                onClick={() => setShowAllInterviews(!showAllInterviews)}
+                className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors"
+              >
+                {showAllInterviews ? 'Show Recent' : 'View All'}
+              </button>
+            )}
+          </div>
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-400">Loading interview history...</p>
+            </div>
+          ) : interviewHistory.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus className="w-8 h-8 text-gray-500" />
+              </div>
+              <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
+              <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
+            </div>
+          ) : (
+            <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2 custom-scrollbar' : ''}`}>
+              {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5))
+                .filter(interview => {
+                  if (!interviewTypeFilter) return true;
+                  if (interviewTypeFilter === 'focused') return interview.interviewType && interview.interviewType !== 'college' && interview.interviewType !== 'dynamic';
+                  if (interviewTypeFilter === 'college') return interview.interviewType === 'college';
+                  if (interviewTypeFilter === 'dynamic') return !interview.interviewType || interview.interviewType === 'general' || interview.interviewType === 'dynamic';
+                  return true;
+                })
+                .map((interview) => {
+                  const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college';
+                  const isCollegeInterview = interview.interviewType === 'college';
+                  
+                  console.log('Dashboard: Rendering interview:', {
+                    id: interview.id,
+                    interviewType: interview.interviewType,
+                    isFocused: isFocusedInterview,
+                    isCollege: isCollegeInterview,
+                    date: interview.date,
+                    status: interview.status
+                  });
+                  
+                  return (
+                    <div
+                      key={interview.id}
+                      className={`flex items-center justify-between p-4 rounded-xl hover:bg-dark-700/50 transition-colors cursor-pointer border ${
+                        isCollegeInterview
+                          ? 'bg-gradient-to-r from-purple-900/70 to-indigo-900/40 border-purple-500/50 shadow-purple-500/20'
+                          : isFocusedInterview 
+                          ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20' 
+                          : 'bg-dark-700/30 border-dark-700'
+                      }`}
+                      onClick={() => onViewInterviewResults(interview.id, interview.interviewType)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2 rounded-lg ${
+                          isCollegeInterview ? 'bg-purple-500/30' :
+                          isFocusedInterview ? 'bg-blue-500/30' : 'bg-orange-500/20'
+                        }`}> 
+                          <Calendar className={`w-4 h-4 ${
+                            isCollegeInterview ? 'text-purple-300' :
+                            isFocusedInterview ? 'text-blue-300' : 'text-orange-400'
+                          }`} />
+                        </div>                          <div>                            <h4 className="font-medium text-white flex items-center gap-2">
+                              {isCollegeInterview 
+                                ? formatCollegeInterviewTitle(interview.setup)
+                                : `${interview.setup.jobType} - ${interview.setup.industry}`
+                              }
+                              {isCollegeInterview && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-500/40 text-purple-200 border border-purple-400/50" title="College Interview">College</span>
+                              )}
+                              {isFocusedInterview && !isCollegeInterview && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 text-blue-200 border border-blue-400/50" title="Targeted (Focused) Interview">Focused</span>
+                              )}
+                            </h4>
+                            <p className="text-sm text-gray-400">
+                              {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            interview.overallScore >= 80
+                              ? 'bg-green-500/20 text-green-400'
+                              : interview.overallScore >= 60
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {interview.overallScore}%
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                        </div>
+                      </div>
+                    );
+                  })}
+            </div>
+          )}
+        </div>
         {/* Stats Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -293,7 +431,144 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                 'Start practicing to see growth'}
             </div>
           </div>
-        </motion.div>        {/* Focused Interview Stats - Only show when user has completed focused interviews */}
+        </motion.div>
+
+        {/* Dynamic Interviews Performance bar - now below stats grid */}
+        {interviewHistory && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <BarChart3 className="w-5 h-5 text-orange-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">Dynamic Interviews Performance</h2>
+              <div className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-medium rounded-full border border-orange-500/30">
+                Dynamic
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Sessions Card */}
+              <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-orange-500/30 rounded-lg">
+                    <BarChart3 className="w-5 h-5 text-orange-300" />
+                  </div>
+                  <span className="text-orange-200 text-sm font-medium">Dynamic Sessions</span>
+                </div>
+                <div className="text-3xl font-bold text-white">
+                  {interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic').length}
+                </div>
+                <div className="text-xs text-orange-300 mt-2">
+                  Adaptive interviews completed
+                </div>
+              </div>
+              {/* Overall Score Card */}
+              <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-orange-500/30 rounded-lg">
+                    <Award className="w-5 h-5 text-orange-300" />
+                  </div>
+                  <span className="text-orange-200 text-sm font-medium">Overall Score</span>
+                </div>
+                <div className="text-3xl font-bold text-white">
+                  {(() => {
+                    const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                    if (dynamic.length === 0) return '--';
+                    return Math.round(dynamic.reduce((sum, i) => sum + i.overallScore, 0) / dynamic.length) + '%';
+                  })()}
+                </div>
+                <div className="text-xs text-orange-300 mt-2">
+                  Average dynamic interview score
+                </div>
+              </div>
+            </div>
+            {/* 2x2 grid for metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Problem Solving Card */}
+                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-orange-500/30 rounded-lg">
+                      <Target className="w-5 h-5 text-orange-300" />
+                    </div>
+                    <span className="text-orange-200 text-sm font-medium">Problem Solving</span>
+                  </div>
+                  <div className="text-3xl font-bold text-white">
+                    {(() => {
+                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                      const scores = dynamic.flatMap(i => (i as any).metrics?.problem_solving ? [(i as any).metrics.problem_solving] : []);
+                      if (scores.length === 0) return '--';
+                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                    })()}
+                  </div>
+                  <div className="text-xs text-orange-300 mt-2">
+                    Avg. problem solving score
+                  </div>
+                </div>
+                {/* Communication Card */}
+                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-orange-500/30 rounded-lg">
+                      <MessageSquare className="w-5 h-5 text-orange-300" />
+                    </div>
+                    <span className="text-orange-200 text-sm font-medium">Communication</span>
+                  </div>
+                  <div className="text-3xl font-bold text-white">
+                    {(() => {
+                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                      const scores = dynamic.flatMap(i => (i as any).metrics?.communication ? [(i as any).metrics.communication] : []);
+                      if (scores.length === 0) return '--';
+                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                    })()}
+                  </div>
+                  <div className="text-xs text-orange-300 mt-2">
+                    Avg. communication score
+                  </div>
+                </div>
+                {/* Depth Card */}
+                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-orange-500/30 rounded-lg">
+                      <Brain className="w-5 h-5 text-orange-300" />
+                    </div>
+                    <span className="text-orange-200 text-sm font-medium">Depth</span>
+                  </div>
+                  <div className="text-3xl font-bold text-white">
+                    {(() => {
+                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                      const scores = dynamic.flatMap(i => (i as any).metrics?.depth ? [(i as any).metrics.depth] : []);
+                      if (scores.length === 0) return '--';
+                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                    })()}
+                  </div>
+                  <div className="text-xs text-orange-300 mt-2">
+                    Avg. depth score
+                  </div>
+                </div>
+                {/* Relevance Card */}
+                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-orange-500/30 rounded-lg">
+                      <CheckCircle className="w-5 h-5 text-orange-300" />
+                    </div>
+                    <span className="text-orange-200 text-sm font-medium">Relevance</span>
+                  </div>
+                  <div className="text-3xl font-bold text-white">
+                    {(() => {
+                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                      const scores = dynamic.flatMap(i => (i as any).metrics?.relevance ? [(i as any).metrics.relevance] : []);
+                      if (scores.length === 0) return '--';
+                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                    })()}
+                  </div>
+                  <div className="text-xs text-orange-300 mt-2">
+                    Avg. relevance score
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Focused Interview Stats - Only show when user has completed focused interviews */}
         {stats.focusedInterviews > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -702,105 +977,95 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
               </button>
             </div>
 
-            {/* Recent Interviews */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-                  <BarChart3 className="w-5 h-5 text-orange-400" />
-                  Recent Interviews
+            {/* Quick Tips & Performance */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="space-y-6"
+            >
+              {/* Features */}
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-orange-400" />
+                  Platform Features
                 </h3>
-                {interviewHistory.length > 5 && (
-                  <button 
-                    onClick={() => setShowAllInterviews(!showAllInterviews)}
-                    className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors"
-                  >
-                    {showAllInterviews ? 'Show Recent' : 'View All'}
-                  </button>
-                )}
+                <div className="space-y-4">
+                  <div className="p-4 bg-dark-700/30 rounded-lg">
+                    <h4 className="font-medium text-white mb-2">Dynamic Questions</h4>
+                    <p className="text-sm text-gray-400">Questions generated based on your responses and adapt difficulty in real-time.</p>
+                  </div>
+                  <div className="p-4 bg-dark-700/30 rounded-lg">
+                    <h4 className="font-medium text-white mb-2">Smart Follow-ups</h4>
+                    <p className="text-sm text-gray-400">Get follow-up questions that dig deeper into your answers, just like real interviews.</p>
+                  </div>
+                  <div className="p-4 bg-dark-700/30 rounded-lg">
+                    <h4 className="font-medium text-white mb-2">Natural Conclusion</h4>
+                    <p className="text-sm text-gray-400">The system knows when to end the interview at an appropriate time based on your performance.</p>
+                  </div>
+                </div>
               </div>
 
-              {isLoading ? (
-                <div className="text-center py-12">
-                  <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-gray-400">Loading interview history...</p>
-                </div>
-              ) : interviewHistory.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Plus className="w-8 h-8 text-gray-500" />
-                  </div>
-                  <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
-                  <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
-                </div>
-              ) : (                <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2 custom-scrollbar' : ''}`}>
-                  {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5)).map((interview) => {
-                    const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college';
-                    const isCollegeInterview = interview.interviewType === 'college';
-                    
-                    console.log('Dashboard: Rendering interview:', {
-                      id: interview.id,
-                      interviewType: interview.interviewType,
-                      isFocused: isFocusedInterview,
-                      isCollege: isCollegeInterview,
-                      date: interview.date,
-                      status: interview.status
-                    });
-                    
-                    return (
-                      <div
-                        key={interview.id}
-                        className={`flex items-center justify-between p-4 rounded-xl hover:bg-dark-700/50 transition-colors cursor-pointer border ${
-                          isCollegeInterview
-                            ? 'bg-gradient-to-r from-purple-900/70 to-indigo-900/40 border-purple-500/50 shadow-purple-500/20'
-                            : isFocusedInterview 
-                            ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20' 
-                            : 'bg-dark-700/30 border-dark-700'
-                        }`}
-                        onClick={() => onViewInterviewResults(interview.id, interview.interviewType)}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${
-                            isCollegeInterview ? 'bg-purple-500/30' :
-                            isFocusedInterview ? 'bg-blue-500/30' : 'bg-orange-500/20'
-                          }`}> 
-                            <Calendar className={`w-4 h-4 ${
-                              isCollegeInterview ? 'text-purple-300' :
-                              isFocusedInterview ? 'text-blue-300' : 'text-orange-400'
-                            }`} />
-                          </div>                          <div>                            <h4 className="font-medium text-white flex items-center gap-2">
-                              {isCollegeInterview 
-                                ? formatCollegeInterviewTitle(interview.setup)
-                                : `${interview.setup.jobType} - ${interview.setup.industry}`
-                              }
-                              {isCollegeInterview && (
-                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-500/40 text-purple-200 border border-purple-400/50" title="College Interview">College</span>
-                              )}
-                              {isFocusedInterview && !isCollegeInterview && (
-                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 text-blue-200 border border-blue-400/50" title="Targeted (Focused) Interview">Focused</span>
-                              )}
-                            </h4>
-                            <p className="text-sm text-gray-400">
-                              {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            interview.overallScore >= 80
-                              ? 'bg-green-500/20 text-green-400'
-                              : interview.overallScore >= 60
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {interview.overallScore}%
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-gray-500" />
-                        </div>
+              {/* Performance Insights */}
+              {stats.totalInterviews > 0 && (
+                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-orange-400" />
+                    Your Progress
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-400">Overall Performance</span>
+                        <span className="text-white font-medium">{stats.averageScore}%</span>
                       </div>
-                    );
-                  })}
+                      <div className="w-full bg-dark-700 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${stats.averageScore}%` }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {stats.improvement !== 0 && (
+                      <div className={`p-3 rounded-lg border ${
+                        stats.improvement > 0 
+                          ? 'bg-green-500/10 border-green-500/20' 
+                          : 'bg-red-500/10 border-red-500/20'
+                      }`}>
+                        <p className={`text-sm ${
+                          stats.improvement > 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {stats.improvement > 0 ? '📈' : '📉'} You've {stats.improvement > 0 ? 'improved' : 'declined'} by {Math.abs(stats.improvement)}% over your recent interviews
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
+
+              {/* Interview Tips */}
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Target className="w-5 h-5 text-orange-400" />
+                  Pro Tips
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-gray-300">Start with confidence - the system begins with small talk to help you warm up</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-gray-300">Use specific examples - the system recognizes and rewards concrete details</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-gray-300">Don't worry about mistakes - the system adapts and helps you improve</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
 
           {/* Quick Tips & Performance */}

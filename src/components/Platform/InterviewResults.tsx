@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Target,
@@ -46,6 +46,50 @@ const formatCategoryLabel = (category: string): string => {
   ).join(' ');
 };
 
+// Add InterviewMetricDetail inline for use in this file
+const InterviewMetricDetail = ({ metric, sessionData, onBack }: { metric: string, sessionData: any, onBack: () => void }) => {
+  const responses = sessionData.responses || [];
+  const questions = sessionData.questions || [];
+  const transcript = sessionData.transcript || [];
+  return (
+    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
+      <div className="container max-w-3xl mx-auto px-4">
+        <button className="mb-6 px-4 py-2 bg-gray-700 text-white rounded" onClick={onBack}>Back</button>
+        <h1 className="text-3xl font-bold text-white mb-4 capitalize">{metric.replace('_', ' ')} Details</h1>
+        <div className="space-y-6 mb-12">
+          {responses.map((r: any, idx: number) => {
+            const q = questions.find((q: any) => q.id === r.questionId);
+            const score = r.analysis?.[metric];
+            if (score === undefined) return null;
+            return (
+              <div key={r.questionId || idx} className="bg-dark-800 rounded p-4 border border-dark-700">
+                <div className="mb-2 text-orange-400 font-semibold">Q{idx + 1}: {q?.text || r.question}</div>
+                <div className="mb-1 text-white">Score: <span className="font-bold">{score}/10</span></div>
+                <div className="mb-1 text-gray-300">Your Response: {r.response}</div>
+                <div className="text-gray-400">AI Feedback: {r.analysis?.feedback}</div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Full Transcript Section */}
+        <div className="bg-dark-800 rounded p-4 border border-dark-700">
+          <h2 className="text-2xl font-semibold text-white mb-4">Full Transcript</h2>
+          <div className="space-y-2">
+            {transcript.length === 0 && <div className="text-gray-400">No transcript available.</div>}
+            {transcript.map((chunk: any, idx: number) => (
+              <div key={chunk.id || idx} className="flex items-start gap-3">
+                <span className={`font-bold ${chunk.speaker === 'user' ? 'text-blue-400' : 'text-orange-400'}`}>{chunk.speaker === 'user' ? 'You' : 'AI'}:</span>
+                <span className="text-gray-200">{chunk.text}</span>
+                <span className="text-xs text-gray-500 ml-auto">{chunk.timestamp ? new Date(chunk.timestamp).toLocaleTimeString() : ''}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface InterviewResultsProps {
   sessionData: any;
   onBackToDashboard: () => void;
@@ -60,6 +104,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  // Add state for selected metric
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   if (!sessionData) {
     return (
@@ -273,6 +320,11 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   const skillAdvice = getSkillAdvice(safeSessionData.interviewType);
   const nextSteps = getNextSteps(safeSessionData.overallScore);
 
+  // If a metric is selected, show the detail page
+  if (selectedMetric) {
+    return <InterviewMetricDetail metric={selectedMetric} sessionData={sessionData} onBack={() => setSelectedMetric(null)} />;
+  }
+
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">
@@ -374,7 +426,11 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 + index * 0.1 }}
-                    className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
+                    className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-600/40 transition-colors"
+                    onClick={() => setSelectedMetric(metric.name.toLowerCase().replace(/\s/g, '_'))}
+                    role="button"
+                    tabIndex={0}
+                    onKeyPress={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedMetric(metric.name.toLowerCase().replace(/\s/g, '_')); }}
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>

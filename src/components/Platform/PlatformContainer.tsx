@@ -15,8 +15,53 @@ import RealtimeInterviewSession from './RealtimeInterviewSession';
 import InterviewProcessing from './InterviewProcessing';
 import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import CustomDemoInterview from './CustomDemoInterview';
+// Temporary metric detail component
+const InterviewMetricDetail = ({ metric, sessionData, onBack }: { metric: string, sessionData: any, onBack: () => void }) => {
+  // Find relevant responses and scores for the metric
+  const responses = sessionData.responses || [];
+  const questions = sessionData.questions || [];
+  const transcript = sessionData.transcript || [];
+  return (
+    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
+      <div className="container max-w-3xl mx-auto px-4">
+        <button className="mb-6 px-4 py-2 bg-gray-700 text-white rounded" onClick={onBack}>Back</button>
+        <h1 className="text-3xl font-bold text-white mb-4 capitalize">{metric.replace('_', ' ')} Details</h1>
+        <div className="space-y-6 mb-12">
+          {responses.map((r: any, idx: number) => {
+            const q = questions.find((q: any) => q.id === r.questionId);
+            const score = r.analysis?.[metric];
+            if (score === undefined) return null;
+            return (
+              <div key={r.questionId || idx} className="bg-dark-800 rounded p-4 border border-dark-700">
+                <div className="mb-2 text-orange-400 font-semibold">Q{idx + 1}: {q?.text || r.question}</div>
+                <div className="mb-1 text-white">Score: <span className="font-bold">{score}/10</span></div>
+                <div className="mb-1 text-gray-300">Your Response: {r.response}</div>
+                <div className="text-gray-400">AI Feedback: {r.analysis?.feedback}</div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Full Transcript Section */}
+        <div className="bg-dark-800 rounded p-4 border border-dark-700">
+          <h2 className="text-2xl font-semibold text-white mb-4">Full Transcript</h2>
+          <div className="space-y-2">
+            {transcript.length === 0 && <div className="text-gray-400">No transcript available.</div>}
+            {transcript.map((chunk: any, idx: number) => (
+              <div key={chunk.id || idx} className="flex items-start gap-3">
+                <span className={`font-bold ${chunk.speaker === 'user' ? 'text-blue-400' : 'text-orange-400'}`}>{chunk.speaker === 'user' ? 'You' : 'AI'}:</span>
+                <span className="text-gray-200">{chunk.text}</span>
+                <span className="text-xs text-gray-500 ml-auto">{chunk.timestamp ? new Date(chunk.timestamp).toLocaleTimeString() : ''}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview' | 'processing' | 'processing-focused' | 'processing-college';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview' | 'processing' | 'processing-focused' | 'processing-college' | 'view-metric-detail' | 'custom-demo-interview';
 
 interface PlatformContainerProps {
   onFullScreenChange?: (isFullScreen: boolean) => void;
@@ -36,6 +81,9 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
   
   // State for viewing interview results - moved to top level to avoid conditional hooks
   const [viewingSessionData, setViewingSessionData] = useState<any>(null);
+  
+  // State for viewing metric details
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   
   // Helper function to scroll to top smoothly
   const scrollToTop = () => {
@@ -299,14 +347,52 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     );
   }
 
+  const handleMetricClick = (metric: string) => {
+    setSelectedMetric(metric);
+    setCurrentState('view-metric-detail');
+    scrollToTop();
+  };
+  const handleBackFromMetricDetail = () => {
+    setCurrentState('view-results');
+    setSelectedMetric(null);
+    scrollToTop();
+  };
+
+  if (currentState === 'view-metric-detail' && selectedMetric && sessionData) {
+    return (
+      <InterviewMetricDetail
+        metric={selectedMetric}
+        sessionData={sessionData}
+        onBack={handleBackFromMetricDetail}
+      />
+    );
+  }
+
+  // Handler to launch the custom demo interview
+  const handleStartCustomDemoInterview = () => {
+    setCurrentState('custom-demo-interview');
+    scrollToTop();
+  };
+
+  if (currentState === 'custom-demo-interview' && (
+    <CustomDemoInterview onBack={handleBackToDashboard} />
+  )) {
+    return (
+      <CustomDemoInterview onBack={handleBackToDashboard} />
+    );
+  }
+
   return (
     <>
       {currentState === 'dashboard' && (
-        <PlatformDashboard 
-          key={dashboardKey}
-          onStartRealtimeInterview={handleStartRealtimeInterview}
-          onViewInterviewResults={handleViewInterviewResults}
-        />
+        <>
+          <PlatformDashboard 
+            key={dashboardKey}
+            onStartRealtimeInterview={handleStartRealtimeInterview}
+            onViewInterviewResults={handleViewInterviewResults}
+            onStartCustomDemoInterview={handleStartCustomDemoInterview}
+          />
+        </>
       )}
         {currentState === 'setup' && (
         <SetupFlow 
