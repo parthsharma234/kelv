@@ -19,7 +19,6 @@ import {
   MessageSquare,
   AlertCircle,
   Clock,
-  GraduationCap,
   Heart
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
@@ -60,17 +59,6 @@ const formatCategoryLabel = (category: string): string => {
     'customer_focus': 'Customer Focus',
     'results_oriented': 'Results Oriented',
     
-    // College interview categories
-    'school_fit': 'School Fit',
-    'personal_qualities': 'Personal Qualities',
-    'academic_readiness': 'Academic Readiness',
-    'future_goals': 'Future Goals',
-    'personal': 'Personal',
-    'academic': 'Academic',
-    'values': 'Values',
-    'community': 'Community',
-    'extracurricular': 'Extracurricular',
-    'diversity': 'Diversity'
   };
   
   return categoryMappings[category] || category.split('_').map(word => 
@@ -123,15 +111,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
   const rawSetup = sessionData.setup || {};
   let normalizedSetup;
 
-  if (isCollegeInterview) {
-    // College interview setup
-    normalizedSetup = {
-      schoolType: rawSetup.schoolType || 'University',
-      program: rawSetup.program || 'Undergraduate',
-      major: rawSetup.major || 'General Studies',
-      interviewMode: rawSetup.interviewMode || 'voice'
-    };
-  } else if (isFocusedInterview) {
+  if (isFocusedInterview) {
     // Focused interview setup
     normalizedSetup = {
       jobType: rawSetup.jobType || 'Software Engineer',
@@ -221,6 +201,41 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
         high: "Excellent - you avoid filler words and speak with precision.",
         medium: "Good control of filler words, continue reducing 'um' and 'uh'.",
         low: "Focus on reducing filler words like 'um', 'uh', and 'like'."
+      },
+      depth: {
+        high: "Excellent depth - you provide comprehensive, well-thought-out responses.",
+        medium: "Good depth, consider elaborating with more specific examples and details.",
+        low: "Work on providing more thorough responses with greater detail and examples."
+      },
+      clarity: {
+        high: "Outstanding clarity - your responses are clear and easy to understand.",
+        medium: "Good clarity, focus on organizing your thoughts more systematically.",
+        low: "Practice expressing your ideas more clearly and concisely."
+      },
+      relevance: {
+        high: "Excellent relevance - your answers directly address the questions asked.",
+        medium: "Good relevance, ensure you stay focused on the core question.",
+        low: "Work on staying more focused on what the interviewer is asking."
+      },
+      structure: {
+        high: "Perfect structure - your responses are well-organized and logical.",
+        medium: "Good structure, consider using frameworks like STAR method.",
+        low: "Practice organizing your responses with clear beginning, middle, and end."
+      },
+      confidence: {
+        high: "Strong confidence - you present yourself with authority and conviction.",
+        medium: "Good confidence, work on projecting more certainty in your responses.",
+        low: "Practice building confidence through preparation and mock interviews."
+      },
+      communication: {
+        high: "Excellent communication skills - you express ideas effectively.",
+        medium: "Good communication, focus on being more engaging and dynamic.",
+        low: "Work on improving your overall communication and presentation skills."
+      },
+      'problem solving': {
+        high: "Outstanding problem-solving approach - you think systematically and logically.",
+        medium: "Good problem-solving, consider explaining your thought process more clearly.",
+        low: "Practice breaking down problems step-by-step and explaining your reasoning."
       }
     };
 
@@ -228,28 +243,6 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
     return insights[metric.toLowerCase() as keyof typeof insights]?.[level] || "Keep practicing to improve this area.";
   };
 
-  // College-specific advice functions
-  const getSchoolTypeAdvice = (schoolType: string) => {
-    const advice = {
-      'University': "Universities value academic rigor and research experience. Emphasize your intellectual curiosity and ability to contribute to scholarly discussions.",
-      'Liberal Arts': "Liberal arts colleges appreciate well-rounded students. Highlight your diverse interests and ability to think critically across disciplines.",
-      'Technical': "Technical schools focus on practical skills and innovation. Demonstrate your problem-solving abilities and hands-on experience.",
-      'Community': "Community colleges value accessibility and practical education. Show your commitment to learning and career goals."
-    };
-    return advice[schoolType as keyof typeof advice] || "Focus on demonstrating your academic readiness and personal growth.";
-  };
-
-  const getMajorAdvice = (major: string) => {
-    const advice = {
-      'Computer Science': "Emphasize your logical thinking, problem-solving skills, and passion for technology. Discuss any coding projects or technical challenges you've overcome.",
-      'Engineering': "Highlight your analytical abilities, attention to detail, and interest in building solutions. Share examples of projects or problems you've solved.",
-      'Business': "Demonstrate your leadership potential, communication skills, and understanding of market dynamics. Discuss any business experiences or entrepreneurial ventures.",
-      'Arts': "Show your creativity, unique perspective, and commitment to artistic expression. Share your portfolio and artistic influences.",
-      'Sciences': "Emphasize your curiosity, research skills, and understanding of scientific principles. Discuss any lab experience or scientific projects.",
-      'Humanities': "Highlight your critical thinking, writing skills, and understanding of human culture. Discuss your intellectual interests and analytical abilities."
-    };
-    return advice[major as keyof typeof advice] || "Focus on demonstrating your passion for the field and relevant experiences.";
-  };
 
   // Focused interview advice functions
   const getInterviewTypeAdvice = (interviewType: string) => {
@@ -327,10 +320,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
 
   // Get appropriate advice based on interview type
   let interviewAdvice, skillAdvice;
-  if (isCollegeInterview) {
-    interviewAdvice = getSchoolTypeAdvice(safeSessionData.setup.schoolType);
-    skillAdvice = getMajorAdvice(safeSessionData.setup.major);
-  } else if (isFocusedInterview) {
+  if (isFocusedInterview) {
     interviewAdvice = getInterviewTypeAdvice(interviewType);
     skillAdvice = getSkillAdvice(interviewType);
   } else {
@@ -355,16 +345,13 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
               <ArrowLeft className="w-5 h-5 text-gray-400" />
             </button>
             <div className="flex items-center gap-3">
-              {isCollegeInterview ? (
-                <GraduationCap className="w-6 h-6 text-purple-400" />
-              ) : isFocusedInterview ? (
+              {isFocusedInterview ? (
                 <Target className="w-6 h-6 text-blue-400" />
               ) : (
                 <Trophy className="w-6 h-6 text-orange-400" />
               )}
               <h1 className="text-2xl font-bold text-white">
-                {isCollegeInterview ? 'College Interview' : 
-                 isFocusedInterview ? 'Focused Interview' : 'Interview'} Results
+                {isFocusedInterview ? 'Focused Interview' : 'Interview'} Results
               </h1>
             </div>
           </div>
@@ -372,8 +359,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
             onClick={() => onStartNewInterview(interviewType)}
             className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-all duration-200 font-medium"
           >
-            Start New {isCollegeInterview ? 'College' : 
-                      isFocusedInterview ? 'Focused' : ''} Interview
+            Start New {isFocusedInterview ? 'Focused' : ''} Interview
           </button>
         </motion.div>
 
@@ -423,55 +409,33 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
               <div className="flex items-center gap-3 mb-4">
-                {isCollegeInterview ? (
-                  <GraduationCap className="w-5 h-5 text-purple-400" />
-                ) : isFocusedInterview ? (
+                {isFocusedInterview ? (
                   <Target className="w-5 h-5 text-blue-400" />
                 ) : (
                   <Brain className="w-5 h-5 text-orange-400" />
                 )}
                 <h3 className="text-lg font-semibold text-white">
-                  {isCollegeInterview ? 'College Details' : 
-                   isFocusedInterview ? 'Interview Focus' : 'Interview Type'}
+                  {isFocusedInterview ? 'Interview Focus' : 'Interview Type'}
                 </h3>
               </div>
               <div className="space-y-3">
-                {isCollegeInterview ? (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">School Type:</span>
-                      <span className="text-white">{safeSessionData.setup.schoolType}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Program:</span>
-                      <span className="text-white">{safeSessionData.setup.program}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Major:</span>
-                      <span className="text-white">{safeSessionData.setup.major}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Job Type:</span>
-                      <span className="text-white">{safeSessionData.setup.jobType}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Industry:</span>
-                      <span className="text-white">{safeSessionData.setup.industry}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Experience:</span>
-                      <span className="text-white">{safeSessionData.setup.experienceLevel}</span>
-                    </div>
-                    {isFocusedInterview && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Focus:</span>
-                        <span className="text-blue-400">{interviewType}</span>
-                      </div>
-                    )}
-                  </>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Job Type:</span>
+                  <span className="text-white">{safeSessionData.setup.jobType}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Industry:</span>
+                  <span className="text-white">{safeSessionData.setup.industry}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Experience:</span>
+                  <span className="text-white">{safeSessionData.setup.experienceLevel}</span>
+                </div>
+                {isFocusedInterview && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Focus:</span>
+                    <span className="text-blue-400">{interviewType}</span>
+                  </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-gray-400">Mode:</span>
@@ -589,6 +553,124 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
                     />
                   </div>
                 )}
+              </motion.div>
+            )}
+
+            {/* Interview Performance Metrics - Standard/Focused Interviews */}
+            {!isCollegeInterview && safeSessionData.metrics && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+              >
+                <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
+                  Interview Performance Metrics
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(() => {
+                    const metricsObj = safeSessionData.metrics || {};
+                    const performanceMetrics = [];
+                    
+                    if (metricsObj.depth !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Depth', 
+                        score: Math.max(1, Math.min(10, metricsObj.depth)), 
+                        icon: Brain, 
+                        color: 'from-purple-500 to-indigo-500', 
+                        detail: `${metricsObj.depth}/10 depth` 
+                      });
+                    }
+                    
+                    if (metricsObj.clarity !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Clarity', 
+                        score: Math.max(1, Math.min(10, metricsObj.clarity)), 
+                        icon: MessageCircle, 
+                        color: 'from-blue-500 to-cyan-500', 
+                        detail: `${metricsObj.clarity}/10 clarity` 
+                      });
+                    }
+                    
+                    if (metricsObj.relevance !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Relevance', 
+                        score: Math.max(1, Math.min(10, metricsObj.relevance)), 
+                        icon: Target, 
+                        color: 'from-green-500 to-emerald-500', 
+                        detail: `${metricsObj.relevance}/10 relevance` 
+                      });
+                    }
+                    
+                    if (metricsObj.structure !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Structure', 
+                        score: Math.max(1, Math.min(10, metricsObj.structure)), 
+                        icon: FileText, 
+                        color: 'from-orange-500 to-red-500', 
+                        detail: `${metricsObj.structure}/10 structure` 
+                      });
+                    }
+                    
+                    if (metricsObj.confidence !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Confidence', 
+                        score: Math.max(1, Math.min(10, metricsObj.confidence)), 
+                        icon: Star, 
+                        color: 'from-yellow-500 to-orange-500', 
+                        detail: `${metricsObj.confidence}/10 confidence` 
+                      });
+                    }
+                    
+                    if (metricsObj.communication !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Communication', 
+                        score: Math.max(1, Math.min(10, metricsObj.communication)), 
+                        icon: MessageSquare, 
+                        color: 'from-teal-500 to-cyan-500', 
+                        detail: `${metricsObj.communication}/10 communication` 
+                      });
+                    }
+                    
+                    if (metricsObj.problem_solving !== undefined) {
+                      performanceMetrics.push({ 
+                        name: 'Problem Solving', 
+                        score: Math.max(1, Math.min(10, metricsObj.problem_solving)), 
+                        icon: Lightbulb, 
+                        color: 'from-amber-500 to-yellow-500', 
+                        detail: `${metricsObj.problem_solving}/10 problem solving` 
+                      });
+                    }
+
+                    return performanceMetrics.map((metric, index) => (
+                      <div
+                        key={metric.name}
+                        className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
+                            <metric.icon className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-white">{metric.name}</span>
+                              <span className="text-lg font-semibold text-white">{metric.score}/10</span>
+                            </div>
+                            <div className="text-xs text-gray-400">{metric.detail}</div>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-dark-600 rounded-full overflow-hidden mb-3">
+                          <div
+                            className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                            style={{ width: `${metric.score * 10}%`, transition: 'width 1.5s' }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </motion.div>
             )}
 

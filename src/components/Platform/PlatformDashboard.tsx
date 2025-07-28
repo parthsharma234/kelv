@@ -48,65 +48,9 @@ const formatInterviewType = (type: string): string => {
     .replace(/\b\w/g, letter => letter.toUpperCase());
 };
 
-// Utility function to format college interview titles
-const formatCollegeInterviewTitle = (setup: any): string => {
-  // For college interviews, setup contains schoolType, program, major directly
-  if (setup.schoolType && setup.major) {
-    const { schoolType, major } = setup;
-    
-    // Format school type
-    const schoolTypeMap: { [key: string]: string } = {
-      'public': 'Public University',
-      'private': 'Private University',
-      'ivy-league': 'Ivy League',
-      'liberal-arts': 'Liberal Arts College',
-      'community': 'Community College',
-      'technical': 'Technical Institute'
-    };
-    
-    // Format major (convert kebab-case to Title Case)
-    const formattedMajor = major
-      .split('-')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
-    
-    return `${formattedMajor} - ${formattedSchoolType}`;
-  }
-  
-  // Fallback for legacy format or if data is missing
-  if (typeof setup === 'string') {
-    // Handle legacy format: "schoolType - major"
-    const parts = setup.split(' - ');
-    if (parts.length !== 2) return setup;
-    
-    const [schoolType, major] = parts;
-    
-    const schoolTypeMap: { [key: string]: string } = {
-      'public': 'Public University',
-      'private': 'Private University',
-      'ivy-league': 'Ivy League',
-      'liberal-arts': 'Liberal Arts College',
-      'community': 'Community College',
-      'technical': 'Technical Institute'
-    };
-    
-    const formattedMajor = major
-      .split('-')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
-    
-    return `${formattedMajor} - ${formattedSchoolType}`;
-  }
-  
-  return 'College Interview';
-};
 
 interface PlatformDashboardProps {
-  onStartRealtimeInterview: (type: 'standard' | 'focused' | 'college', focusedType?: string) => void;
+  onStartRealtimeInterview: (type: 'standard' | 'focused', focusedType?: string) => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
 }
 
@@ -120,10 +64,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
     improvement: 0,
     focusedInterviews: 0,
     focusedAverageScore: 0,
-    collegeInterviews: 0,
-    collegeAverageScore: 0,
-    collegeAuthenticity: 0,
-    collegePassion: 0,
     mostPracticedType: ''
   });
   const [strengthsAndWeaknesses, setStrengthsAndWeaknesses] = useState({
@@ -155,29 +95,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
           }))
         });
         
-        // Calculate college interview specific metrics
-        const collegeInterviews = history.filter(interview => 
-          interview.interviewType === 'college' || interview.setup.industry === 'Education'
-        );
-        
-        // Only calculate metrics if there are college interviews with metrics data
-        const collegeInterviewsWithMetrics = collegeInterviews.filter(interview => interview.speechMetricsAverage);
-        
-        const collegeStats = {
-          collegeInterviews: collegeInterviews.length,
-          collegeAverageScore: collegeInterviews.length > 0 
-            ? Math.round(collegeInterviews.reduce((sum, interview) => sum + interview.overallScore, 0) / collegeInterviews.length)
-            : 0,
-          collegeAuthenticity: collegeInterviewsWithMetrics.length > 0
-            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.speechMetricsAverage?.overallConfidence || 0), 0) / collegeInterviewsWithMetrics.length)
-            : 0,
-          collegePassion: collegeInterviewsWithMetrics.length > 0
-            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.speechMetricsAverage?.fluencyScore || 0), 0) / collegeInterviewsWithMetrics.length)
-            : 0
-        };
-        
         setInterviewHistory(history);
-        setStats({ ...statsData, ...collegeStats });
+        setStats(statsData);
         setStrengthsAndWeaknesses(swData);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
