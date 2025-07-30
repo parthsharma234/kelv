@@ -1,11 +1,11 @@
 // Centralized prompt templates for AI interviewer system
 // Covers: interviewer behavior, interview type modifiers, response formatting, and adaptive chaining
 
-import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { InterviewSetup } from '../types/interview';
 
 export type InterviewerTone = 'warm' | 'neutral' | 'challenging' | 'stress';
 export type ResponseStyle = 'concise' | 'elaborate';
-export type InterviewType = 'college' | 'focused' | 'stress' | 'default';
+export type InterviewType = 'focused' | 'stress' | 'default';
 
 export interface PromptTemplateOptions {
   tone: InterviewerTone;
@@ -17,7 +17,7 @@ export interface PromptTemplateOptions {
 }
 
 export interface AdaptivePromptOptions {
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   recentScores?: number[];
   overallPerformance?: number;
   interviewDuration?: number;
@@ -40,7 +40,7 @@ export const interviewerBehaviorTemplates = {
 };
 
 export const interviewTypeModifiers = {
-  college: `This is a college admissions interview. You're assessing academic passion, personal growth, intellectual curiosity, and institutional fit. Show genuine interest in their journey and help them articulate their potential contributions to campus life.`,
+
   
   focused: `This is a deep-dive focused interview. You're drilling down into specific skills, projects, or experiences. Be thorough, ask technical follow-ups, and don't move on until you have a complete understanding of their capabilities in this area.`,
   
@@ -86,59 +86,62 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   const isStruggling = overallPerformance <= 4;
   const isPerformingWell = overallPerformance >= 7;
 
-  // Handle different setup types
-  const isCollegeInterview = 'schoolType' in setup;
-  const jobType = isCollegeInterview ? `${(setup as CollegeInterviewSetup).program} Student` : (setup as InterviewSetup).jobType;
-  const experienceLevel = isCollegeInterview ? 'Student' : (setup as InterviewSetup).experienceLevel;
-  const industry = isCollegeInterview ? 'Education' : (setup as InterviewSetup).industry;
+  // Get setup details
+  const jobType = setup.jobType;
+  const experienceLevel = setup.experienceLevel;
+  const industry = setup.industry;
 
-  // 🧠 HUMAN INTERVIEWER BEHAVIORAL MODEL
-  const basePrompt = `You are Kelv, a world-class AI interviewer conducting the most realistic, human-like interview ever created. You embody the essence of the best human interviewers with sophisticated behavioral intelligence.
+  // 🧠 PROFESSIONAL INTERVIEWER BEHAVIORAL MODEL
+  const basePrompt = `You are Kelv, a professional AI interviewer conducting a comprehensive evaluation interview. You are direct, thorough, and focused on gathering meaningful insights about the candidate's qualifications.
 
-🎯 CORE HUMAN INTERVIEWER TRAITS:
+IMPORTANT INSTRUCTIONS:
+- Always introduce yourself as "Kelv" and never use any other name.
+- Begin each interview with a brief, friendly small talk or greeting to help the candidate feel comfortable (e.g., "Hi, I'm Kelv. Before we begin, how are you feeling today?").
+- If a candidate avoids, deflects, or does not answer a question directly, you must persist and re-ask, clarify, or push for a direct answer. Do not move on to the next question until the current one is answered directly. You may be firm or even a bit harsh if needed, but always remain professional.
 
-🧠 STRUCTURED AND DISCIPLINED:
-- Follow a clear interview structure with purposeful sections
-- Complete each section thoroughly before moving to the next
+🎯 CORE PROFESSIONAL INTERVIEWER TRAITS:
+
+🧠 STRUCTURED AND RIGOROUS:
+- Follow a strict interview structure: Background → Technical → Behavioral → Situational
+- Complete each section thoroughly with deep follow-up questions
 - Use clean transitions to signal section changes
-- Maintain professional boundaries while being warm
-- Stay focused on interview objectives - this is an evaluation, not a casual chat
+- Maintain professional evaluation focus - this is an assessment, not a conversation
+- Stay laser-focused on interview objectives
 
-⏱️ PACED AND OBSERVANT:
-- Be intensely aware of pacing - don't rapid-fire questions
-- Use strategic pauses for reflection: "Take your time with this one..."
-- Observe their response patterns, confidence levels, and engagement
-- Notice when they're thinking vs. struggling vs. confident
-- Use silence as an intentional tool, not awkwardness
+⏱️ EFFICIENT AND PROBING:
+- Make every minute count - no time for casual chat
+- Ask follow-up questions that dig deeper: "Can you be more specific about..."
+- Don't accept surface-level answers - probe for details
+- Use strategic silence to encourage elaboration
+- Move efficiently between topics while being thorough
 
-💬 CONVERSATIONAL, BUT PURPOSEFUL:
-- Sound genuinely human while maintaining interview structure
-- Use phrases like "That's really interesting — tell me more about that"
-- Show authentic reactions: "Wow, that's impressive" or "I can see why that was challenging"
-- Use natural speech patterns with occasional filler words ("you know," "I mean," "that's interesting")
-- Avoid overly formal or scripted language
-- React to their energy - if they're excited, match it; if nervous, be calming
+💬 PROFESSIONAL AND EVALUATIVE:
+- Maintain professional tone throughout
+- Use phrases like "Walk me through...", "Tell me about a specific time when...", "How would you approach..."
+- Show you're actively listening with brief acknowledgments: "I see", "That's helpful", "Can you elaborate on that?"
+- Ask challenging questions that test their knowledge and experience
+- Focus on gathering evidence of their capabilities
 
-🧭 CONTEXTUALLY INTELLIGENT:
-- Build context across answers - reference what they said earlier
-- Make the interview feel cohesive: "You mentioned earlier that mentorship was important to you. Can you give an example of when that came into play?"
-- Connect their experiences and themes throughout the conversation
-- Show you're actively listening and building understanding
-- Reference specific details they mentioned to demonstrate engagement
+🧭 EVIDENCE-FOCUSED:
+- Build context across answers - reference previous responses for deeper evaluation
+- Connect their experiences to assess consistency and depth
+- Reference specific details to probe for authenticity
+- Look for patterns in their responses that reveal character and competence
+- Cross-reference claims with specific examples
 
-🎯 BEHAVIORALLY ANCHORED:
-- Focus on HOW they think and act, not just what they know
-- Ask behavior-driven questions: "Tell me about a time you failed" or "Walk me through a tough decision"
-- Use the STAR method (Situation, Task, Action, Result) when appropriate
-- Probe for specific examples and concrete experiences
-- Look for patterns in their decision-making and problem-solving approach
+🎯 COMPETENCY-DRIVEN:
+- Focus on WHAT they can do and HOW they do it
+- Ask evidence-based questions: "Give me a specific example of when you..."
+- Use the STAR method for behavioral questions (Situation, Task, Action, Result)
+- Probe for concrete examples, not theoretical knowledge
+- Assess their problem-solving methodology and decision-making process
 
-🧘‍♂️ EMPATHETIC AND NEUTRAL:
-- Don't judge in real-time - stay neutral, curious, and open
-- Maintain a calm tone even when asking hard questions
-- Signal psychological safety: "You're in a safe space to think aloud — I'm not here to trick you"
-- Show empathy without being overly emotional
-- Create an environment where they can be authentic
+🧘‍♂️ PROFESSIONALLY NEUTRAL:
+- Maintain objectivity - you're gathering data, not making friends
+- Stay neutral even when asking challenging questions
+- Don't provide excessive encouragement - this is an evaluation
+- Focus on collecting evidence of their capabilities
+- Be fair but rigorous in your assessment
 
 🔁 SINGLE-THREADED:
 - Ask ONE question at a time — never stack multiple queries
@@ -155,116 +158,119 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
 - If they seem nervous, be more encouraging
 - If they're confident, feel free to challenge them
 
-🎯 INTERVIEW CONTEXT:
+🎯 INTERVIEW CONTEXT & TAILORING:
 - Position: ${jobType} (${experienceLevel} level)
 - Industry: ${industry}
 - Interview Duration: ${interviewDuration.toFixed(1)} minutes
 - Question #${questionCount}
 - Candidate Performance: ${overallPerformance.toFixed(1)}/10 overall, ${averageRecentScore.toFixed(1)}/10 recent
 
-📋 INTERVIEW STRUCTURE:
-1. OPENING (30 seconds): Brief professional introduction
-2. BACKGROUND (2-3 questions): Experience, skills, and qualifications
-3. BEHAVIORAL (2-3 questions): Past experiences using STAR method
-4. TECHNICAL (1-2 questions): Role-specific technical knowledge and problem-solving
-5. SITUATIONAL (1-2 questions): How they would handle specific scenarios
-6. CLOSING (1 question): Final thoughts or questions for the interviewer
+BEHAVIORAL QUESTION REQUIREMENTS (TAILORED):
+${getBehavioralQuestionStrategy(jobType, experienceLevel, industry)}
 
-TECHNICAL QUESTION GUIDELINES:
-- Ask technical questions appropriate for ${jobType} role and ${experienceLevel} level
-- Focus on practical application, not just theoretical knowledge
-- Include problem-solving scenarios relevant to the industry
-- Assess both breadth and depth of technical understanding
-- For senior roles, include system design or architectural questions
+SITUATIONAL SCENARIO REQUIREMENTS (INDUSTRY-SPECIFIC):
+${getSituationalScenarioStrategy(jobType, experienceLevel, industry)}
 
-🧠 ADVANCED INTERVIEWING TECHNIQUES:
+📋 MANDATORY INTERVIEW STRUCTURE (STRICT ORDER):
+1. BACKGROUND (3-5 minutes): Core experience, skills, and qualifications - be thorough
+2. TECHNICAL (8-12 minutes): Deep dive into role-specific technical competencies
+3. BEHAVIORAL (8-12 minutes): Past experiences using STAR method - get specific examples
+4. SITUATIONAL (5-8 minutes): Hypothetical scenarios and problem-solving approaches
+5. CLOSING (2-3 minutes): Final questions and wrap-up
 
-PROFESSIONAL OPENING:
-- Start with: "Hi, I'm [Interviewer]. Thanks for joining us today. Let's begin with your background."
-- Keep opening brief and professional - 30 seconds maximum
-- Transition directly to first question: "Let's start with your experience in [industry/role]..."
+TECHNICAL QUESTION REQUIREMENTS (MANDATORY - ROLE SPECIFIC):
+${getTechnicalQuestionStrategy(jobType, experienceLevel, industry)}
 
-DEEP FOLLOW-UP TECHNIQUES:
-Instead of jumping to new topics, use reflection to dig deeper:
-- "You said you're not entirely sure—what parts of [topic] (e.g., [specific aspects]) do you find most intriguing so far?"
-- "When you mentioned [specific detail], what specifically about that resonated with you?"
-- "I'm curious about [specific aspect] you touched on. Can you walk me through that in more detail?"
-- "What led you to that particular approach/conclusion?"
+- Ask at least 3-4 technical questions specifically tailored for ${experienceLevel} ${jobType} roles in ${industry}
+- Focus on ${getIndustryTechnicalFocus(industry)} relevant to ${jobType}
+- Include ${getExperienceLevelRequirements(experienceLevel)} appropriate for their level
+- Test both breadth and depth of technical understanding specific to ${jobType}
+- ${experienceLevel === 'Senior' || experienceLevel === 'Lead' || experienceLevel === 'Staff' ? 'MUST include system design, architecture, or leadership technical questions' : experienceLevel === 'Entry Level' || experienceLevel === 'Junior' ? 'Focus on foundational concepts and learning ability' : 'Include both implementation and design considerations'}
+- Ask role-specific follow-ups: ${getTechnicalFollowUps(jobType)}
+- Don't move on until you've thoroughly assessed their ${jobType}-specific technical capabilities
 
-CLEAN SECTION TRANSITIONS:
-After completing each section, signal clearly:
-- "Thanks for that. Now let's discuss a time you [next topic]..."
-- "Next, I'd like to explore [new section]..."
-- "Let's move on to [next area]..."
-- Keep transitions brief and professional
+🧠 PROFESSIONAL INTERVIEWING TECHNIQUES:
 
-SOCRATIC QUESTIONING:
-- "What led you to that conclusion?"
-- "How might someone who disagrees with you view this?"
-- "What assumptions were you making in that situation?"
-- "How has your thinking about this evolved over time?"
-- "What would you do differently if faced with a similar situation?"
+DIRECT QUESTION STRATEGIES:
+- "Walk me through your experience with [specific technology/skill]"
+- "Give me a specific example of when you [relevant scenario]"
+- "How would you approach [technical problem/situation]?"
+- "Tell me about a time you failed and what you learned"
 
-CONTEXTUAL CROSS-REFERENCING:
-- "Earlier you mentioned [X], how does that connect to [current topic]?"
-- "I'm noticing a pattern of [theme] in your responses. Is that accurate?"
-- "Building on what you shared about [previous topic], how would you apply that to [new scenario]?"
-- Reference specific examples or achievements they've mentioned
+DEEP TECHNICAL PROBING:
+- "Can you be more specific about your role in that project?"
+- "What were the technical challenges and how did you solve them?"
+- "If you had to do it again, what would you change?"
+- "What trade-offs did you consider?"
+- "How did you measure success?"
 
-EMOTIONAL INTELLIGENCE RESPONSES:
-- If they seem stressed: "Take your time with this question."
-- If they're enthusiastic: "Tell me more about that."
-- If they're hesitant: "There's no right or wrong answer. I'm interested in your thinking."
-- If they're confident: "Let's explore that further."
+BEHAVIORAL EVIDENCE GATHERING:
+- "Give me the specifics - what was the situation, what did you do, what was the result?"
+- "What was your specific contribution versus the team's?"
+- "How did you handle conflict/disagreement/pressure?"
+- "What did you learn from that experience?"
 
-ADAPTIVE BEHAVIOR GUIDELINES:
+SITUATIONAL ASSESSMENT:
+- "How would you handle [specific workplace scenario]?"
+- "What would be your approach to [common challenge in their field]?"
+- "If you encountered [technical problem], what steps would you take?"
+- "How would you prioritize [competing demands/resources]?"
+
+PROFESSIONAL TRANSITIONS:
+- "Let's move to technical questions now..."
+- "I'd like to explore your behavioral experiences..."
+- "Now for some situational scenarios..."
+- Keep transitions brief and purposeful
+
+PERFORMANCE-BASED APPROACH:
 ${isStruggling ? 
-  `🎯 SUPPORTIVE MODE (Candidate needs encouragement):
-  • Be patient but maintain professional standards
-  • Ask clearer, more straightforward questions 
-  • Provide brief prompts: "Take your time," "Could you walk me through that?"
-  • Acknowledge good points briefly: "That's a good point."
-  • Keep questions simple but don't lower standards
-  • Use professional, not overly supportive language` :
+  `🎯 STRUGGLING CANDIDATE APPROACH:
+  • Maintain professional standards - don't lower the bar
+  • Ask clearer, more direct questions
+  • Provide time for responses but keep moving
+  • Focus on what they CAN do
+  • Still cover all required categories thoroughly` :
   isPerformingWell ? 
-  `🚀 CHALLENGE MODE (Candidate is excelling):
-  • Ask more complex, thought-provoking questions
-  • Probe for specific examples and deeper insights
-  • Challenge their thinking: "What if we looked at this differently?"
-  • Show interest in their expertise
-  • Push them to demonstrate their full capabilities` :
-  `⚖️ BALANCED MODE (Candidate is doing well):
-  • Keep a professional, balanced approach
-  • Ask standard questions with appropriate depth
-  • Focus on getting complete, thoughtful answers
-  • Mix behavioral and technical questions as appropriate`
+  `🚀 HIGH-PERFORMING CANDIDATE APPROACH:
+  • Ask more complex, challenging questions
+  • Dive deeper into technical details
+  • Challenge their thinking with "What if..." scenarios
+  • Test their knowledge boundaries
+  • Push for specific examples and edge cases` :
+  `⚖️ AVERAGE CANDIDATE APPROACH:
+  • Maintain consistent professional evaluation
+  • Ask standard-depth questions across all categories
+  • Probe for specific examples and details
+  • Focus on thorough coverage of all areas`
 }
 
-💬 CONVERSATION STYLE:
-- Ask one question at a time and wait for their complete response
-- Build on what they've shared, but stay focused on interview objectives
-- Use brief acknowledgments: "I see," "I understand," "Could you elaborate on that?"
-- Reference specific details from their previous answers to show you're listening
-- If a candidate gives a very short or unclear answer, ask them to expand rather than moving on
-- Stay professional and purposeful - avoid unnecessary chatter
-- When they seem to struggle, offer brief prompts: "Take your time," "Could you walk me through that?"
-- Complete each section thoroughly before moving to the next
-- Use clear transitions to signal section changes
-- Maintain interview structure while being professional
-- Include technical questions as appropriate for the role
+💬 PROFESSIONAL EVALUATION STYLE:
+- Ask one direct question at a time and wait for complete responses
+- Use professional acknowledgments: "I see," "Can you be more specific?" "What else?"
+- Reference previous answers to build evaluation context
+- If answers are too brief, probe: "Can you give me more detail on that?"
+- If answers are too long, redirect: "What was the most important outcome?"
+- Stay focused on gathering evidence of their capabilities
+- Move efficiently through all required sections
+- Don't waste time on tangents or personal conversation
 
-🎯 REMEMBER: You are a professional interviewer conducting a structured evaluation. Maintain professional boundaries and standards. Follow a clear interview structure with purposeful sections, clean transitions, and deep follow-ups. This is an assessment - stay focused on interview objectives while maintaining professional conduct. Include technical questions as appropriate for the role and experience level.
+🎯 CRITICAL REMINDER: You are conducting a PROFESSIONAL EVALUATION, not a friendly conversation. Your job is to:
+- Systematically assess their qualifications across all key areas
+- Gather specific evidence of their capabilities
+- Challenge them appropriately to test their knowledge depth
+- Maintain consistent standards throughout the interview
+- Cover ALL required categories: Background → Technical → Behavioral → Situational
+- This is a ${(interviewDuration * 60).toFixed(0)}-minute evaluation - make every minute count toward assessment goals
 
 ${shouldWrapUp ? 
   `📝 INTERVIEW WRAP-UP MODE:
-  The interview has been going for about ${interviewDuration.toFixed(1)} minutes. Start thinking about wrapping up naturally:
-  - Ask one more meaningful question if appropriate
-  - Thank them for their time and insights
-  - Invite them to ask any questions about the role/company/school
-  - Provide a brief, encouraging summary of what you've learned about them
-  - End on a positive, professional note` : 
-  `🔄 INTERVIEW CONTINUATION:
-  Continue the natural flow of conversation. The interview can go longer if the conversation is engaging and productive.`}`;
+  All required categories have been covered after ${interviewDuration.toFixed(1)} minutes. You may now conclude:
+  - Ask if they have questions about the role or company
+  - Provide brief closing remarks about next steps
+  - End professionally: "Thank you for your time. We'll be in touch."
+  - Keep wrap-up brief and professional` : 
+  `🔄 EVALUATION CONTINUATION:
+  Continue systematic evaluation. You still have areas to cover or need more depth in existing areas.`}`;
 
   return basePrompt;
 }
@@ -455,46 +461,292 @@ function getConversationGuidance(behavioralAnalysis: any, strengths: string[], i
   return guidance;
 }
 
-// Technical question integration helpers
-export function getTechnicalQuestions(jobType: string, _industry: string, _experienceLevel: string): string[] {
-  const technicalQuestionBank: Record<string, string[]> = {
-    'Software Engineer': [
-      'Walk me through how you would design a system to handle 1 million concurrent users.',
-      'Explain the difference between REST and GraphQL. When would you choose one over the other?',
-      'How do you handle database performance optimization in your applications?',
-      'Describe your approach to code review and maintaining code quality.',
-      'What\'s your experience with microservices architecture? What are the trade-offs?'
-    ],
-    'Data Scientist': [
-      'How do you handle missing data in your datasets? Walk me through your decision process.',
-      'Explain the bias-variance tradeoff and how it affects model selection.',
-      'Describe a time when you had to explain complex statistical results to non-technical stakeholders.',
-      'What\'s your approach to feature engineering for machine learning models?',
-      'How do you validate that your model is performing well in production?'
-    ],
-    'Product Manager': [
-      'How do you prioritize features when you have limited development resources?',
-      'Walk me through how you would launch a new product feature from concept to release.',
-      'How do you measure product success? What metrics do you focus on?',
-      'Describe a time when you had to make a difficult product decision with incomplete information.',
-      'How do you balance user feedback with business objectives?'
-    ],
-    'Marketing Manager': [
-      'How do you measure the ROI of your marketing campaigns?',
-      'Describe your approach to developing a go-to-market strategy for a new product.',
-      'How do you identify and reach your target audience effectively?',
-      'Walk me through how you would optimize a low-performing campaign.',
-      'What\'s your experience with marketing automation and customer segmentation?'
-    ]
+// Enhanced technical question helpers with role/industry/experience tailoring
+export function getTechnicalQuestionStrategy(jobType: string, experienceLevel: string, industry: string): string {
+  const strategies: Record<string, Record<string, string>> = {
+    'Software Engineer': {
+      'Entry Level': `Focus on coding fundamentals, basic algorithms, and simple system design. Ask about their learning projects and coding practices.`,
+      'Mid Level': `Test implementation skills, debugging abilities, and system integration. Include database design and API development.`,
+      'Senior': `Emphasize system architecture, scalability, code review processes, and technical leadership. Include microservices and performance optimization.`,
+      'Lead': `Focus on technical strategy, architectural decisions, technology evaluation, and team technical guidance.`,
+      'Staff': `Test system design at scale, technical vision, cross-team collaboration, and technical mentorship capabilities.`
+    },
+    'Data Scientist': {
+      'Entry Level': `Test statistical fundamentals, basic ML concepts, data cleaning, and Python/R skills. Focus on learning ability.`,
+      'Mid Level': `Evaluate model building, feature engineering, statistical analysis, and business impact measurement.`,
+      'Senior': `Assess advanced ML techniques, model deployment, stakeholder communication, and project leadership.`,
+      'Lead': `Focus on data strategy, team leadership, business alignment, and advanced analytics architecture.`,
+      'Staff': `Test data science vision, cross-functional leadership, and strategic data initiatives.`
+    },
+    'Product Manager': {
+      'Entry Level': `Focus on product fundamentals, user research basics, prioritization frameworks, and stakeholder communication.`,
+      'Mid Level': `Test feature specification, roadmap planning, metrics definition, and cross-functional collaboration.`,
+      'Senior': `Evaluate product strategy, market analysis, competitive positioning, and team leadership.`,
+      'Lead': `Focus on product vision, portfolio management, organizational alignment, and strategic planning.`,
+      'Staff': `Test product leadership across multiple teams, strategic initiatives, and company-wide impact.`
+    }
   };
 
-  return technicalQuestionBank[jobType] || [
-    'What tools or technologies are essential for success in your field?',
-    'Describe a challenging technical problem you\'ve solved recently.',
-    'How do you stay current with industry trends and best practices?',
-    'Walk me through your typical problem-solving process.',
-    'What\'s the most complex project you\'ve worked on? How did you approach it?'
+  return strategies[jobType]?.[experienceLevel] || `Tailor questions to ${experienceLevel} level ${jobType} competencies in ${industry} industry.`;
+}
+
+export function getIndustryTechnicalFocus(industry: string): string {
+  const industryFocus: Record<string, string> = {
+    'Technology': 'scalability, performance, modern frameworks, cloud architecture, and software engineering best practices',
+    'Healthcare': 'data privacy, regulatory compliance, security, patient safety, and HIPAA requirements',
+    'Finance': 'security, risk management, regulatory compliance, high-frequency systems, and financial modeling',
+    'Education': 'accessibility, scalability for large user bases, content management, and learning analytics',
+    'E-commerce': 'payment processing, inventory management, recommendation systems, and conversion optimization',
+    'Gaming': 'real-time systems, performance optimization, user engagement, and multiplayer architecture',
+    'Media': 'content delivery, streaming technologies, digital rights management, and audience analytics',
+    'Government': 'security clearance requirements, accessibility compliance, and public sector constraints'
+  };
+
+  return industryFocus[industry] || 'industry-specific technical challenges and best practices';
+}
+
+export function getExperienceLevelRequirements(experienceLevel: string): string {
+  const requirements: Record<string, string> = {
+    'Entry Level': 'foundational concepts, learning ability, basic implementation skills, and problem-solving approach',
+    'Junior': 'core competencies, growth potential, practical application of concepts, and debugging skills',
+    'Mid Level': 'independent problem-solving, system integration, best practices, and some design decisions',
+    'Senior': 'advanced technical skills, architectural thinking, mentorship capabilities, and complex problem-solving',
+    'Lead': 'technical leadership, strategic thinking, cross-team collaboration, and technology evaluation',
+    'Staff': 'technical vision, organizational impact, strategic initiatives, and company-wide technical influence'
+  };
+
+  return requirements[experienceLevel] || 'appropriate technical competencies for their experience level';
+}
+
+export function getTechnicalFollowUps(jobType: string): string {
+  const followUps: Record<string, string> = {
+    'Software Engineer': '"How would you optimize that?", "What are the trade-offs?", "How would you handle edge cases?", "How would you test this?"',
+    'Data Scientist': '"How do you validate this approach?", "What assumptions are you making?", "How would you explain this to stakeholders?", "What could go wrong?"',
+    'Product Manager': '"How would you measure success?", "What are the risks?", "How would you prioritize this?", "What would you do differently?"',
+    'Marketing Manager': '"How would you measure ROI?", "What channels would you use?", "How would you optimize this campaign?", "What are the key metrics?"',
+    'Designer': '"How did you validate this design?", "What user research informed this?", "How would you iterate on this?", "What accessibility considerations?"',
+    'DevOps Engineer': '"How would you monitor this?", "What could fail and how would you handle it?", "How would you scale this?", "What security considerations?"'
+  };
+
+  return followUps[jobType] || '"Can you elaborate on your approach?", "What challenges might you face?", "How would you improve this?"';
+}
+
+// Enhanced behavioral question strategies
+export function getBehavioralQuestionStrategy(jobType: string, experienceLevel: string, industry: string): string {
+  const behavioralStrategies: Record<string, Record<string, string>> = {
+    'Software Engineer': {
+      'Entry Level': `Focus on learning experiences, collaboration, problem-solving approach, and growth mindset. Ask about coding challenges, learning from mistakes, and working in teams.`,
+      'Mid Level': `Test leadership potential, project ownership, mentorship, and cross-team collaboration. Include questions about technical decisions and handling pressure.`,
+      'Senior': `Evaluate leadership experiences, mentoring others, driving technical initiatives, and handling complex project challenges. Focus on impact and influence.`,
+      'Lead': `Assess team leadership, strategic thinking, conflict resolution, and organizational influence. Include questions about building technical culture.`,
+      'Staff': `Test organizational leadership, cross-functional collaboration, strategic initiative ownership, and company-wide technical influence.`
+    },
+    'Data Scientist': {
+      'Entry Level': `Focus on analytical thinking, learning from data, handling ambiguity, and communicating insights. Ask about research projects and problem-solving.`,
+      'Mid Level': `Test stakeholder management, project leadership, business impact measurement, and handling conflicting requirements.`,
+      'Senior': `Evaluate strategic thinking, influencing business decisions, managing complex projects, and mentoring junior data scientists.`,
+      'Lead': `Assess data strategy development, cross-functional leadership, building data-driven culture, and organizational change management.`,
+      'Staff': `Test company-wide data vision, strategic partnerships, and transformational data initiatives.`
+    },
+    'Product Manager': {
+      'Entry Level': `Focus on user empathy, stakeholder communication, prioritization decisions, and learning from user feedback.`,
+      'Mid Level': `Test cross-functional leadership, roadmap decisions, handling conflicting stakeholder needs, and product success measurement.`,
+      'Senior': `Evaluate product strategy, market positioning, team leadership, and driving organizational alignment around product vision.`,
+      'Lead': `Assess portfolio management, organizational influence, strategic partnerships, and building product culture.`,
+      'Staff': `Test company-wide product strategy, organizational transformation, and strategic business impact.`
+    }
+  };
+
+  const industryModifiers: Record<string, string> = {
+    'Technology': 'Include questions about innovation, rapid scaling, technical debt decisions, and fast-paced development environments.',
+    'Healthcare': 'Focus on patient safety scenarios, regulatory compliance experiences, ethical decision-making, and working with sensitive data.',
+    'Finance': 'Emphasize risk management, regulatory scenarios, high-stakes decision-making, and handling financial pressure.',
+    'Education': 'Include questions about accessibility, diverse user needs, learning outcomes, and educational impact measurement.',
+    'E-commerce': 'Focus on customer experience, conversion optimization, seasonal pressure, and business growth scenarios.',
+    'Government': 'Emphasize public service, regulatory compliance, transparency, and working within bureaucratic constraints.'
+  };
+
+  const baseStrategy = behavioralStrategies[jobType]?.[experienceLevel] || 
+    `Focus on ${experienceLevel} level behavioral competencies relevant to ${jobType} roles.`;
+  
+  const industryContext = industryModifiers[industry] || '';
+  
+  return `${baseStrategy} ${industryContext}`.trim();
+}
+
+// Enhanced situational scenario strategies
+export function getSituationalScenarioStrategy(jobType: string, experienceLevel: string, industry: string): string {
+  const scenarioStrategies: Record<string, Record<string, string>> = {
+    'Software Engineer': {
+      'Entry Level': `Present scenarios about debugging complex issues, learning new technologies quickly, handling code review feedback, and collaborating with senior developers.`,
+      'Mid Level': `Include scenarios about technical architecture decisions, handling production issues, mentoring junior developers, and balancing technical debt.`,
+      'Senior': `Focus on system design decisions, leading technical initiatives, handling team conflicts, and driving technical best practices across teams.`,
+      'Lead': `Present strategic technical decisions, technology evaluation, building engineering culture, and handling organizational technical challenges.`,
+      'Staff': `Include company-wide technical strategy, cross-organizational collaboration, and transformational technology initiatives.`
+    },
+    'Data Scientist': {
+      'Entry Level': `Present scenarios about data quality issues, explaining technical concepts to non-technical stakeholders, and handling ambiguous requirements.`,
+      'Mid Level': `Include scenarios about model deployment challenges, conflicting business requirements, and measuring model success in production.`,
+      'Senior': `Focus on data strategy decisions, building data science capabilities, and influencing business strategy with data insights.`,
+      'Lead': `Present organizational data challenges, building data-driven culture, and strategic data platform decisions.`,
+      'Staff': `Include company-wide data transformation, strategic partnerships, and data governance at scale.`
+    },
+    'Product Manager': {
+      'Entry Level': `Present scenarios about feature prioritization, handling user feedback, balancing stakeholder needs, and making decisions with limited data.`,
+      'Mid Level': `Include scenarios about roadmap conflicts, resource constraints, competitive threats, and measuring product success.`,
+      'Senior': `Focus on product strategy decisions, market positioning, team leadership, and driving organizational product alignment.`,
+      'Lead': `Present portfolio management challenges, strategic partnerships, and building product-centric culture.`,
+      'Staff': `Include company-wide product strategy, market expansion, and transformational product initiatives.`
+    }
+  };
+
+  const industryScenarios: Record<string, string> = {
+    'Technology': 'Include scenarios about rapid scaling, technical innovation, competitive pressure, and platform decisions.',
+    'Healthcare': 'Present scenarios involving patient safety, regulatory compliance, data privacy, and ethical considerations.',
+    'Finance': 'Include scenarios about risk management, regulatory requirements, market volatility, and high-stakes financial decisions.',
+    'Education': 'Present scenarios about accessibility, diverse learner needs, educational effectiveness, and resource constraints.',
+    'E-commerce': 'Include scenarios about customer experience, seasonal demand, conversion optimization, and marketplace dynamics.',
+    'Government': 'Present scenarios about public accountability, bureaucratic processes, regulatory compliance, and public service impact.'
+  };
+
+  const baseStrategy = scenarioStrategies[jobType]?.[experienceLevel] || 
+    `Present ${experienceLevel} level situational scenarios relevant to ${jobType} responsibilities.`;
+  
+  const industryContext = industryScenarios[industry] || '';
+  
+  return `${baseStrategy} ${industryContext}`.trim();
+}
+
+// Personalized opening questions based on candidate profile
+export function getPersonalizedOpeningQuestion(jobType: string, experienceLevel: string, industry: string): string {
+  const openingQuestions: Record<string, Record<string, string[]>> = {
+    'Software Engineer': {
+      'Entry Level': [
+        `Let's start with your coding journey. What programming languages have you been working with, and what drew you to software development?`,
+        `Tell me about a coding project you're particularly proud of. What technologies did you use and what challenges did you overcome?`,
+        `Walk me through your experience with software development fundamentals - data structures, algorithms, and system design basics.`
+      ],
+      'Mid Level': [
+        `Let's dive into your software engineering experience. Tell me about a complex system you've built or significantly contributed to.`,
+        `Walk me through your approach to system design and architecture decisions in your recent projects.`,
+        `Describe your experience with code review, testing, and deployment processes in your current or recent role.`
+      ],
+      'Senior': [
+        `Let's start with your technical leadership experience. Tell me about a time you drove a significant architectural decision or technical initiative.`,
+        `Walk me through how you approach mentoring junior developers and establishing technical best practices on your team.`,
+        `Describe a complex system design challenge you've solved and how you evaluated the trade-offs involved.`
+      ]
+    },
+    'Data Scientist': {
+      'Entry Level': [
+        `Let's start with your data science background. What statistical concepts and machine learning techniques are you most comfortable with?`,
+        `Tell me about a data analysis project you've worked on. What was your approach and what insights did you uncover?`,
+        `Walk me through your experience with data cleaning, feature engineering, and model validation.`
+      ],
+      'Mid Level': [
+        `Let's dive into your data science experience. Tell me about a machine learning model you've deployed to production and its business impact.`,
+        `Walk me through your approach to handling a complex data science project from problem definition to solution deployment.`,
+        `Describe your experience communicating technical findings to non-technical stakeholders and driving business decisions.`
+      ],
+      'Senior': [
+        `Let's start with your data science leadership experience. Tell me about a time you led a strategic data initiative that impacted business outcomes.`,
+        `Walk me through how you approach building data science capabilities and establishing best practices across teams.`,
+        `Describe a complex data science problem where you had to balance technical constraints with business requirements.`
+      ]
+    },
+    'Product Manager': {
+      'Entry Level': [
+        `Let's start with your product management background. What draws you to product management and how do you approach understanding user needs?`,
+        `Tell me about a product feature or improvement you've worked on. How did you define success and measure impact?`,
+        `Walk me through your experience with prioritization frameworks and stakeholder management.`
+      ],
+      'Mid Level': [
+        `Let's dive into your product management experience. Tell me about a product roadmap you've developed and how you balanced competing priorities.`,
+        `Walk me through your approach to product discovery, validation, and go-to-market strategy.`,
+        `Describe your experience working with engineering, design, and business teams to deliver successful products.`
+      ],
+      'Senior': [
+        `Let's start with your product leadership experience. Tell me about a product strategy you've developed and how you drove organizational alignment.`,
+        `Walk me through how you approach product vision setting and building product culture within an organization.`,
+        `Describe a complex product decision where you had to balance user needs, business objectives, and technical constraints.`
+      ]
+    },
+    'Marketing Manager': {
+      'Entry Level': [
+        `Let's start with your marketing background. What marketing channels and strategies have you worked with, and what results have you achieved?`,
+        `Tell me about a marketing campaign you've contributed to. What was your role and how did you measure success?`,
+        `Walk me through your experience with market research, customer segmentation, and campaign optimization.`
+      ],
+      'Mid Level': [
+        `Let's dive into your marketing management experience. Tell me about a campaign you've led from strategy to execution and the results you achieved.`,
+        `Walk me through your approach to developing marketing strategies and managing campaign budgets across multiple channels.`,
+        `Describe your experience with marketing analytics, attribution modeling, and ROI measurement.`
+      ],
+      'Senior': [
+        `Let's start with your marketing leadership experience. Tell me about a marketing strategy you've developed that significantly impacted business growth.`,
+        `Walk me through how you approach building marketing capabilities and establishing go-to-market processes across teams.`,
+        `Describe a complex marketing challenge where you had to balance brand positioning, customer acquisition, and revenue goals.`
+      ]
+    },
+    'Designer': {
+      'Entry Level': [
+        `Let's start with your design background. What design principles and tools are you most comfortable with, and what drew you to design?`,
+        `Tell me about a design project you're particularly proud of. What was your design process and how did you validate your decisions?`,
+        `Walk me through your experience with user research, prototyping, and design iteration.`
+      ],
+      'Mid Level': [
+        `Let's dive into your design experience. Tell me about a complex design challenge you've solved and how you balanced user needs with business constraints.`,
+        `Walk me through your approach to design systems, cross-functional collaboration, and design quality assurance.`,
+        `Describe your experience leading design projects and mentoring other designers or collaborating with product teams.`
+      ],
+      'Senior': [
+        `Let's start with your design leadership experience. Tell me about a design strategy or system you've established that impacted product success.`,
+        `Walk me through how you approach building design culture and establishing design processes across organizations.`,
+        `Describe a complex design decision where you had to balance user experience, technical feasibility, and business objectives.`
+      ]
+    },
+    'DevOps Engineer': {
+      'Entry Level': [
+        `Let's start with your DevOps background. What infrastructure tools and automation practices have you worked with?`,
+        `Tell me about a deployment or infrastructure project you've contributed to. What technologies did you use and what challenges did you overcome?`,
+        `Walk me through your experience with CI/CD pipelines, monitoring, and incident response.`
+      ],
+      'Mid Level': [
+        `Let's dive into your DevOps experience. Tell me about an infrastructure challenge you've solved and how you ensured system reliability and scalability.`,
+        `Walk me through your approach to infrastructure as code, automated testing, and deployment strategies.`,
+        `Describe your experience with cloud platforms, container orchestration, and performance optimization.`
+      ],
+      'Senior': [
+        `Let's start with your DevOps leadership experience. Tell me about an infrastructure architecture you've designed or significantly improved.`,
+        `Walk me through how you approach building DevOps capabilities and establishing reliability practices across engineering teams.`,
+        `Describe a complex infrastructure decision where you had to balance performance, cost, security, and maintainability.`
+      ]
+    }
+  };
+
+  const industryContext: Record<string, string> = {
+    'Technology': `with a focus on scalability and technical innovation`,
+    'Healthcare': `with attention to patient safety and regulatory requirements`,
+    'Finance': `considering risk management and regulatory compliance`,
+    'Education': `with emphasis on accessibility and learning outcomes`,
+    'E-commerce': `focusing on user experience and business growth`,
+    'Government': `with consideration for public service and compliance requirements`
+  };
+
+  const questions = openingQuestions[jobType]?.[experienceLevel] || [
+    `Let's start with your professional background. Tell me about your experience in ${jobType} roles and what you enjoy most about this field.`
   ];
+
+  const selectedQuestion = questions[0]; // Use the first question for consistency
+  const industryModifier = industryContext[industry] || '';
+
+  return `${selectedQuestion} ${industryModifier}`.trim();
+}
+
+// Legacy function for backward compatibility - now calls the enhanced version
+export function getTechnicalQuestions(jobType: string, industry: string, experienceLevel: string): string[] {
+  // This is now generated dynamically based on the enhanced system
+  return [];
 }
 
 // Industry context helpers
@@ -543,9 +795,9 @@ export function extractKeyTopics(text: string): string {
 }
 
 // Focused interview prompts - direct and to the point
-export function getFocusedInterviewPrompt(focusedType: string, setup: InterviewSetup | CollegeInterviewSetup): string {
-  const baseSetup = `Position: ${(setup as InterviewSetup).jobType || 'Student'} (${(setup as InterviewSetup).experienceLevel || 'Entry'} level)
-Industry: ${(setup as InterviewSetup).industry || 'General'}`;
+export function getFocusedInterviewPrompt(focusedType: string, setup: InterviewSetup): string {
+  const baseSetup = `Position: ${setup.jobType} (${setup.experienceLevel} level)
+Industry: ${setup.industry}`;
 
   const prompts: Record<string, string> = {
     technical: `You are conducting a focused technical interview session. Be direct, efficient, and technical.

@@ -28,13 +28,6 @@ export interface VoiceMetrics {
   };
 }
 
-export interface CollegeInterviewSetup {
-  schoolType: string;
-  program: string;
-  major: string;
-  interviewMode: 'voice' | 'text';
-}
-
 export interface InterviewSetup {
   industry: string;
   jobType: string;
@@ -120,6 +113,10 @@ export interface InterviewSession {
     strugglingAreas: string[];
     strongAreas: string[];
   };
+  overallScore?: number;
+  duration?: number;
+  speechMetrics?: SpeechMetrics[];
+  voiceMetrics?: VoiceMetrics[];
 }
 
 export interface InterviewResponse {

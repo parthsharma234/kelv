@@ -10,8 +10,11 @@ const generateUUID = () => {
   });
 };
 
+import { InterviewProcessingStatus } from '../types/processing';
+
 export interface RealtimeInterviewState {
   status: 'idle' | 'connecting' | 'connected' | 'interviewing' | 'paused' | 'completed' | 'error' | 'processing';
+  processingStatus: InterviewProcessingStatus;
   transcript: TranscriptChunk[];
   currentQuestion: string;
   isAISpeaking: boolean;
@@ -21,11 +24,14 @@ export interface RealtimeInterviewState {
   sessionId: string | null;
   duration: number;
   questionCount: number;
+  processingProgress?: number;
+  processingError?: string;
 }
 
 export function useInterviewState() {
   const [state, setState] = useState<RealtimeInterviewState>({
     status: 'idle',
+    processingStatus: 'pending',
     transcript: [],
     currentQuestion: '',
     isAISpeaking: false,
@@ -35,6 +41,7 @@ export function useInterviewState() {
     sessionId: null,
     duration: 0,
     questionCount: 0,
+    processingProgress: 0,
   });
 
   const assistantTextBuffer = useRef<string>('');
@@ -46,7 +53,22 @@ export function useInterviewState() {
   }, []);
 
   const setError = useCallback((error: string | null) => {
-    setState(prev => ({ ...prev, status: error ? 'error' : prev.status, error }));
+    setState(prev => ({ 
+      ...prev, 
+      status: error ? 'error' : prev.status, 
+      error,
+      processingStatus: error ? 'failed' : prev.processingStatus,
+      processingError: error || undefined
+    }));
+  }, []);
+
+  const setProcessingStatus = useCallback((status: InterviewProcessingStatus, progress?: number, error?: string) => {
+    setState(prev => ({ 
+      ...prev, 
+      processingStatus: status,
+      processingProgress: progress !== undefined ? progress : prev.processingProgress,
+      processingError: error
+    }));
   }, []);
 
   const setSessionId = useCallback((sessionId: string) => {

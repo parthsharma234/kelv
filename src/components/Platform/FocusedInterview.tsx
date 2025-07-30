@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { InterviewSetup, Question, InterviewResponse } from '../../types/interview';
 import { generateFocusedQuestions, analyzeResponse, synthesizeSpeech, AudioRecorder, processVoiceInput } from '../../utils/openai';
-import { isElevenLabsTTSAvailable } from '../../utils/elevenLabsTTS';
+
 import AIInterviewer from '../AIInterviewer';
 import { createInitialInterviewSession, saveInterviewSession } from '../../utils/supabase-interview';
 import { extractSpeechMetrics } from '../../utils/openai';
@@ -61,8 +61,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
     import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
 
-  // Check if ElevenLabs TTS is available for voice synthesis
-  const hasTTSAvailable = isElevenLabsTTSAvailable();
+
 
   // Interview type configurations
   const interviewConfig = {
@@ -363,7 +362,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       setCanUserRespond(true);
       
       // Play first question
-      if (questions.length > 0 && isVoiceMode && hasTTSAvailable) {
+      if (questions.length > 0 && isVoiceMode) {
         await playQuestion(questions[0].text);
       }
     } catch (error) {
@@ -372,7 +371,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
     }
   };
   const playQuestion = async (questionText: string) => {
-    if (!hasTTSAvailable) return;
+
     
     setIsAISpeaking(true);
     setCanUserRespond(false);
@@ -484,7 +483,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
     if (nextIndex < questions.length) {
       setCurrentQuestionIndex(nextIndex);
         // Play the question if in voice mode
-      if (isVoiceMode && hasTTSAvailable) {
+      if (isVoiceMode) {
         await playQuestion(questions[nextIndex].text);
       } else {
         setCanUserRespond(true);
@@ -503,7 +502,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       ? finalResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / finalResponses.length * 10
       : 0;
 
-    // Calculate voice metrics averages if available (to match college interview format)
+    // Calculate voice metrics averages if available
     let voiceMetrics = null;
     if (speechMetrics && speechMetrics.length > 0) {
       const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);
@@ -820,7 +819,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
                 </div>
               </div>
             )}            {/* Repeat question button - only for voice mode */}
-            {hasStartedInterview && currentQuestion && isVoiceMode && hasTTSAvailable && (
+            {hasStartedInterview && currentQuestion && isVoiceMode && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}

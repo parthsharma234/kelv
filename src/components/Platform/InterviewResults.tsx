@@ -552,34 +552,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   const question = safeSessionData.questions.find((q: any) => q.id === response.questionId);
                   const analysis = response.analysis || {};
                   const responseTime = safeSessionData.responseTimes?.[index];
-
-                  const score = analysis.score || 7;
-                  const scoreColorClass = score >= 8
-                      ? 'bg-green-500/20 text-green-400'
-                      : score >= 6
-                      ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'bg-red-500/20 text-red-400';
-
-                  const feedbackText = analysis.feedback ||
-                      (score >= 8
-                      ? 'Excellent response! You demonstrated strong understanding and clear communication.'
-                      : score >= 6
-                      ? 'Good response with room for improvement in detail and structure.'
-                      : 'This is a learning opportunity. Focus on providing more specific examples.');
-
-                  const strengths = (analysis.strengths && analysis.strengths.length > 0
-                      ? analysis.strengths
-                      : ['Responded to the question clearly.', 'Structured the answer logically.']
-                  ).slice(0, 2);
-
-                  const areasForImprovement = (analysis.areasForImprovement && analysis.areasForImprovement.length > 0
-                      ? analysis.areasForImprovement
-                      : [
-                          'Actionable: Add more specific details to your examples.',
-                          'Actionable: Conclude your answer with a strong summary.',
-                          ]
-                  ).slice(0, 2);
-
+                  
                   return (
                     <div key={response.questionId || index} className="border border-dark-600/50 rounded-lg overflow-hidden">
                       {/* Question Header - Compact */}
@@ -601,9 +574,15 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                                     <span>{(responseTime / 1000).toFixed(2)}s</span>
                                 </div>
                             )}
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${scoreColorClass}`}>
-                                {score}/10
-                            </div>
+                          <div
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              (analysis.score || 7) >= 8
+                                ? 'bg-green-500/20 text-green-400'
+                                : (analysis.score || 7) >= 6
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                            {analysis.score || 7}/10
                           </div>
                         </div>
                       </div>
@@ -621,7 +600,14 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                           <>
                             <div>
                               <h5 className="text-xs font-medium text-gray-400 mb-1">Feedback</h5>
-                              <p className="text-gray-300 text-xs">{feedbackText}</p>
+                              <p className="text-gray-300 text-xs">
+                                {analysis.feedback ||
+                                  ((analysis.score || 7) >= 8
+                                    ? 'Excellent response! You demonstrated strong understanding and clear communication.'
+                                    : (analysis.score || 7) >= 6
+                                    ? 'Good response with room for improvement in detail and structure.'
+                                    : 'This is a learning opportunity. Focus on providing more specific examples.')}
+                              </p>
                             </div>
 
                             {/* Compact metrics grid */}
@@ -652,12 +638,19 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                                   Strengths
                                 </h5>
                                 <ul className="space-y-0.5">
-                                  {strengths.map((strength: string, idx: number) => (
-                                      <li key={idx} className="text-xs text-gray-300 flex items-start">
+                                  {(analysis.strengths && analysis.strengths.length > 0
+                                    ? analysis.strengths
+                                    : ['Responded to the question clearly.', 'Structured the answer logically.']
+                                  )
+                                    .slice(0, 2)
+                                    .map((strength: string, idx: number) => {
+                                      return (
+                                        <li key={idx} className="text-xs text-gray-300 flex items-start">
                                           <div className="w-1 h-1 bg-green-400 rounded-full mr-1 mt-1.5 flex-shrink-0" />
                                           {strength.charAt(0).toUpperCase() + strength.slice(1)}
-                                      </li>
-                                  ))}
+                                        </li>
+                                      );
+                                    })}
                                 </ul>
                               </div>
 
@@ -667,12 +660,22 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                                   Improve
                                 </h5>
                                 <ul className="space-y-0.5">
-                                  {areasForImprovement.map((area: string, idx: number) => (
-                                      <li key={idx} className="text-xs text-gray-300 flex items-start">
+                                  {(analysis.areasForImprovement && analysis.areasForImprovement.length > 0
+                                    ? analysis.areasForImprovement
+                                    : [
+                                        'Actionable: Add more specific details to your examples.',
+                                        'Actionable: Conclude your answer with a strong summary.',
+                                      ]
+                                  )
+                                    .slice(0, 2)
+                                    .map((area: string, idx: number) => {
+                                      return (
+                                        <li key={idx} className="text-xs text-gray-300 flex items-start">
                                           <div className="w-1 h-1 bg-orange-400 rounded-full mr-1 mt-1.5 flex-shrink-0" />
                                           {area.charAt(0).toUpperCase() + area.slice(1)}
-                                      </li>
-                                  ))}
+                                        </li>
+                                      );
+                                    })}
                                 </ul>
                               </div>
                             </div>

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Clock, MessageSquare, Play, Pause, Mic, MicOff, Phone, AlertCircle, Settings, ArrowLeft, Brain, Send, Volume2, VolumeX } from 'lucide-react';
 import { InterviewSetup, InterviewSession as IInterviewSession, InterviewResponse, AIInterviewerState } from '../../types/interview';
 import { generateInterviewQuestions, analyzeResponse, generateNextQuestion, synthesizeSpeech, AudioRecorder, processVoiceInput, extractSpeechMetrics, updateGlobalQuestions } from '../../utils/openai';
-import { isElevenLabsTTSAvailable } from '../../utils/elevenLabsTTS';
+
 import { saveSpeechAnalysisCache, createInitialInterviewSession } from '../../utils/supabase-interview';
 import AIInterviewer from '../AIInterviewer';
+import RecordingSaveDialog from './RecordingSaveDialog';
+import { createVideoRecorder, saveInterviewRecording, getVideoDuration, RecordingData } from '../../utils/recording-utils';
 
 // Utility function to format category labels
 const formatCategoryLabel = (category: string): string => {
@@ -63,7 +65,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [isVideoElementReady, setIsVideoElementReady] = useState(false);
+
   const [userResponse, setUserResponse] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
@@ -81,18 +83,24 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   const [canUserRespond, setCanUserRespond] = useState(false);
 
   // Add AI state for adaptive interview
-  const [aiState, setAiState] = useState<AIInterviewerState>({
+  const [aiState] = useState<AIInterviewerState>({
     currentPersonality: 'friendly',
     adaptationLevel: 5,
     questionFlow: 'adaptive',
     focusAreas: []
   });
-  // Check if OpenAI API key is configured
+
+  // Recording states
+  const [videoRecorder, setVideoRecorder] = useState<ReturnType<typeof createVideoRecorder> | null>(null);
+  const [isVideoRecording, setIsVideoRecording] = useState(false);
+  const [recordedVideoBlob, setRecordedVideoBlob] = useState<Blob | null>(null);
+  const [showRecordingSaveDialog, setShowRecordingSaveDialog] = useState(false);
+  const [isUploadingRecording, setIsUploadingRecording] = useState(false);
+  const [uploadError, setUploadError] = useState<string>();
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  // Check if OpenAI API key is configured for voice mode
   const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY && 
                       import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
-
-  // Check if ElevenLabs TTS is available for voice synthesis
-  const hasTTSAvailable = isElevenLabsTTSAvailable();
 
   // Check if this is voice mode
   const isVoiceMode = setup.interviewMode === 'voice';
@@ -126,10 +134,10 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   useEffect(() => {
     const currentVideoRef = hasStartedInterview ? videoRef : previewVideoRef;
     if (currentVideoRef.current) {
-      setIsVideoElementReady(true);
+      // Video element is ready
     }
     return () => {
-      setIsVideoElementReady(false);
+      // Video element stopped
     };
   }, [hasStartedInterview]);
   // Separate effect for preview video stream
@@ -277,7 +285,21 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       
       // Set the new stream
       setStream(mediaStream);
-        // Set interview as started
+      
+      // Initialize video recording
+      try {
+        const recorder = createVideoRecorder(mediaStream);
+        setVideoRecorder(recorder);
+        // Start recording automatically
+        recorder.startRecording();
+        setIsVideoRecording(true);
+        console.log('Video recording started');
+      } catch (recordingError) {
+        console.error('Failed to start video recording:', recordingError);
+        // Continue with interview even if recording fails
+      }
+      
+      // Set interview as started
       setHasStartedInterview(true);
       
       if (session) {
@@ -290,7 +312,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         }
         
         // Play the first question in voice mode after session is active
-        if (session.questions.length > 0 && isVoiceMode && hasTTSAvailable) {
+        if (session.questions.length > 0 && isVoiceMode) {
           const firstQuestion = session.questions[0];
           console.log('Playing first question:', firstQuestion.text);
           await playQuestion(firstQuestion.text);
@@ -378,7 +400,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
   };
 
   const playQuestion = async (questionText: string) => {
-    if (!audioEnabled || !isVoiceMode || !hasTTSAvailable) {
+    if (!audioEnabled || !isVoiceMode) {
       // For text mode or when audio is disabled, user can respond immediately
       setCanUserRespond(true);
       return;
@@ -556,7 +578,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         };
       });
         // Play the question if in voice mode
-      if (isVoiceMode && hasTTSAvailable) {
+      if (isVoiceMode) {
         await playQuestion(nextQuestion.text);
       }
       
@@ -589,7 +611,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           const question = session.questions.find(q => q.id === response.questionId);
           if (!question) return response;
 
-          const analysis = await analyzeResponse(question, response.response, setup, finalResponses.slice(0, index), 'college');
+          const analysis = await analyzeResponse(question, response.response, setup, finalResponses.slice(0, index));
           
           // Add speech metrics if available
           const speechMetric = speechMetrics.find(m => m.questionId === response.questionId);
@@ -686,9 +708,8 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
       existingHistory.push(historyEntry);
       localStorage.setItem('kelv-interview-history', JSON.stringify(existingHistory));
 
-      stopCamera();
-      stopPreviewCamera();
-      onComplete(sessionData);    } catch (error) {
+      // Stop recording and show save dialog
+      await handleRecordingCompletion(sessionData);    } catch (error) {
       console.error('Error completing interview:', error);
       // Fallback completion without analysis
       const endTime = new Date();
@@ -759,11 +780,99 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
         isActive: false
       };
 
+      // Stop recording and show save dialog
+      await handleRecordingCompletion(sessionData);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleRecordingCompletion = async (sessionData: any) => {
+    try {
+      // Stop video recording if active
+      if (videoRecorder && isVideoRecording) {
+        const recordedBlob = await videoRecorder.stopRecording();
+        setRecordedVideoBlob(recordedBlob);
+        setIsVideoRecording(false);
+        console.log('Video recording stopped, blob size:', recordedBlob.size);
+      }
+
+      // Stop camera streams
+      stopCamera();
+      stopPreviewCamera();
+
+      // Store session data for later use
+      setSession(prevSession => ({
+        ...prevSession,
+        ...sessionData
+      }));
+
+      // Show recording save dialog
+      setShowRecordingSaveDialog(true);
+    } catch (error) {
+      console.error('Error handling recording completion:', error);
+      // Continue to results even if recording fails
       stopCamera();
       stopPreviewCamera();
       onComplete(sessionData);
+    }
+  };
+
+  const handleSaveRecording = async () => {
+    if (!recordedVideoBlob || !session) {
+      console.error('No recording or session data available');
+      return;
+    }
+
+    try {
+      setIsUploadingRecording(true);
+      setUploadError(undefined);
+
+      // Get video duration
+      const duration = await getVideoDuration(recordedVideoBlob);
+
+      // Prepare recording data
+      const recordingData: RecordingData = {
+        session_id: session.id,
+        video_blob: recordedVideoBlob,
+        duration: Math.floor(duration),
+        file_size: recordedVideoBlob.size,
+        mime_type: recordedVideoBlob.type,
+        metadata: {
+          setup: session.setup,
+          questions_answered: session.responses?.length || 0,
+          overall_score: session.overallScore,
+          analysis_data: {
+            duration: session.duration,
+            speech_metrics: session.speechMetrics,
+            voice_metrics: session.voiceMetrics
+          }
+        }
+      };
+
+      // Save recording to Supabase
+      await saveInterviewRecording(recordingData);
+      
+      setUploadSuccess(true);
+      
+      // After a brief delay, continue to results
+      setTimeout(() => {
+        setShowRecordingSaveDialog(false);
+        onComplete(session);
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error saving recording:', error);
+      setUploadError(error instanceof Error ? error.message : 'Failed to save recording');
     } finally {
-      setIsAnalyzing(false);
+      setIsUploadingRecording(false);
+    }
+  };
+
+  const handleSkipRecording = () => {
+    setShowRecordingSaveDialog(false);
+    if (session) {
+      onComplete(session);
     }
   };
 
@@ -773,7 +882,17 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
+    // Stop video recording if active
+    if (videoRecorder && isVideoRecording) {
+      try {
+        await videoRecorder.stopRecording();
+        setIsVideoRecording(false);
+      } catch (error) {
+        console.error('Error stopping video recording:', error);
+      }
+    }
+    
     stopCamera();
     stopPreviewCamera();
     if (audioRecorderRef.current?.isRecording()) {
@@ -815,16 +934,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               <Settings className="w-5 h-5 mr-2 text-[#FF5722]" />
               Interview Mode: {isVoiceMode ? 'Voice' : 'Text'}
             </h3>
-            <div className="space-y-3">              <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
-                <span className="text-sm text-gray-300">Voice Synthesis (ElevenLabs):</span>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  hasTTSAvailable 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-red-500/20 text-red-400'
-                }`}>
-                  {hasTTSAvailable ? 'CONFIGURED' : 'REQUIRED'}
-                </span>
-              </div>
+            <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg">
                 <span className="text-sm text-gray-300">Voice Input (Direct):</span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -847,16 +957,16 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
               </div>
               <div className="text-xs text-gray-400">
                 {isVoiceMode 
-                  ? (hasOpenAIKey && hasTTSAvailable)
-                    ? '✅ Full voice-enabled interview with speech analysis' 
-                    : `❌ Voice mode requires ${!hasOpenAIKey ? 'OpenAI' : ''}${!hasOpenAIKey && !hasTTSAvailable ? ' and ' : ''}${!hasTTSAvailable ? 'ElevenLabs' : ''} API key${(!hasOpenAIKey && !hasTTSAvailable) ? 's' : ''}`
+                  ? (hasOpenAIKey)
+                    ? '✅ Voice-enabled interview with realtime AI' 
+                    : '❌ Voice mode requires OpenAI API key'
                   : '📝 Text-only interview mode selected'
                 }
               </div>
             </div>
           </div>
 
-          {(hasOpenAIKey && hasTTSAvailable) ? (
+          {hasOpenAIKey ? (
             <button
               onClick={requestPermissions}
               disabled={isRequestingPermission}
@@ -1092,7 +1202,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             {hasStartedInterview && currentQuestion && (
               <div className="flex-1 flex flex-col space-y-4">
                 <div className="flex-1">
-                  {isVoiceMode && hasTTSAvailable ? (
+                  {isVoiceMode ? (
                     <div className="text-center">
                       <button
                         onClick={isRecording ? stopRecording : startRecording}
@@ -1180,7 +1290,7 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
             )}
 
             {/* Repeat question button - only for voice mode */}
-            {hasStartedInterview && currentQuestion && isVoiceMode && hasTTSAvailable && (
+            {hasStartedInterview && currentQuestion && isVoiceMode && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
                 <button
                   onClick={() => playQuestion(currentQuestion.text)}
@@ -1282,6 +1392,17 @@ export const InterviewSession: React.FC<InterviewSessionProps> = ({ setup, onCom
           </div>
         </div>
       </div>
+
+      {/* Recording Save Dialog */}
+      <RecordingSaveDialog
+        isOpen={showRecordingSaveDialog}
+        onSave={handleSaveRecording}
+        onSkip={handleSkipRecording}
+        isUploading={isUploadingRecording}
+        uploadError={uploadError}
+        uploadSuccess={uploadSuccess}
+        sessionData={session}
+      />
     </div>
   );
 };

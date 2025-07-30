@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { InterviewHistory, InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { InterviewHistory, InterviewSetup } from '../types/interview';
 
 // 🧠 Behavioral Insights Interfaces
 export interface BehavioralInsight {
@@ -41,13 +41,18 @@ export interface TranscriptChunk {
   created_at: string;
 }
 
+import { InterviewProcessingStatus } from '../types/processing';
+
 export interface RealtimeSessionMetadata {
   session_id: string;
   user_id: string;
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   interview_type?: string;
   start_time: string;
   end_time?: string;
+  processing_status?: InterviewProcessingStatus;
+  processing_error?: string;
+  processing_progress?: number;
   status: 'active' | 'paused' | 'completed' | 'error';
   model_type: string;
   total_duration: number;
@@ -67,18 +72,7 @@ export interface SavedInterviewSetup {
   updated_at: string;
 }
 
-// College interview setup interface  
-export interface SavedCollegeInterviewSetup {
-  id: string;
-  name: string;
-  setup: CollegeInterviewSetup;
-  is_favorite: boolean;
-  usage_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup | CollegeInterviewSetup, interviewType?: string): Promise<void> => {
+export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup, interviewType?: string): Promise<void> => {
   if (!isSupabaseConfigured()) {
     console.log('Supabase not configured, skipping initial session creation');
     return;
@@ -174,7 +168,16 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
     }
 
     // Calculate interview metrics based on interview type and responses
-    const calculateInterviewMetrics = (responses: any[], interviewType: string) => {
+    const calculateInterviewMetrics = (responses: any[], interviewType: string): {
+      authenticity?: number;
+      passion?: number;
+      clarity?: number;
+      specificity?: number;
+      problem_solving?: number;
+      communication?: number;
+      depth?: number;
+      relevance?: number;
+    } | null => {
       if (!responses || responses.length === 0) {
         return null;
       }
@@ -183,9 +186,9 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       if (validResponses.length === 0) {
         return null;
       }
-      
-      if (interviewType === 'college') {
-        // College interview metrics
+
+      if (interviewType === 'standard') {
+        // Standard interview metrics
         const authenticityScores = validResponses.map((r: any) => r.analysis.authenticity || 0);
         const passionScores = validResponses.map((r: any) => r.analysis.passion || 0);
         const clarityScores = validResponses.map((r: any) => r.analysis.clarity || 0);
@@ -308,6 +311,8 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
     // Don't throw error to prevent blocking user flow
   }
 };
+
+// Helper function declaration moved to avoid redeclaration
 
 export const saveSpeechAnalysisCache = async (
   sessionId: string,
@@ -563,134 +568,6 @@ export const deleteInterviewSetup = async (setupId: string): Promise<boolean> =>
   }
 };
 
-// College Interview Setup functions
-export const saveCollegeInterviewSetup = async (
-  name: string, 
-  setup: CollegeInterviewSetup, 
-  isFavorite: boolean = false
-): Promise<SavedCollegeInterviewSetup | null> => {
-  if (!isSupabaseConfigured()) {
-    console.log('Supabase not configured, skipping college setup save');
-    return null;
-  }
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('college_interview_setups')
-      .insert({
-        user_id: user.id,
-        name,
-        setup,
-        is_favorite: isFavorite,
-        usage_count: 1
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error saving college interview setup:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Failed to save college interview setup:', error);
-    return null;
-  }
-};
-
-export const getUserCollegeInterviewSetups = async (): Promise<SavedCollegeInterviewSetup[]> => {
-  if (!isSupabaseConfigured()) {
-    console.log('Supabase not configured, returning empty college setups');
-    return [];
-  }
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('college_interview_setups')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching college interview setups:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Failed to fetch college interview setups:', error);
-    return [];
-  }
-};
-
-export const updateCollegeSetupUsage = async (setupId: string): Promise<void> => {
-  if (!isSupabaseConfigured()) {
-    return;
-  }
-
-  try {
-    // First get the current usage count
-    const { data: currentData, error: fetchError } = await supabase
-      .from('college_interview_setups')
-      .select('usage_count')
-      .eq('id', setupId)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching current college setup usage count:', fetchError);
-      return;
-    }
-
-    // Then update with incremented value
-    const { error } = await supabase
-      .from('college_interview_setups')
-      .update({ 
-        usage_count: (currentData.usage_count || 0) + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', setupId);
-
-    if (error) {
-      console.error('Error updating college setup usage:', error);
-    }
-  } catch (error) {
-    console.error('Failed to update college setup usage:', error);
-  }
-};
-
-export const deleteCollegeInterviewSetup = async (setupId: string): Promise<boolean> => {
-  if (!isSupabaseConfigured()) {
-    return false;
-  }
-
-  try {
-    const { error } = await supabase
-      .from('college_interview_setups')
-      .delete()
-      .eq('id', setupId);
-
-    if (error) {
-      console.error('Error deleting college interview setup:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to delete college interview setup:', error);
-    return false;
-  }
-};
 
 export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
   if (!isSupabaseConfigured()) {
@@ -765,7 +642,7 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
         speechRate: session.speech_metrics.timing?.speechRate || 0,
         voiceStability: session.speech_metrics.voice?.voiceStability || 0
       } : undefined,
-      interviewType: session.interview_type === 'college' ? 'college' : (session.focused_type ? session.focused_type : 'standard'),
+      interviewType: session.interview_type,
       isRealtime: true
     }));
 
@@ -808,18 +685,21 @@ export const getInterviewStats = async () => {
     }
     
     // Calculate focused interview stats
-    const focusedInterviews = history.filter((interview: any) => interview.interviewType).length;
-    const focusedScores = history.filter((interview: any) => interview.interviewType).map((interview: any) => interview.overallScore);
+    const focusedInterviews = history.filter((interview: any) => interview.interviewType && interview.interviewType !== 'standard').length;
+    const focusedScores = history.filter((interview: any) => interview.interviewType && interview.interviewType !== 'standard')
+      .map((interview: any) => interview.overallScore);
     const focusedAverageScore = focusedScores.length > 0 ? focusedScores.reduce((sum: number, score: number) => sum + score, 0) / focusedScores.length : 0;
     
     // Find most practiced type
     const typeCounts: { [key: string]: number } = {};
     history.forEach((interview: any) => {
-      if (interview.interviewType) {
+      if (interview.interviewType && interview.interviewType !== 'standard') {
         typeCounts[interview.interviewType] = (typeCounts[interview.interviewType] || 0) + 1;
       }
     });
-    const mostPracticedType = Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
+    const mostPracticedType = Object.keys(typeCounts).length > 0 ?
+      Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b) :
+      '';
     
     return {
       totalInterviews,
@@ -885,7 +765,7 @@ export const getInterviewStats = async () => {
     }
 
     // Calculate focused interview stats (including realtime focused interviews)
-    const focusedSessions = allData.filter(session => session.interview_type && session.interview_type !== 'college');
+    const focusedSessions = allData.filter(session => session.interview_type && session.interview_type !== 'standard');
     const focusedInterviews = focusedSessions.length;
     const focusedAverageScore = focusedSessions.length > 0 
       ? focusedSessions.reduce((sum, session) => sum + (session.overall_score || 0), 0) / focusedSessions.length 

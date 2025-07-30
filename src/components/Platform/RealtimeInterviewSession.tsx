@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, Brain, MessageCircle, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
-import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
+import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
 import AIInterviewer from '../AIInterviewer';
 
 interface RealtimeInterviewSessionProps {
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   interviewType?: string;
   sessionId?: string;
   onComplete: (sessionData: any) => void;
@@ -156,7 +156,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   // Determine if this is a focused interview and what type
-  const isFocusedInterview = interviewType && !['standard', 'college'].includes(interviewType);
+  const isFocusedInterview = interviewType && interviewType !== 'standard';
   const focusedType = isFocusedInterview ? interviewType : undefined;
   const actualInterviewType = isFocusedInterview ? 'focused' : interviewType;
 

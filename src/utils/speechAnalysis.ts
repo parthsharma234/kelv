@@ -1,5 +1,5 @@
-// Advanced Speech Analysis Utilities for College Interview Voice Metrics
-// Focused on high-quality voice metrics for college interview feedback
+// Advanced Speech Analysis Utilities for Interview Voice Metrics
+// Focused on high-quality voice metrics for interview feedback
 
 export interface VoiceMetrics {
   speechRate: number;        // Words per minute
@@ -940,7 +940,7 @@ export class AdvancedSpeechAnalyzer {
     hesitations: number,
     speechRate: number
   ): number {
-    // Optimal speech rate for college interviews: 140-170 WPM
+    // Optimal speech rate: 140-170 WPM
     const optimalRateMin = 140;
     const optimalRateMax = 170;
     

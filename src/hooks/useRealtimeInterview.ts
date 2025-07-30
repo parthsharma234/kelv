@@ -1,13 +1,14 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
-import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt } from '../utils/promptTemplates';
-import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt, getPersonalizedOpeningQuestion } from '../utils/promptTemplates';
+import { InterviewSetup } from '../types/interview';
 import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession, saveBehavioralInsight, saveBehavioralSummary, calculateBehavioralSummary } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
-import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
+import { VoiceTimelinePoint } from '../utils/speechAnalysis';
+import { usePostureAnalysis } from './usePostureAnalysis';
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetricEntry {
@@ -25,7 +26,9 @@ const generateUUID = () => {
 };
 
 interface UseRealtimeInterviewOptions {
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup & {
+    interviewMode?: 'voice' | 'text';
+  };
   interviewType?: string;
   focusedType?: string; // Add focused interview type
   mediaStream?: MediaStream | null; // Allow null values
@@ -37,13 +40,12 @@ interface UseRealtimeInterviewOptions {
 const getInterviewDuration = (interviewType?: string): number => {
   switch (interviewType) {
     case 'standard':
-      return 20; // 20 minutes for standard interviews
-    case 'college':
-      return 10; // 10 minutes for college interviews
+      return 30; // 30 minutes for standard interviews - more time for deep questions
+
     case 'focused':
-      return 8;  // Default focused interview duration
+      return 20;  // 20 minutes for focused interviews - enough for proper evaluation
     default:
-      return 15; // Default fallback
+      return 25; // Default fallback - adequate time for thorough interview
   }
 };
 
@@ -77,6 +79,21 @@ export function useRealtimeInterview({
   const candidateResponsesRef = useRef<string[]>([]);
   const speechMetricsRef = useRef<SpeechMetricEntry[]>([]);
   const currentQuestionRef = useRef<string>('');
+  // CV metrics for body posture, eye contact, hand movement, fidgeting
+  const cvTimelineRef = useRef<Array<{
+    timestamp: string;
+    posture_score: number;
+    eye_contact: boolean;
+    hand_movement_score: number;
+    fidgeting_score: number;
+  }>>([]);
+  const cvSummaryRef = useRef<{
+    avgPosture: number;
+    percentEyeContact: number;
+    avgHandMovement: number;
+    avgFidgeting: number;
+    keyEvents: Array<{ type: string; timestamp: string }>;
+  } | null>(null);
   const questionTimestampRef = useRef<number | null>(null);
   const responseTimesRef = useRef<number[]>([]);
   // Add a ref to store per-response segments for the voice timeline
@@ -86,6 +103,7 @@ export function useRealtimeInterview({
     endTimestamp: number;
     questionContext?: string;
   }>>([]);
+const { startAnalysis, fetchAnalysisResult, fetchTimelineData } = usePostureAnalysis();
   // Add a ref to collect transcript chunks for the current user response
   const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
 
@@ -347,73 +365,27 @@ export function useRealtimeInterview({
             const directInstruction = `Start the interview immediately. This is a focused ${focusedType} interview session. Follow your instructions precisely - be direct, efficient, and get straight to the relevant questions. No small talk needed.`;
             clientRef.current?.createResponse(directInstruction);
           } else {
-            // For regular interviews, use the full small talk approach
-            const currentTime = new Date();
-            const hour = currentTime.getHours();
-            const dayOfWeek = currentTime.toLocaleDateString('en-US', { weekday: 'long' });
-            const isWeekend = dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
-            
-            // More human, contextual greetings
-            const humanGreetings = [
-              // Time-based natural greetings
-              hour < 10 ? "Good morning! I hope you've had a chance to grab some coffee or tea." : 
-              hour < 12 ? "Good morning! How's your day shaping up so far?" :
-              hour < 17 ? "Good afternoon! I hope you're having a good day." :
-              hour < 20 ? "Good evening! How has your day been?" :
-              "Good evening! I hope I'm not keeping you too late.",
-              
-              // Day-specific greetings
-              isWeekend ? `Happy ${dayOfWeek}! I appreciate you taking time on the weekend for this.` :
-              dayOfWeek === 'Monday' ? "Happy Monday! How are you starting your week?" :
-              dayOfWeek === 'Friday' ? "Happy Friday! Almost to the weekend - how are you feeling?" :
-              `Happy ${dayOfWeek}! How's your week going so far?`,
-              
-              // Weather/mood based (more conversational)
-              "Hi there! Thanks for joining me today. How are you feeling right now?",
-              "Hello! I'm really looking forward to our conversation. How has your day been treating you?",
-              "Hey! Great to meet you. Are you somewhere comfortable to chat?",
-              "Hi! I hope you're doing well today. How are you feeling about our conversation?",
-              
-              // Energy/casual greetings
-              "Hello there! I'm excited to get to know you better. How's everything going on your end?",
-              "Hi! Thanks for making time to chat with me. What's been the highlight of your day so far?",
-              "Good to see you! I hope you're having a nice day. How are you doing?",
-              "Hello! I really appreciate you being here. How are you feeling today?"
-            ];
-            
-            const selectedGreeting = humanGreetings[Math.floor(Math.random() * humanGreetings.length)];
-            
-            // More conversational follow-up prompts
-            const conversationalPrompts = [
-              "I'm curious - what's your energy level like today? Are you a morning person or more of an afternoon person?",
-              "Before we dive in, I'm always curious - what's something good that's happened to you recently?",
-              "I like to start by getting a sense of how you're feeling. Any nerves, excitement, or just ready to jump in?",
-              "Tell me, what's been keeping you busy lately? Work, projects, life in general?",
-              "I'm interested to know - where are you joining me from today? Somewhere cozy I hope!",
-              "What's your vibe right now? Feeling confident, a little nervous, excited? All totally normal!",
-              "I always like to check in - how has your week been going so far?",
-              "Before we get started, what's one thing you're looking forward to this week?"
-            ];
-            
-            const followUpPrompt = conversationalPrompts[Math.floor(Math.random() * conversationalPrompts.length)];
-            
-            const professionalOpeningInstruction = `Start with this professional greeting: "Hi, I'm [Interviewer]. Thanks for joining us today. Let's begin with your background."
+            // For regular interviews, use professional direct approach
+            const professionalOpeningInstruction = `You are conducting a professional interview tailored specifically for a ${setup.experienceLevel} ${setup.jobType} candidate in the ${setup.industry} industry. Start immediately with this personalized greeting:
 
-Wait for their response, then continue with: "${followUpPrompt}"
+"Hi, I'm [Interviewer Name] from Kelv AI. Thank you for joining us today for this ${setup.experienceLevel} ${setup.jobType} interview in the ${setup.industry} industry. I'll be conducting a comprehensive evaluation covering your background, technical skills, and behavioral experiences relevant to ${setup.jobType} roles. Let's begin."
 
-Be professional and direct:
-- React briefly to what they share (if they mention being nervous, acknowledge briefly; if excited, note it)
-- Use natural speech patterns but keep it professional
-- Ask follow-up questions based on what they tell you (if they mention experience, ask about specific skills; if they mention background, ask about relevant projects)
-- Keep responses brief and focused on interview objectives
-- Use professional language and tone
+Then immediately ask your first substantive question tailored to their specific profile:
 
-Keep this opening brief - 30 seconds maximum. Then transition directly to first question:
-- "Let's start with your experience in [industry/role]..."
-- "Tell me about your background in [relevant area]..."
-- "What's your experience with [key skill/technology]?"
+${getPersonalizedOpeningQuestion(setup.jobType, setup.experienceLevel, setup.industry)}
 
-Remember: This is a professional interview. Be direct and focused on gathering relevant information.`;
+CRITICAL INSTRUCTIONS - TAILORED EVALUATION:
+- NO small talk or casual conversation
+- NO questions about energy levels, feelings, or personal life  
+- Get straight to professional evaluation tailored to ${setup.experienceLevel} ${setup.jobType} in ${setup.industry}
+- This is a ${maxDuration}-minute interview - every minute counts
+- You must cover: Background (2-3 min) → Technical (8-10 min) → Behavioral (8-10 min) → Situational (5-7 min)
+- Ask ${setup.experienceLevel}-appropriate questions with ${setup.industry}-specific context
+- Focus on ${setup.jobType}-relevant competencies and experiences
+- Don't accept surface-level answers - probe for specific examples
+- This is a professional evaluation, not a friendly chat
+
+Begin the interview now with professional authority and focus on ${setup.jobType}-specific substantive questions.`;
             
             clientRef.current?.createResponse(professionalOpeningInstruction);
           }
@@ -558,11 +530,11 @@ Remember: This is a professional interview. Be direct and focused on gathering r
             const analysisPromise = analyzeResponseWithAI(
               { text: currentQuestion, type: 'behavioral', id: `q${Date.now()}` },
               currentResponse.trim(),
-              'jobType' in setup ? setup : {
-                jobType: 'General',
-                experienceLevel: 'Mid-level',
-                industry: 'Technology',
-                interviewMode: setup.interviewMode
+              {
+                jobType: 'jobType' in setup ? setup.jobType : 'General',
+                experienceLevel: 'experienceLevel' in setup ? setup.experienceLevel : 'Mid-level',
+                industry: 'industry' in setup ? setup.industry : 'Technology',
+                interviewMode: 'interviewMode' in setup ? setup.interviewMode : 'voice'
               },
               [],
               focusedType || 'default'
@@ -572,7 +544,7 @@ Remember: This is a professional interview. Be direct and focused on gathering r
             const analysis = await Promise.race([
               analysisPromise,
               new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Analysis timeout')), 10000)
+                setTimeout(() => reject(new Error('Analysis timeout')), 30000)
               )
             ]);
             
@@ -644,11 +616,11 @@ Remember: This is a professional interview. Be direct and focused on gathering r
         const analysisPromise = analyzeResponseWithAI(
           { text: currentQuestion, type: 'behavioral', id: `q${Date.now()}` },
           currentResponse.trim(),
-          'jobType' in setup ? setup : {
-            jobType: 'General',
-            experienceLevel: 'Mid-level',
-            industry: 'Technology',
-            interviewMode: setup.interviewMode
+          {
+            jobType: 'jobType' in setup ? setup.jobType : 'General',
+            experienceLevel: 'experienceLevel' in setup ? setup.experienceLevel : 'Mid-level',
+            industry: 'industry' in setup ? setup.industry : 'Technology',
+            interviewMode: 'interviewMode' in setup ? setup.interviewMode : 'voice'
           },
           [],
           focusedType || 'default'
@@ -658,7 +630,7 @@ Remember: This is a professional interview. Be direct and focused on gathering r
         const analysis = await Promise.race([
           analysisPromise,
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Analysis timeout')), 10000)
+            setTimeout(() => reject(new Error('Analysis timeout')), 30000)
           )
         ]);
         
@@ -724,6 +696,10 @@ Remember: This is a professional interview. Be direct and focused on gathering r
       // Initialize and connect client
       initializeClient();
       await clientRef.current?.connect();
+      if (state.sessionId) {
+  console.log('Starting computer vision analysis for session:', state.sessionId);
+  startAnalysis(state.sessionId, (window as any).videoUrl || '');
+}
       // Interview will start after connection.opened event
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start interview';
@@ -820,10 +796,10 @@ Remember: This is a professional interview. Be direct and focused on gathering r
     console.log('Ending realtime interview...');
     stopTimer();
     setStatus('processing');
-    
-    // Add a timeout to the entire endInterview process - OPTIMIZED FOR SPEED
+
+    // Add a timeout to the entire endInterview process
     const endInterviewTimeout = setTimeout(() => {
-      console.error('End interview process timed out after 15 seconds');
+      console.error('End interview process timed out after 45 seconds');
       // Force completion with fallback data
       const fallbackData = {
         sessionId: state.sessionId,
@@ -840,286 +816,246 @@ Remember: This is a professional interview. Be direct and focused on gathering r
         behavioralSummary: null
       };
       onComplete?.(fallbackData);
-    }, 15000); // 15 second timeout - optimized for speed
+    }, 45000);
 
     try {
-      // 🚀 OPTIMIZED VOICE ANALYTICS: Fast processing with all features
-      let voiceMetrics: SpeechMetricEntry[] | null = null;
-      let voiceTimeline: VoiceTimelinePoint[] = [];
-      
-      // Process voice analytics for all voice interviews
-      if (setup.interviewMode === 'voice' && clientRef.current) {
-        const allAudioChunks = clientRef.current.getAllAudioChunks();
-        
-        if (allAudioChunks.length > 0) {
-          try {
-            console.log('Starting optimized voice analytics processing...');
-            voiceMetrics = await processVoiceAnalytics();
-            console.log('Voice analytics processing finished.');
-            
-            // 🚀 FAST VOICE TIMELINE: Simplified processing for speed
-            if (voiceTimelineSegmentsRef.current.length > 0) {
-              console.log('Processing voice timeline segments...');
-              const sampleRate = 24000;
-              
-              // Only process first few segments for speed (most important ones)
-              const segmentsToProcess = voiceTimelineSegmentsRef.current.slice(0, 3);
-              
-              for (const segment of segmentsToProcess) {
-                try {
-                  // Simplified metrics calculation
-                  const duration = (segment.endTimestamp - segment.startTimestamp) / 1000;
-                  const wordCount = segment.transcript.split(' ').length;
-                  const wordsPerMinute = (wordCount / duration) * 60;
-                  
-                  // Create simplified metrics with correct VoiceMetrics structure
-                  const metrics: import('../utils/speechAnalysis').VoiceMetrics = {
-                    speechRate: wordsPerMinute,
-                    fluencyScore: Math.min(100, Math.max(0, (wordCount / duration) * 20)),
-                    voiceConfidence: Math.min(100, Math.max(0, wordCount * 2)),
-                    deliveryScore: Math.min(100, Math.max(0, duration * 10)),
-                    clarityScore: Math.min(100, Math.max(0, wordsPerMinute * 2)),
-                    fillerWordCount: 0, // Simplified - no filler word detection
-                    pauseAnalysis: {
-                      averagePauseLength: 0.5,
-                      pauseFrequency: 2,
-                      strategicPauses: 1
-                    },
-                    pitchAnalysis: {
-                      averagePitch: 220,
-                      pitchVariation: 50,
-                      pitchStability: 80
-                    },
-                    energyAnalysis: {
-                      averageEnergy: 0.7,
-                      energyConsistency: 0.8,
-                      dynamicRange: 0.6
-                    },
-                    timestamp: segment.endTimestamp,
-                    duration: duration
-                  };
-                  
-                  const feedback: import('../utils/speechAnalysis').ActionableFeedback = {
-                    overall: `Good response with ${wordCount} words in ${duration.toFixed(1)}s`,
-                    strengths: ['Clear communication', 'Good pace'],
-                    improvements: ['Could elaborate more'],
-                    specificTips: ['Try to provide more specific examples'],
-                    score: Math.round((metrics.fluencyScore + metrics.voiceConfidence + metrics.deliveryScore) / 3),
-                    category: 'good'
-                  };
-                  
-                  voiceTimeline.push({
-                    timestamp: segment.endTimestamp,
-                    metrics,
-                    feedback,
-                    questionContext: segment.questionContext
-                  });
-                } catch (err) {
-                  console.error('Failed to process voice timeline segment:', err);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error during voice analytics processing:', error);
-            // Continue without voice metrics if processing fails
-          }
-        } else {
-          console.log('No audio chunks available for voice analytics');
-        }
-      }
-      // --- End Voice Timeline Metrics Extraction ---
-
       if (clientRef.current) {
         clientRef.current.disconnect();
       }
-      
       setStatus('completed');
-      
-      // Update realtime session in Supabase with final data
-      if (state.sessionId) {
-        try {
-          console.log('Updating realtime session in Supabase...');
-          await updateRealtimeSession(state.sessionId, {
-            end_time: new Date().toISOString(),
-            status: 'completed',
-            total_duration: state.duration,
-            question_count: state.questionCount
-          });
 
-          // Parse transcript into structured Q&A pairs for analysis with timeout
-          console.log('Parsing transcript into Q&A pairs...');
-          let questions: any[] = [];
-          let responses: any[] = [];
-          
-                      try {
-              // Add 30-second timeout to the entire completion process
-              const completionPromise = (async () => {
-                const result = await parseTranscriptIntoQAPairs(state.transcript);
-                return result;
-              })();
-              
-              const result = await Promise.race([
-                completionPromise,
-                new Promise<never>((_, reject) => 
-                  setTimeout(() => reject(new Error('Completion timeout')), 30000)
-                )
-              ]) as { questions: any[]; responses: any[] };
-              
-              questions = result.questions;
-              responses = result.responses;
-          } catch (error) {
-            console.error('Failed to parse transcript into Q&A pairs:', error);
-            // Continue with empty arrays to prevent breaking the flow
-          }
-          
-          // Calculate overall score from responses
-          const overallScore = responses.length > 0 
-            ? Math.round(responses.reduce((sum: number, r: any) => sum + (r.analysis?.score || 7), 0) / responses.length * 10)
-            : 70;
-          
-          // Prepare session data for completion
-          const finalSpeechMetrics = voiceMetrics || getSpeechMetrics();
-          console.log('Speech metrics collected:', finalSpeechMetrics.length, 'entries');
-          
-          // Calculate consistent voice metrics summary from timeline data
-          let voiceMetricsSummary = null;
-          if (voiceTimeline && voiceTimeline.length > 0) {
-            // Use the timeline metrics to create a consistent summary
-            const allMetrics = voiceTimeline.map(point => point.metrics);
-            voiceMetricsSummary = {
-              speechRate: Math.round(allMetrics.reduce((sum, m) => sum + (m.speechRate || 0), 0) / allMetrics.length),
-              fluencyScore: Math.round(allMetrics.reduce((sum, m) => sum + (m.fluencyScore || 0), 0) / allMetrics.length),
-              voiceConfidence: Math.round(allMetrics.reduce((sum, m) => sum + (m.voiceConfidence || 0), 0) / allMetrics.length),
-              deliveryScore: Math.round(allMetrics.reduce((sum, m) => sum + (m.deliveryScore || 0), 0) / allMetrics.length),
-              clarityScore: Math.round(allMetrics.reduce((sum, m) => sum + (m.clarityScore || 0), 0) / allMetrics.length),
-              fillerWordCount: Math.round(allMetrics.reduce((sum, m) => sum + (m.fillerWordCount || 0), 0) / allMetrics.length),
-              // Include enhanced metrics for consistency (with fallbacks)
-              fluency: Math.round(allMetrics.reduce((sum, m) => sum + ((m as any).fluency || 0), 0) / allMetrics.length),
-              delivery: Math.round(allMetrics.reduce((sum, m) => sum + ((m as any).delivery || 0), 0) / allMetrics.length),
-              clarity: Math.round(allMetrics.reduce((sum, m) => sum + ((m as any).clarity || 0), 0) / allMetrics.length)
-            };
-          } else if (finalSpeechMetrics.length > 0) {
-            // Fallback to the first speech metrics entry
-            voiceMetricsSummary = finalSpeechMetrics[0].metrics;
-          }
-          
-          // Aggregate actionable feedback from voiceTimeline
-          let voiceRecommendations = null;
-          if (voiceTimeline && voiceTimeline.length > 0) {
-            // Flatten and deduplicate feedback
-            const allImprovements = Array.from(new Set(voiceTimeline.flatMap(pt => pt.feedback.improvements || [])));
-            const allStrengths = Array.from(new Set(voiceTimeline.flatMap(pt => pt.feedback.strengths || [])));
-            const allSpecificTips = Array.from(new Set(voiceTimeline.flatMap(pt => pt.feedback.specificTips || [])));
-            // Find the timeline point with the lowest score (most critical feedback)
-            let summary = '';
-            let minScore = Infinity;
-            for (const pt of voiceTimeline) {
-              if (typeof pt.feedback.score === 'number' && pt.feedback.score < minScore) {
-                minScore = pt.feedback.score;
-                summary = pt.feedback.overall;
+      // Run analytics in parallel with explicit types
+      type VoiceResult = { voiceMetrics: SpeechMetricEntry[] | null; voiceTimeline: VoiceTimelinePoint[] };
+      type QAResult = { questions: any[]; responses: any[] };
+      type BehavioralResult = { behavioralSummary: any };
+      type CVResult = { cvSummary: any; cvTimeline: any[] };
+
+      const analyticsPromises: [Promise<VoiceResult>, Promise<QAResult>, Promise<BehavioralResult>, Promise<CVResult>] = [
+        // Voice analytics
+        (async () => {
+          let voiceMetrics: SpeechMetricEntry[] | null = null;
+          let voiceTimeline: VoiceTimelinePoint[] = [];
+          if (setup.interviewMode === 'voice' && clientRef.current) {
+            const allAudioChunks = clientRef.current.getAllAudioChunks();
+            if (allAudioChunks.length > 0) {
+              try {
+                voiceMetrics = await processVoiceAnalytics();
+                if (voiceTimelineSegmentsRef.current.length > 0) {
+                  const segmentsToProcess = voiceTimelineSegmentsRef.current.slice(0, 3);
+                  for (const segment of segmentsToProcess) {
+                    try {
+                      const duration = (segment.endTimestamp - segment.startTimestamp) / 1000;
+                      const wordCount = segment.transcript.split(' ').length;
+                      const wordsPerMinute = (wordCount / duration) * 60;
+                      const metrics: import('../utils/speechAnalysis').VoiceMetrics = {
+                        speechRate: wordsPerMinute,
+                        fluencyScore: Math.min(100, Math.max(0, (wordCount / duration) * 20)),
+                        voiceConfidence: Math.min(100, Math.max(0, wordCount * 2)),
+                        deliveryScore: Math.min(100, Math.max(0, duration * 10)),
+                        clarityScore: Math.min(100, Math.max(0, wordsPerMinute * 2)),
+                        fillerWordCount: 0,
+                        pauseAnalysis: { averagePauseLength: 0.5, pauseFrequency: 2, strategicPauses: 1 },
+                        pitchAnalysis: { averagePitch: 220, pitchVariation: 50, pitchStability: 80 },
+                        energyAnalysis: { averageEnergy: 0.7, energyConsistency: 0.8, dynamicRange: 0.6 },
+                        timestamp: segment.endTimestamp,
+                        duration: duration
+                      };
+                      const feedback: import('../utils/speechAnalysis').ActionableFeedback = {
+                        overall: `Good response with ${wordCount} words in ${duration.toFixed(1)}s`,
+                        strengths: ['Clear communication', 'Good pace'],
+                        improvements: ['Could elaborate more'],
+                        specificTips: ['Try to provide more specific examples'],
+                        score: Math.round((metrics.fluencyScore + metrics.voiceConfidence + metrics.deliveryScore) / 3),
+                        category: 'good'
+                      };
+                      voiceTimeline.push({
+                        timestamp: segment.endTimestamp,
+                        metrics,
+                        feedback,
+                        questionContext: segment.questionContext
+                      });
+                    } catch (err) {
+                      console.error('Failed to process voice timeline segment:', err);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error during voice analytics processing:', error);
               }
             }
-            // If all scores are equal or missing, use the last point's summary
-            if (!summary && voiceTimeline.length > 0) {
-              summary = voiceTimeline[voiceTimeline.length - 1].feedback.overall;
-            }
-            voiceRecommendations = {
-              priorityImprovements: allImprovements,
-              strengths: allStrengths,
-              areasForImprovement: allImprovements, // For now, same as improvements
-              specificTips: allSpecificTips,
-              summary,
-            };
           }
-
-          // 🧠 CALCULATE AND SAVE BEHAVIORAL SUMMARY
-          let behavioralSummary = null;
+          return { voiceMetrics, voiceTimeline };
+        })(),
+        // Q&A parsing
+        (async () => {
+          let questions: any[] = [];
+          let responses: any[] = [];
+          try {
+            const completionPromise = (async () => {
+              const result = await parseTranscriptIntoQAPairs(state.transcript);
+              return result;
+            })();
+            const result = await Promise.race([
+              completionPromise,
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Completion timeout')), 60000))
+            ]) as { questions: any[]; responses: any[] };
+            questions = result.questions;
+            responses = result.responses;
+          } catch (error) {
+            console.error('Failed to parse transcript into Q&A pairs:', error);
+          }
+          return { questions, responses };
+        })(),
+        // Behavioral summary
+        (async () => {
+          let behavioralSummary: any = null;
           try {
             const behavioralInsights = (window as any).behavioralInsights || [];
             if (behavioralInsights.length > 0) {
               behavioralSummary = calculateBehavioralSummary(behavioralInsights);
-              
-              // Save behavioral summary to Supabase
               if (state.sessionId) {
-                await saveBehavioralSummary({
-                  session_id: state.sessionId,
-                  ...behavioralSummary
-                });
+                await saveBehavioralSummary({ session_id: state.sessionId, ...behavioralSummary });
               }
             }
           } catch (behavioralError) {
             console.error('Failed to calculate/save behavioral summary:', behavioralError);
           }
-
-          const sessionData = {
-            sessionId: state.sessionId,
-            setup,
-            transcript: state.transcript,
-            duration: state.duration,
-            questionCount: state.questionCount,
-            questionsAnswered: responses.length,
-            overallScore,
-            questions, // Add structured questions
-            responses, // Add structured responses with analysis
-            interviewType,
-            focusedType,
-            completedAt: new Date().toISOString(),
-            speechMetrics: finalSpeechMetrics, // Include speech metrics like college interviews
-            voice_metrics_summary: voiceMetricsSummary,
-            responseTimes: responseTimesRef.current,
-            voiceTimeline, // <-- Add the timeline here
-            voiceRecommendations, // <-- Add the new field here
-            behavioralInsights: (window as any).behavioralInsights || [], // 🧠 Add behavioral insights
-            behavioralSummary // 🧠 Add behavioral summary
-          };
-
-          // Save structured interview data for viewing in recent interviews
+          return { behavioralSummary };
+        })(),
+        // CV metrics
+        (async () => {
+          let cvSummary: any = null;
+          let cvTimeline: any[] = [];
           try {
-            console.log('Saving realtime interview session...');
-            await saveRealtimeInterviewSession(sessionData);
-          } catch (saveError) {
-            console.error('Failed to save realtime interview session:', saveError);
-            // Continue even if save fails
+            const analysisResult = state.sessionId ? await fetchAnalysisResult(state.sessionId) : null;
+            const timelineData = state.sessionId ? await fetchTimelineData(state.sessionId) : [];
+            cvSummary = analysisResult ? {
+              avgPosture: analysisResult.avg_posture_score,
+              percentEyeContact: analysisResult.eye_contact_percentage,
+              avgHandMovement: analysisResult.avg_hand_movement_score,
+              avgFidgeting: analysisResult.avg_fidgeting_score,
+              keyEvents: analysisResult.top_posture_moments?.map((moment: any) => ({ type: moment.description, timestamp: moment.timestamp })) || []
+            } : null;
+            cvTimeline = timelineData ? timelineData.map((point: any) => ({
+              timestamp: point.timestamp_ms.toString(),
+              posture_score: point.posture_score,
+              eye_contact: point.eye_contact,
+              hand_movement_score: point.hand_movement_score,
+              fidgeting_score: point.fidgeting_score
+            })) : [];
+          } catch (cvError) {
+            console.error('Failed to fetch CV metrics:', cvError);
           }
+          return { cvSummary, cvTimeline };
+        })()
+      ];
 
-          console.log('Calling onComplete with session data...');
-          clearTimeout(endInterviewTimeout);
-          onComplete?.(sessionData);
-        } catch (supabaseError) {
-          console.error('Failed to update realtime session in Supabase:', supabaseError);
-          // Continue with completion even if Supabase fails
-          const fallbackData = {
-            sessionId: state.sessionId,
-            setup,
-            transcript: state.transcript,
-            duration: state.duration,
-            questionCount: state.questionCount,
-            interviewType,
-            focusedType,
-            completedAt: new Date().toISOString(),
-            speechMetrics: getSpeechMetrics(),
-            voiceTimeline
-          };
-          console.log('Calling onComplete with fallback data...');
-          clearTimeout(endInterviewTimeout);
-          onComplete?.(fallbackData);
-        }
-      } else {
-        console.warn('No session ID found, calling onComplete with minimal data...');
-        const minimalData = {
-          setup,
-          transcript: state.transcript,
-          duration: state.duration,
-          questionCount: state.questionCount,
-          interviewType,
-          focusedType,
-          completedAt: new Date().toISOString(),
-          speechMetrics: getSpeechMetrics(),
-          voiceTimeline
+      // Wait for all analytics (with Promise.allSettled to avoid blocking on any single failure)
+      const [voiceResultRaw, qaResultRaw, behavioralResultRaw, cvResultRaw] = await Promise.allSettled(analyticsPromises).then(results => results.map(r => (r.status === 'fulfilled' ? r.value : undefined)));
+
+      // Type guards for each result
+      const voiceResult: VoiceResult = (voiceResultRaw && typeof voiceResultRaw === 'object' && 'voiceMetrics' in voiceResultRaw && 'voiceTimeline' in voiceResultRaw)
+        ? voiceResultRaw as VoiceResult : { voiceMetrics: getSpeechMetrics(), voiceTimeline: [] };
+      const qaResult: QAResult = (qaResultRaw && typeof qaResultRaw === 'object' && 'questions' in qaResultRaw && 'responses' in qaResultRaw)
+        ? qaResultRaw as QAResult : { questions: [], responses: [] };
+      const behavioralResult: BehavioralResult = (behavioralResultRaw && typeof behavioralResultRaw === 'object' && 'behavioralSummary' in behavioralResultRaw)
+        ? behavioralResultRaw as BehavioralResult : { behavioralSummary: null };
+      const cvResult: CVResult = (cvResultRaw && typeof cvResultRaw === 'object' && 'cvSummary' in cvResultRaw && 'cvTimeline' in cvResultRaw)
+        ? cvResultRaw as CVResult : { cvSummary: null, cvTimeline: [] };
+
+      // Compose session data
+      const voiceMetrics = voiceResult.voiceMetrics || getSpeechMetrics();
+      const voiceTimeline = voiceResult.voiceTimeline || [];
+      const questions = qaResult.questions || [];
+      const responses = qaResult.responses || [];
+      const behavioralSummary = behavioralResult.behavioralSummary || null;
+      const cvSummary = cvResult.cvSummary || null;
+      const cvTimeline: any[] = cvResult.cvTimeline || [];
+
+      // Calculate overall score from responses
+      const overallScore = responses.length > 0 
+        ? Math.round(responses.reduce((sum: number, r: any) => sum + (r.analysis?.score || 7), 0) / responses.length * 10)
+        : 70;
+
+      // Calculate consistent voice metrics summary from timeline data
+      let voiceMetricsSummary = null;
+      if (voiceTimeline && voiceTimeline.length > 0) {
+        const allMetrics = voiceTimeline.map((point: any) => point.metrics);
+        voiceMetricsSummary = {
+          speechRate: Math.round(allMetrics.reduce((sum: any, m: any) => sum + (m.speechRate || 0), 0) / allMetrics.length),
+          fluencyScore: Math.round(allMetrics.reduce((sum: any, m: any) => sum + (m.fluencyScore || 0), 0) / allMetrics.length),
+          voiceConfidence: Math.round(allMetrics.reduce((sum: any, m: any) => sum + (m.voiceConfidence || 0), 0) / allMetrics.length),
+          deliveryScore: Math.round(allMetrics.reduce((sum: any, m: any) => sum + (m.deliveryScore || 0), 0) / allMetrics.length),
+          clarityScore: Math.round(allMetrics.reduce((sum: any, m: any) => sum + (m.clarityScore || 0), 0) / allMetrics.length),
+          fillerWordCount: Math.round(allMetrics.reduce((sum: any, m: any) => sum + (m.fillerWordCount || 0), 0) / allMetrics.length),
+          fluency: Math.round(allMetrics.reduce((sum: any, m: any) => sum + ((m as any).fluency || 0), 0) / allMetrics.length),
+          delivery: Math.round(allMetrics.reduce((sum: any, m: any) => sum + ((m as any).delivery || 0), 0) / allMetrics.length),
+          clarity: Math.round(allMetrics.reduce((sum: any, m: any) => sum + ((m as any).clarity || 0), 0) / allMetrics.length)
         };
-        clearTimeout(endInterviewTimeout);
-        onComplete?.(minimalData);
+      } else if (voiceMetrics.length > 0) {
+        voiceMetricsSummary = voiceMetrics[0].metrics;
       }
+
+      // Aggregate actionable feedback from voiceTimeline
+      let voiceRecommendations = null;
+      if (voiceTimeline && voiceTimeline.length > 0) {
+        const allImprovements = Array.from(new Set(voiceTimeline.flatMap((pt: any) => pt.feedback.improvements || [])));
+        const allStrengths = Array.from(new Set(voiceTimeline.flatMap((pt: any) => pt.feedback.strengths || [])));
+        const allSpecificTips = Array.from(new Set(voiceTimeline.flatMap((pt: any) => pt.feedback.specificTips || [])));
+        let summary = '';
+        let minScore = Infinity;
+        for (const pt of voiceTimeline) {
+          if (typeof pt.feedback.score === 'number' && pt.feedback.score < minScore) {
+            minScore = pt.feedback.score;
+            summary = pt.feedback.overall;
+          }
+        }
+        if (!summary && voiceTimeline.length > 0) {
+          summary = voiceTimeline[voiceTimeline.length - 1].feedback.overall;
+        }
+        voiceRecommendations = {
+          priorityImprovements: allImprovements,
+          strengths: allStrengths,
+          areasForImprovement: allImprovements,
+          specificTips: allSpecificTips,
+          summary,
+        };
+      }
+
+      const sessionData = {
+        sessionId: state.sessionId,
+        setup,
+        transcript: state.transcript,
+        duration: state.duration,
+        questionCount: state.questionCount,
+        questionsAnswered: responses.length,
+        overallScore,
+        questions,
+        responses,
+        interviewType,
+        focusedType,
+        completedAt: new Date().toISOString(),
+        speechMetrics: voiceMetrics,
+        voice_metrics_summary: voiceMetricsSummary,
+        responseTimes: responseTimesRef.current,
+        voiceTimeline,
+        voiceRecommendations,
+        behavioralInsights: (window as any).behavioralInsights || [],
+        behavioralSummary,
+        showVideo: typeof window !== 'undefined' && (window as any).showVideo === true,
+        videoUrl: typeof window !== 'undefined' ? (window as any).videoUrl || '' : '',
+        cvTimeline,
+        cvSummary
+      };
+
+      try {
+        await saveRealtimeInterviewSession(sessionData);
+      } catch (saveError) {
+        console.error('Failed to save realtime interview session:', saveError);
+      }
+
+      clearTimeout(endInterviewTimeout);
+      onComplete?.(sessionData);
     } catch (error) {
       console.error('Unhandled error in endInterview, calling onComplete with fallback data to prevent UI freeze:', error);
       const fallbackData = {
@@ -1137,7 +1073,7 @@ Remember: This is a professional interview. Be direct and focused on gathering r
       clearTimeout(endInterviewTimeout);
       onComplete?.(fallbackData);
     }
-  }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
+  }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus, getSpeechMetrics, processVoiceAnalytics, parseTranscriptIntoQAPairs]);
 
   const startRecording = useCallback(async () => {
     if (!clientRef.current || state.status !== 'interviewing') {

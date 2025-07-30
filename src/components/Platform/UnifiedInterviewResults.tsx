@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import ProcessingOverlay from './ProcessingOverlay';
+import type { VoiceMetrics } from '../../types/interview';
 import { 
   Target,
   ArrowLeft,
@@ -14,12 +16,10 @@ import {
   BarChart3,
   Volume2,
   Mic,
-  BookOpen,
   Play,
   MessageSquare,
   AlertCircle,
   Clock,
-  Heart
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
@@ -84,6 +84,29 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
     });
   }, []);
 
+  // Handle processing state for realtime interviews
+  const [isProcessing, setIsProcessing] = useState<boolean>(
+    sessionData?.status === 'processing' || sessionData?.processingStatus === 'processing'
+  );
+
+  useEffect(() => {
+    setIsProcessing(
+      sessionData?.status === 'processing' || sessionData?.processingStatus === 'processing'
+    );
+  }, [sessionData?.status, sessionData?.processingStatus]);
+
+  // Extract CV metrics for realtime interviews
+  const cvTimeline = sessionData?.cvTimeline || [];
+  const cvSummary = sessionData?.cvSummary || null;
+
+  // Show processing overlay while the interview is being analyzed
+  if (isProcessing && sessionData?.session_id) {
+    return <ProcessingOverlay 
+      sessionId={sessionData.session_id} 
+      onProcessingComplete={() => setIsProcessing(false)} 
+    />;
+  }
+
   if (!sessionData) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
@@ -103,9 +126,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
 
   // Determine interview type
   const interviewType = sessionData.interviewType || 'standard';
-  const isCollegeInterview = interviewType === 'college';
-  const isFocusedInterview = interviewType !== 'standard' && interviewType !== 'college';
-  const isStandardInterview = interviewType === 'standard';
+  const isFocusedInterview = interviewType !== 'standard';
 
   // Normalize setup data
   const rawSetup = sessionData.setup || {};
@@ -482,7 +503,22 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {(() => {
-                    const metricsObj = safeSessionData.voice_metrics_summary || safeSessionData.speech_metrics?.[0]?.metrics || {};
+                    // Robustly extract the metrics object, unwrapping arrays recursively
+                    function extractMetrics(obj: any) {
+                      if (!obj) return {};
+                      if (Array.isArray(obj) && obj.length > 0) {
+                        return obj[0].metrics || obj[0] || {};
+                      }
+                      return obj;
+                    }
+                    const metricsObj = extractMetrics(
+                      safeSessionData.speechMetrics?.[0]?.metrics ||
+                      safeSessionData.speechMetrics?.[0] ||
+                      safeSessionData.voice_metrics_summary ||
+                      safeSessionData.speech_metrics?.[0]?.metrics ||
+                      safeSessionData.speech_metrics?.[0] ||
+                      {}
+                    );
                     const voiceMetrics = [];
                     
                     if (metricsObj.speechRate !== undefined) {
@@ -502,6 +538,72 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
                     
                     if (metricsObj.deliveryScore !== undefined) {
                       const score = Math.round(Math.min(10, Math.max(1, metricsObj.deliveryScore / 10)));
+                {/* CV Timeline & Metrics */}
+                {cvTimeline.length > 0 && cvSummary && (
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold text-purple-400 mb-4 flex items-center gap-2">
+                      <Target className="w-5 h-5" /> Body Posture & Confidence Analysis
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                      <div className="bg-dark-700/30 rounded-xl p-4 border border-purple-500/30">
+                        <div className="text-sm text-gray-400 mb-1">Avg. Posture</div>
+                        <div className="text-2xl font-bold text-purple-400">{(cvSummary.avgPosture * 100).toFixed(1)}%</div>
+                      </div>
+                      <div className="bg-dark-700/30 rounded-xl p-4 border border-blue-500/30">
+                        <div className="text-sm text-gray-400 mb-1">Eye Contact</div>
+                        <div className="text-2xl font-bold text-blue-400">{(cvSummary.percentEyeContact * 100).toFixed(1)}%</div>
+                      </div>
+                      <div className="bg-dark-700/30 rounded-xl p-4 border border-green-500/30">
+                        <div className="text-sm text-gray-400 mb-1">Hand Movement</div>
+                        <div className="text-2xl font-bold text-green-400">{(cvSummary.avgHandMovement * 100).toFixed(1)}%</div>
+                      </div>
+                      <div className="bg-dark-700/30 rounded-xl p-4 border border-yellow-500/30">
+                        <div className="text-sm text-gray-400 mb-1">Fidgeting</div>
+                        <div className="text-2xl font-bold text-yellow-400">{(cvSummary.avgFidgeting * 100).toFixed(1)}%</div>
+                      </div>
+                    </div>
+                    <div className="mb-6">
+                      <h4 className="text-md font-semibold text-purple-300 mb-2">Key Events</h4>
+                      <ul className="space-y-2">
+                        {cvSummary.keyEvents.map((event: {type: string; timestamp: string}, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-300 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-purple-400" />
+                            <span>{event.type.replace('_', ' ')} at {event.timestamp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="mb-6">
+                      <h4 className="text-md font-semibold text-purple-300 mb-2">Voice Metrics Timeline</h4>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-gray-400">
+                          <thead>
+                            <tr>
+                              <th className="px-2 py-1">Time</th>
+                              <th className="px-2 py-1">Speech Rate</th>
+                              <th className="px-2 py-1">Fluency</th>
+                              <th className="px-2 py-1">Clarity</th>
+                              <th className="px-2 py-1">Confidence</th>
+                              <th className="px-2 py-1">Delivery</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cvTimeline.map((entry: { metrics: VoiceMetrics }, i: number) => (
+                              <tr key={i} className="border-b border-dark-700/30">
+                                <td className="px-2 py-1">{new Date(entry.metrics.timestamp).toLocaleTimeString()}</td>
+                                <td className="px-2 py-1">{Math.round(entry.metrics.speechRate)} WPM</td>
+                                <td className="px-2 py-1">{Math.round(entry.metrics.fluencyScore || entry.metrics.fluency * 10)}%</td>
+                                <td className="px-2 py-1">{Math.round(entry.metrics.clarityScore || entry.metrics.clarity * 10)}%</td>
+                                <td className="px-2 py-1">{Math.round(entry.metrics.voiceConfidence)}%</td>
+                                <td className="px-2 py-1">{Math.round(entry.metrics.deliveryScore || entry.metrics.delivery * 10)}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
                       voiceMetrics.push({ name: 'Delivery', score, icon: Play, color: 'from-orange-500 to-red-500', detail: `${Math.round(metricsObj.deliveryScore)}% delivery` });
                     }
                     
@@ -515,7 +617,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
                       voiceMetrics.push({ name: 'Filler Words', score, icon: AlertCircle, color: 'from-red-500 to-pink-500', detail: `${metricsObj.fillerWordCount} fillers` });
                     }
 
-                    return voiceMetrics.map((metric, index) => (
+                    return voiceMetrics.map((metric) => (
                       <div
                         key={metric.name}
                         className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
@@ -557,7 +659,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
             )}
 
             {/* Interview Performance Metrics - Standard/Focused Interviews */}
-            {!isCollegeInterview && safeSessionData.metrics && (
+            {safeSessionData.metrics && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -643,7 +745,7 @@ const UnifiedInterviewResults: React.FC<UnifiedInterviewResultsProps> = ({
                       });
                     }
 
-                    return performanceMetrics.map((metric, index) => (
+                    return performanceMetrics.map((metric) => (
                       <div
                         key={metric.name}
                         className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
