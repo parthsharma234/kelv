@@ -107,7 +107,7 @@ const RealtimeTranscript: React.FC<RealtimeTranscriptProps> = ({
           <div 
             ref={scrollRef}
             onScroll={handleScroll}
-            className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar"
+            className="flex-1 p-4 space-y-4 overflow-y-auto custom-scrollbar"
             style={{ 
               height: 'calc(100% - 120px)', // Fixed height minus header and status
               maxHeight: 'calc(100% - 120px)'
@@ -127,7 +127,7 @@ const RealtimeTranscript: React.FC<RealtimeTranscriptProps> = ({
                 const isFirstInGroup = !prevChunk || prevChunk.speaker !== chunk.speaker;
                 const isLastInGroup = !nextChunk || nextChunk.speaker !== chunk.speaker;
 
-                const messageClass = `flex items-end max-w-[85%] ${
+                const messageClass = `flex items-end max-w-[85%] justify-end ${
                   chunk.speaker === 'user' ? 'ml-auto' : 'mr-auto'
                 }`;
 

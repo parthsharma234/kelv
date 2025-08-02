@@ -10,14 +10,16 @@ const MARK_VOICE_ID = 'flq6f7yk4E4fJM5XTYuZ';
  * @returns Promise<HTMLAudioElement | null>
  */
 export const synthesizeSpeechWithElevenLabs = async (
-  text: string
+  text: string,
+  voiceId: string = MARK_VOICE_ID
 ): Promise<HTMLAudioElement | null> => {
   if (!ELEVEN_LABS_API_KEY || ELEVEN_LABS_API_KEY === 'your_elevenlabs_api_key_here') {
     console.warn('ElevenLabs API key not configured');
     return null;
   }
 
-  try {    const requestBody = {
+  try {
+    const requestBody = {
       text,
       model_id: 'eleven_flash_v2_5', // Latest Flash v2.5 model - faster and more natural
       voice_settings: {
@@ -28,9 +30,9 @@ export const synthesizeSpeechWithElevenLabs = async (
       }
     };
 
-    console.log('Synthesizing speech with ElevenLabs Flash v2.5 (Mark):', text.substring(0, 50) + '...');
+    console.log('Synthesizing speech with ElevenLabs Flash v2.5:', text.substring(0, 50) + '...');
 
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${MARK_VOICE_ID}`, {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
       headers: {
         'Accept': 'audio/mpeg',

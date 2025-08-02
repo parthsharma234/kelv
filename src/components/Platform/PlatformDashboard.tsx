@@ -108,9 +108,10 @@ const formatCollegeInterviewTitle = (setup: any): string => {
 interface PlatformDashboardProps {
   onStartRealtimeInterview: (type: 'standard' | 'focused' | 'college', focusedType?: string) => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
+  onStartHardcodedInterview: () => void;
 }
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeInterview, onViewInterviewResults }) => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeInterview, onViewInterviewResults, onStartHardcodedInterview }) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
   const [showAllInterviews, setShowAllInterviews] = useState(false);
   const [stats, setStats] = useState({
@@ -892,6 +893,25 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
               </div>
             </div>
           </motion.div>
+        </div>
+        <div className="bg-gradient-to-br from-pink-500/10 to-pink-400/5 rounded-2xl p-8 border border-pink-500/20 mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-4 bg-gradient-to-br from-pink-500 to-pink-400 rounded-2xl">
+              <Star className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Scripted Demo Interview</h2>
+              <p className="text-gray-300">Run a hardcoded AI interview for social media or demo videos. The AI will follow your pre-set script.</p>
+            </div>
+          </div>
+          <button
+            onClick={onStartHardcodedInterview}
+            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-pink-500 to-pink-400 text-white rounded-xl font-semibold hover:from-pink-400 hover:to-pink-300 transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-3 group"
+          >
+            <Star className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            Start Scripted Interview
+            <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       </div>
     </div>

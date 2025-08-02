@@ -15,8 +15,9 @@ import RealtimeInterviewSession from './RealtimeInterviewSession';
 import InterviewProcessing from './InterviewProcessing';
 import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import HardcodedInterviewSession from './HardcodedInterviewSession';
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview' | 'processing' | 'processing-focused' | 'processing-college';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'view-college-results' | 'college-setup' | 'college-interview' | 'college-results' | 'realtime-interview' | 'realtime-focused-interview' | 'realtime-college-interview' | 'processing' | 'processing-focused' | 'processing-college' | 'hardcoded-interview';
 
 interface PlatformContainerProps {
   onFullScreenChange?: (isFullScreen: boolean) => void;
@@ -49,7 +50,8 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
   React.useEffect(() => {
     const isFullScreen = currentState === 'realtime-interview' || 
                         currentState === 'realtime-focused-interview' || 
-                        currentState === 'realtime-college-interview';
+                        currentState === 'realtime-college-interview' ||
+                        currentState === 'hardcoded-interview';
     
     if (onFullScreenChange) {
       onFullScreenChange(isFullScreen);
@@ -174,6 +176,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     setIsFocusedFlow(false);
     setIsCollegeFlow(false);
     setDashboardKey(prev => prev + 1); // Force dashboard refresh
+    if (onFullScreenChange) onFullScreenChange(false);
     scrollToTop();
   };
 
@@ -299,6 +302,12 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     );
   }
 
+  const handleStartHardcodedInterview = () => {
+    setCurrentState('hardcoded-interview');
+    if (onFullScreenChange) onFullScreenChange(true);
+    scrollToTop();
+  };
+
   return (
     <>
       {currentState === 'dashboard' && (
@@ -306,6 +315,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           key={dashboardKey}
           onStartRealtimeInterview={handleStartRealtimeInterview}
           onViewInterviewResults={handleViewInterviewResults}
+          onStartHardcodedInterview={handleStartHardcodedInterview}
         />
       )}
         {currentState === 'setup' && (
@@ -422,6 +432,10 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
         <InterviewProcessing
           onComplete={() => setCurrentState('college-results')}
         />
+      )}
+
+      {currentState === 'hardcoded-interview' && (
+        <HardcodedInterviewSession onBack={handleBackToDashboard} />
       )}
     </>
   );
