@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { InterviewHistory, InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { InterviewHistory, InterviewSetup } from '../types/interview';
 
 // Realtime transcript interfaces
 export interface TranscriptChunk {
@@ -15,7 +15,7 @@ export interface TranscriptChunk {
 export interface RealtimeSessionMetadata {
   session_id: string;
   user_id: string;
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   interview_type?: string;
   start_time: string;
   end_time?: string;
@@ -38,18 +38,7 @@ export interface SavedInterviewSetup {
   updated_at: string;
 }
 
-// College interview setup interface  
-export interface SavedCollegeInterviewSetup {
-  id: string;
-  name: string;
-  setup: CollegeInterviewSetup;
-  is_favorite: boolean;
-  usage_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup | CollegeInterviewSetup, interviewType?: string): Promise<void> => {
+export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup, interviewType?: string): Promise<void> => {
   if (!isSupabaseConfigured()) {
     console.log('Supabase not configured, skipping initial session creation');
     return;
@@ -155,21 +144,7 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
         return null;
       }
       
-      if (interviewType === 'college') {
-        // College interview metrics
-        const authenticityScores = validResponses.map((r: any) => r.analysis.authenticity || 0);
-        const passionScores = validResponses.map((r: any) => r.analysis.passion || 0);
-        const clarityScores = validResponses.map((r: any) => r.analysis.clarity || 0);
-        const specificityScores = validResponses.map((r: any) => r.analysis.specificity || 0);
-        
-        return {
-          authenticity: Math.round(authenticityScores.reduce((a: number, b: number) => a + b, 0) / authenticityScores.length),
-          passion: Math.round(passionScores.reduce((a: number, b: number) => a + b, 0) / passionScores.length),
-          clarity: Math.round(clarityScores.reduce((a: number, b: number) => a + b, 0) / clarityScores.length),
-          specificity: Math.round(specificityScores.reduce((a: number, b: number) => a + b, 0) / specificityScores.length)
-        };
-      } else {
-        // Focused interview metrics
+      // Focused interview metrics
         const problemSolvingScores = validResponses.map((r: any) => r.analysis.problem_solving || 0);
         const communicationScores = validResponses.map((r: any) => r.analysis.communication || 0);
         const depthScores = validResponses.map((r: any) => r.analysis.depth || 0);
@@ -181,7 +156,6 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
           depth: Math.round(depthScores.reduce((a: number, b: number) => a + b, 0) / depthScores.length),
           relevance: Math.round(relevanceScores.reduce((a: number, b: number) => a + b, 0) / relevanceScores.length)
         };
-      }
     };
     
     const calculatedMetrics = calculateInterviewMetrics(sessionData.responses, sessionData.type || sessionData.interviewType || 'standard');
@@ -534,135 +508,6 @@ export const deleteInterviewSetup = async (setupId: string): Promise<boolean> =>
   }
 };
 
-// College Interview Setup functions
-export const saveCollegeInterviewSetup = async (
-  name: string, 
-  setup: CollegeInterviewSetup, 
-  isFavorite: boolean = false
-): Promise<SavedCollegeInterviewSetup | null> => {
-  if (!isSupabaseConfigured()) {
-    console.log('Supabase not configured, skipping college setup save');
-    return null;
-  }
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('college_interview_setups')
-      .insert({
-        user_id: user.id,
-        name,
-        setup,
-        is_favorite: isFavorite,
-        usage_count: 1
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error saving college interview setup:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Failed to save college interview setup:', error);
-    return null;
-  }
-};
-
-export const getUserCollegeInterviewSetups = async (): Promise<SavedCollegeInterviewSetup[]> => {
-  if (!isSupabaseConfigured()) {
-    console.log('Supabase not configured, returning empty college setups');
-    return [];
-  }
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('college_interview_setups')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching college interview setups:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Failed to fetch college interview setups:', error);
-    return [];
-  }
-};
-
-export const updateCollegeSetupUsage = async (setupId: string): Promise<void> => {
-  if (!isSupabaseConfigured()) {
-    return;
-  }
-
-  try {
-    // First get the current usage count
-    const { data: currentData, error: fetchError } = await supabase
-      .from('college_interview_setups')
-      .select('usage_count')
-      .eq('id', setupId)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching current college setup usage count:', fetchError);
-      return;
-    }
-
-    // Then update with incremented value
-    const { error } = await supabase
-      .from('college_interview_setups')
-      .update({ 
-        usage_count: (currentData.usage_count || 0) + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', setupId);
-
-    if (error) {
-      console.error('Error updating college setup usage:', error);
-    }
-  } catch (error) {
-    console.error('Failed to update college setup usage:', error);
-  }
-};
-
-export const deleteCollegeInterviewSetup = async (setupId: string): Promise<boolean> => {
-  if (!isSupabaseConfigured()) {
-    return false;
-  }
-
-  try {
-    const { error } = await supabase
-      .from('college_interview_setups')
-      .delete()
-      .eq('id', setupId);
-
-    if (error) {
-      console.error('Error deleting college interview setup:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to delete college interview setup:', error);
-    return false;
-  }
-};
-
 export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
   if (!isSupabaseConfigured()) {
     // Return localStorage data as fallback
@@ -686,7 +531,6 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
 
     console.log('Fetched interview history from Supabase:', {
       total: data.length,
-      collegeInterviews: data.filter(s => s.interview_type === 'college').length,
       interviewTypes: data.map(s => s.interview_type)
     });
 
@@ -999,7 +843,6 @@ export const getInterviewById = async (interviewId: string) => {
       startTime: interview.startTime ? new Date(interview.startTime) : new Date(interview.date),
       endTime: interview.endTime ? new Date(interview.endTime) : undefined,
       speechMetricsAverage: interview.speechMetricsAverage,
-      // Include metrics for college interviews
       metrics: interview.metrics || undefined,
       // Include voice metrics if present
       voiceMetrics: interview.voiceMetrics || undefined
@@ -1044,7 +887,6 @@ export const getInterviewById = async (interviewId: string) => {
         speechRate: data.speech_metrics.timing?.speechRate || 0,
         voiceStability: data.speech_metrics.voice?.voiceStability || 0
       } : undefined,
-      // Include metrics for college interviews
       metrics: data.metrics || undefined,
       // Include voice metrics if present
       voiceMetrics: data.speech_metrics || undefined,

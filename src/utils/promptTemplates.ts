@@ -1,11 +1,11 @@
 // Centralized prompt templates for AI interviewer system
 // Covers: interviewer behavior, interview type modifiers, response formatting, and adaptive chaining
 
-import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { InterviewSetup } from '../types/interview';
 
 export type InterviewerTone = 'warm' | 'neutral' | 'challenging' | 'stress';
 export type ResponseStyle = 'concise' | 'elaborate';
-export type InterviewType = 'college' | 'focused' | 'stress' | 'default';
+export type InterviewType = 'focused' | 'stress' | 'default';
 
 export interface PromptTemplateOptions {
   tone: InterviewerTone;
@@ -17,7 +17,7 @@ export interface PromptTemplateOptions {
 }
 
 export interface AdaptivePromptOptions {
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   recentScores?: number[];
   overallPerformance?: number;
   interviewDuration?: number;
@@ -40,10 +40,7 @@ export const interviewerBehaviorTemplates = {
 };
 
 export const interviewTypeModifiers = {
-  college: `This is a college admissions interview. You're assessing academic passion, personal growth, intellectual curiosity, and institutional fit. Show genuine interest in their journey and help them articulate their potential contributions to campus life.`,
-  
   focused: `This is a deep-dive focused interview. You're drilling down into specific skills, projects, or experiences. Be thorough, ask technical follow-ups, and don't move on until you have a complete understanding of their capabilities in this area.`,
-  
   stress: `This is a stress interview designed to test resilience and composure. Present challenging scenarios, tight timelines, conflicting priorities, or difficult interpersonal situations. Observe how they handle pressure and maintain professionalism.`,
   
   default: `This is a comprehensive professional interview. You're evaluating technical competence, cultural fit, problem-solving ability, and communication skills. Adapt your approach based on their responses - be supportive when needed, challenging when appropriate.`
@@ -91,13 +88,12 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
     isPerformingWell ? 'challenging' : 'neutral';
 
   // Handle different setup types
-  const isCollegeInterview = 'schoolType' in setup;
-  const jobType = isCollegeInterview ? `${(setup as CollegeInterviewSetup).program} Student` : (setup as InterviewSetup).jobType;
-  const experienceLevel = isCollegeInterview ? 'Student' : (setup as InterviewSetup).experienceLevel;
-  const industry = isCollegeInterview ? 'Education' : (setup as InterviewSetup).industry;
+  const jobType = (setup as InterviewSetup).jobType;
+  const experienceLevel = (setup as InterviewSetup).experienceLevel;
+  const industry = (setup as InterviewSetup).industry;
 
   // Base interviewer behavior with adaptive elements
-  const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a ${isCollegeInterview ? 'college applicant' : 'job candidate'}. You have a warm but professional personality that adjusts naturally based on how the candidate is performing.
+  const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a job candidate. You have a warm but professional personality that adjusts naturally based on how the candidate is performing.
 
 CONVERSATION OPENER (First 1-2 exchanges ONLY):
 - Start with a brief, warm welcome and maybe one simple question to break the ice
@@ -287,9 +283,9 @@ export function extractKeyTopics(text: string): string {
 }
 
 // Focused interview prompts - direct and to the point
-export function getFocusedInterviewPrompt(focusedType: string, setup: InterviewSetup | CollegeInterviewSetup): string {
-  const baseSetup = `Position: ${(setup as InterviewSetup).jobType || 'Student'} (${(setup as InterviewSetup).experienceLevel || 'Entry'} level)
-Industry: ${(setup as InterviewSetup).industry || 'General'}`;
+export function getFocusedInterviewPrompt(focusedType: string, setup: InterviewSetup): string {
+  const baseSetup = `Position: ${(setup as InterviewSetup).jobType} (${(setup as InterviewSetup).experienceLevel} level)
+Industry: ${(setup as InterviewSetup).industry}`;
 
   const prompts: Record<string, string> = {
     technical: `You are conducting a focused technical interview session. Be direct, efficient, and technical.
