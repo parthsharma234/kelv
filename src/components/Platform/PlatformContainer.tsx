@@ -4,13 +4,12 @@ import { Navigate } from 'react-router-dom';
 import PlatformDashboard from './PlatformDashboard';
 import { SetupFlow } from './SetupFlow';
 import InterviewSession from './InterviewSession';
-import InterviewResults from './InterviewResults';
 import FocusedInterviewSelection from './FocusedInterviewSelection';
 import FocusedInterview from './FocusedInterview';
-import FocusedInterviewResults from './FocusedInterviewResults';
 import RealtimeInterviewSession from './RealtimeInterviewSession';
 import InterviewProcessing from './InterviewProcessing';
 import { InterviewSetup } from '../../types/interview';
+import FeedbackPage from './FeedbackPage';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import CustomDemoInterview from './CustomDemoInterview';
 // Temporary metric detail component
@@ -58,7 +57,7 @@ const InterviewMetricDetail = ({ metric, sessionData, onBack }: { metric: string
   );
 };
 
-type PlatformState = 'dashboard' | 'setup' | 'interview' | 'results' | 'focused-selection' | 'focused-interview' | 'focused-results' | 'view-results' | 'view-focused-results' | 'realtime-interview' | 'realtime-focused-interview' | 'processing' | 'processing-focused' | 'view-metric-detail' | 'custom-demo-interview';
+type PlatformState = 'dashboard' | 'setup' | 'interview' | 'focused-selection' | 'focused-interview' | 'realtime-interview' | 'realtime-focused-interview' | 'processing' | 'processing-focused' | 'view-metric-detail' | 'custom-demo-interview' | 'feedback';
 
 interface PlatformContainerProps {
   onFullScreenChange?: (isFullScreen: boolean) => void;
@@ -99,33 +98,6 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     }
   }, [currentState, onFullScreenChange]);
 
-  // Effect for loading interview data when viewing results - moved to top level
-  React.useEffect(() => {
-    if ((currentState === 'view-results' || currentState === 'view-focused-results') && viewingInterviewId) {
-      let isMounted = true;
-      setViewingSessionData(null); // Reset data when starting to load
-      
-      console.log('PlatformContainer: Loading interview data for ID:', viewingInterviewId, 'State:', currentState);
-      
-      import('../../utils/supabase-interview').then(({ getInterviewById }) => {
-        getInterviewById(viewingInterviewId).then((data: any) => {
-          console.log('PlatformContainer: Received interview data:', data);
-          if (isMounted) {
-            setViewingSessionData(data);
-          }
-        }).catch((error) => {
-          console.error('PlatformContainer: Error loading interview data:', error);
-          if (isMounted) {
-            setViewingSessionData(null);
-          }
-        });
-      });
-      
-      return () => { 
-        isMounted = false; 
-      };
-    }
-  }, [currentState, viewingInterviewId]);
 
   if (loading) {
     return (
@@ -176,7 +148,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleInterviewComplete = (data: any) => {
     setSessionData(data);
-    setCurrentState('processing');
+    setCurrentState('feedback');
     scrollToTop();
   };
 
@@ -194,7 +166,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleFocusedInterviewComplete = (data: any) => {
     setSessionData(data);
-    setCurrentState('processing-focused');
+    setCurrentState('feedback');
     scrollToTop();
   };  const handleBackToDashboard = () => {
     setCurrentState('dashboard');
@@ -226,58 +198,11 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     setSessionData(null);
     setCurrentState('focused-interview');
     scrollToTop();
-  };  const handleViewInterviewResults = (interviewId: string, interviewType?: string | null) => {
-    setViewingInterviewId(interviewId);
-    if (interviewType) {
-      // It's a focused interview - set the type and route to focused results
-      setFocusedInterviewType(interviewType);
-      setCurrentState('view-focused-results');
-    } else {
-      // It's a regular interview - route to regular results
-      setCurrentState('view-results');
-    }
-    scrollToTop();
-  };  // Handle viewing focused interview results
-  if (currentState === 'view-focused-results' && viewingInterviewId) {
-    if (!viewingSessionData) {
-      return (
-        <div className="min-h-screen bg-dark-900 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading focused interview results...</p>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <FocusedInterviewResults
-        sessionData={viewingSessionData}
-        onBackToDashboard={handleBackToDashboard}
-        onStartNewFocusedInterview={handleStartNewFocusedInterview}
-      />
-    );
-  }
-
-  // Handle viewing regular interview results
-  if (currentState === 'view-results' && viewingInterviewId) {
-    if (!viewingSessionData) {
-      return (
-        <div className="min-h-screen bg-dark-900 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading interview results...</p>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <InterviewResults
-        sessionData={viewingSessionData}
-        onBackToDashboard={handleBackToDashboard}
-        onStartNewInterview={handleStartNewInterview}
-      />
-    );
-  }
+  };
+  const handleViewInterviewResults = (interviewId: string) => {
+    // This will be handled by a new feedback page logic
+    console.log("Viewing results for interview: ", interviewId);
+  };
 
   const handleMetricClick = (metric: string) => {
     setSelectedMetric(metric);
@@ -341,11 +266,10 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
         />
       )}
       
-      {currentState === 'results' && sessionData && (
-        <InterviewResults
+      {currentState === 'feedback' && sessionData && (
+        <FeedbackPage
           sessionData={sessionData}
           onBackToDashboard={handleBackToDashboard}
-          onStartNewInterview={handleStartNewInterview}
         />
       )}
 
@@ -363,14 +287,6 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           setup={interviewSetup as InterviewSetup}
           onComplete={handleFocusedInterviewComplete}
           onBack={handleBackToFocusedSelection}
-        />
-      )}
-
-      {currentState === 'focused-results' && sessionData && (
-        <FocusedInterviewResults
-          sessionData={sessionData}
-          onBackToDashboard={handleBackToDashboard}
-          onStartNewFocusedInterview={handleStartNewFocusedInterview}
         />
       )}
 
@@ -397,13 +313,13 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
       {currentState === 'processing' && (
         <InterviewProcessing
-          onComplete={() => setCurrentState('results')}
+          onComplete={() => setCurrentState('feedback')}
         />
       )}
 
       {currentState === 'processing-focused' && (
         <InterviewProcessing
-          onComplete={() => setCurrentState('focused-results')}
+          onComplete={() => setCurrentState('feedback')}
         />
       )}
     </>

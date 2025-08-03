@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@mediapipe/drawing_utils": "^0.3.1675466124",
+    "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
     "@supabase/supabase-js": "^2.39.0",
     "@tailwindcss/postcss": "^4.1.10",
+    "assemblyai": "^4.14.2",
     "chart.js": "^4.5.0",
     "framer-motion": "^12.15.0",
     "lucide-react": "^0.344.0",

@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { InterviewHistory, InterviewSetup } from '../types/interview';
+import { transcribeAudio } from './assemblyai';
 
 // Realtime transcript interfaces
 export interface TranscriptChunk {
@@ -108,6 +109,15 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
     const speechMetrics = sessionData.speechMetrics || {};
     const audioData = sessionData.audioData || {};
 
+    // --- Upload audio and get transcript from AssemblyAI ---
+    let assemblyAiData = null;
+    if (audioData.blob) {
+      const audioUrl = await uploadAudioBlob(sessionData.id, audioData.blob);
+      if (audioUrl) {
+        assemblyAiData = await transcribeAudio(audioUrl);
+      }
+    }
+
     // --- Aggregate voice metrics from speech_metrics array ---
     let voiceMetricsSummary = null;
     if (Array.isArray(sessionData.speech_metrics) && sessionData.speech_metrics.length > 0) {
@@ -171,8 +181,8 @@ export const saveInterviewSession = async (sessionData: any): Promise<void> => {
       speech_metrics: speechMetrics,
       audio_data: audioData,
       interview_type: sessionData.type || sessionData.interviewType, // Add interview type to database
-      voice_metrics_summary: voiceMetricsSummary // <-- Save the summary here
-      // Note: metrics column doesn't exist in current DB schema, so we don't include it
+      voice_metrics_summary: voiceMetricsSummary, // <-- Save the summary here
+      assemblyai_data: assemblyAiData,
     };
 
     console.log('Saving interview session with data:', {
@@ -482,6 +492,42 @@ export const toggleSetupFavorite = async (setupId: string, isFavorite: boolean):
   } catch (error) {
     console.error('Failed to toggle setup favorite:', error);
     throw error;
+  }
+};
+
+export const uploadAudioBlob = async (sessionId: string, audioBlob: Blob): Promise<string | null> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase not configured, skipping audio upload');
+    return null;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const filePath = `${user.id}/${sessionId}.webm`;
+    const { data, error } = await supabase.storage
+      .from('audio-uploads')
+      .upload(filePath, audioBlob, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Error uploading audio blob:', error);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-uploads')
+      .getPublicUrl(data.path);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Failed to upload audio blob:', error);
+    return null;
   }
 };
 
