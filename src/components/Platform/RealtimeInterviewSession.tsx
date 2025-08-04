@@ -4,6 +4,8 @@ import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
 import AIInterviewer from '../AIInterviewer';
+import { processVideo } from '../../utils/computerVision';
+import { analyzeGaze, analyzeHeadPose, analyzePosture } from '../../utils/computerVision';
 
 interface RealtimeInterviewSessionProps {
   setup: InterviewSetup | CollegeInterviewSetup;
@@ -97,43 +99,107 @@ function extractVoiceMetrics(sessionData: any) {
 const getMetricInsight = (metric: string, score: number) => {
   const insights = {
     'speech rate': {
-      high: "Perfect speaking pace - you speak at an ideal rhythm for interviews.",
-      medium: "Good speaking pace, try to maintain consistency throughout.",
-      low: "Adjust your speaking pace - aim for 140-170 words per minute."
+      high: {
+        explanation: "Your speech rate is ideal. You're speaking at a pace that is easy for listeners to follow and understand.",
+        tip: "Maintain this pace. It shows confidence and allows you to articulate your thoughts clearly."
+      },
+      medium: {
+        explanation: "Your speech rate is good, but could be slightly more consistent.",
+        tip: "Practice speaking at a consistent pace. You can use a metronome or practice with a friend to get feedback."
+      },
+      low: {
+        explanation: "Your speech rate is a bit slow. This can sometimes be perceived as a lack of confidence or knowledge.",
+        tip: "Aim for a speech rate of 140-170 words per minute. Practice reading aloud to improve your pace."
+      }
     },
     fluency: {
-      high: "Outstanding fluency - you speak smoothly with excellent flow.",
-      medium: "Good fluency, work on reducing minor hesitations.",
-      low: "Focus on speaking more smoothly and reducing filler words."
+      high: {
+        explanation: "Your fluency is excellent. You speak smoothly and naturally, with very few hesitations.",
+        tip: "Your natural flow is a great asset. Continue to speak with this level of confidence."
+      },
+      medium: {
+        explanation: "You have good fluency, but there are some minor hesitations in your speech.",
+        tip: "Work on reducing hesitations by practicing your answers and speaking more deliberately."
+      },
+      low: {
+        explanation: "Your speech has noticeable hesitations and choppiness, which affects your fluency.",
+        tip: "Focus on speaking more smoothly. Try to connect your words and phrases to create a better flow."
+      }
     },
     'voice confidence': {
-      high: "Excellent vocal confidence - you sound authoritative and engaging.",
-      medium: "Good voice confidence, project more conviction in your tone.",
-      low: "Work on speaking with more confidence and stronger vocal presence."
+      high: {
+        explanation: "You sound very confident. Your voice is strong and engaging.",
+        tip: "Your vocal confidence is a major strength. Keep it up!"
+      },
+      medium: {
+        explanation: "You sound reasonably confident, but there's room for improvement.",
+        tip: "Project your voice more and speak with more conviction. This will make you sound more authoritative."
+      },
+      low: {
+        explanation: "Your voice sounds hesitant and lacks confidence.",
+        tip: "Work on speaking with a stronger, more assertive voice. Practice power posing before you speak to boost your confidence."
+      }
     },
     delivery: {
-      high: "Outstanding delivery - your pacing and rhythm are perfect for interviews.",
-      medium: "Good delivery, focus on maintaining consistent energy levels.",
-      low: "Work on your vocal delivery and speaking rhythm."
+      high: {
+        explanation: "Your delivery is outstanding. Your pacing, rhythm, and tone are all well-suited for an interview setting.",
+        tip: "Your delivery is a key strength. Continue to use your voice to engage your listener."
+      },
+      medium: {
+        explanation: "Your delivery is good, but could be more consistent.",
+        tip: "Focus on maintaining a consistent energy level and tone throughout your responses."
+      },
+      low: {
+        explanation: "Your delivery is a bit flat and could be more engaging.",
+        tip: "Work on your vocal variety. Vary your pitch, pace, and volume to make your delivery more dynamic."
+      }
     },
     'vocal clarity': {
-      high: "Excellent vocal clarity - you articulate words clearly and precisely.",
-      medium: "Good clarity, focus on enunciating key words more clearly.",
-      low: "Practice speaking more clearly and improving your articulation."
+      high: {
+        explanation: "You have excellent vocal clarity. You articulate your words clearly and precisely.",
+        tip: "Your clear articulation is a great asset. It ensures that your message is easily understood."
+      },
+      medium: {
+        explanation: "You have good clarity, but some words could be more clearly enunciated.",
+        tip: "Focus on enunciating key words and phrases to improve your overall clarity."
+      },
+      low: {
+        explanation: "Your speech lacks clarity, which can make it difficult for listeners to understand you.",
+        tip: "Practice tongue twisters and other articulation exercises to improve your vocal clarity."
+      }
     },
     'clarity': {
-      high: "Excellent vocal clarity - you articulate words clearly and precisely.",
-      medium: "Good clarity, focus on enunciating key words more clearly.",
-      low: "Practice speaking more clearly and improving your articulation."
+        high: {
+            explanation: "You have excellent vocal clarity. You articulate your words clearly and precisely.",
+            tip: "Your clear articulation is a great asset. It ensures that your message is easily understood."
+        },
+        medium: {
+            explanation: "You have good clarity, but some words could be more clearly enunciated.",
+            tip: "Focus on enunciating key words and phrases to improve your overall clarity."
+        },
+        low: {
+            explanation: "Your speech lacks clarity, which can make it difficult for listeners to understand you.",
+            tip: "Practice tongue twisters and other articulation exercises to improve your vocal clarity."
+        }
     },
     'filler words': {
-      high: "Excellent - you avoid filler words and speak with precision.",
-      medium: "Good control of filler words, continue reducing 'um' and 'uh'.",
-      low: "Focus on reducing filler words like 'um', 'uh', and 'like'."
+      high: {
+        explanation: "You did a great job of avoiding filler words. Your speech is precise and to the point.",
+        tip: "This is a great habit to have. Continue to be mindful of using filler words."
+      },
+      medium: {
+        explanation: "You used a few filler words, but it wasn't excessive.",
+        tip: "Continue to work on reducing your use of filler words like 'um', 'uh', and 'like'."
+      },
+      low: {
+        explanation: "You used a noticeable number of filler words. This can be distracting for the listener.",
+        tip: "Focus on pausing instead of using filler words. It will make you sound more thoughtful and confident."
+      }
     }
   };
   const level = score >= 8 ? 'high' : score >= 6 ? 'medium' : 'low';
-  return insights[metric.toLowerCase() as keyof typeof insights]?.[level] || "Keep practicing to improve this area.";
+  const metricData = insights[metric.toLowerCase() as keyof typeof insights];
+  return metricData ? metricData[level] : { explanation: "Keep practicing to improve this area.", tip: "" };
 };
 
 const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
@@ -705,7 +771,10 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
                     style={{ width: `${metric.score * 10}%`, transition: 'width 1.5s' }}
                   />
                 </div>
-                <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+                <div className="text-xs text-gray-400">
+                  <p className="font-semibold text-gray-300">{getMetricInsight(metric.name.toLowerCase(), metric.score).explanation}</p>
+                  <p className="mt-1">{getMetricInsight(metric.name.toLowerCase(), metric.score).tip}</p>
+                </div>
               </div>
             ))}
           </div>
