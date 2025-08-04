@@ -4,6 +4,9 @@ import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
 import AIInterviewer from '../AIInterviewer';
+import SophisticatedAnalyticsOverlay from './SophisticatedAnalyticsOverlay';
+import { computerVisionAnalyzer } from '../../utils/computerVision';
+import { advancedVoiceAnalyzer } from '../../utils/advancedVoiceAnalytics';
 
 interface RealtimeInterviewSessionProps {
   setup: InterviewSetup | CollegeInterviewSetup;
@@ -151,6 +154,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<any>(null); // Store final session data after completion
+  const [showAnalytics, setShowAnalytics] = useState(true);
+  const [analyticsMinimized, setAnalyticsMinimized] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -544,7 +549,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
           {/* Current question overlay - top right */}
           {state.currentQuestion && (
-            <div className="absolute top-6 right-6 max-w-md bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 border border-[#FF5722]/20 z-20">
+            <div className={`absolute top-6 ${showAnalytics && !analyticsMinimized ? 'right-[22rem]' : 'right-6'} max-w-md bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 border border-[#FF5722]/20 z-20 transition-all duration-300`}>
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 rounded-lg bg-[#FF5722] flex items-center justify-center flex-shrink-0">
                   <MessageSquare className="w-4 h-4 text-white" />
@@ -564,6 +569,15 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
             </div>
           )}
 
+          {/* Sophisticated Analytics Overlay */}
+          <SophisticatedAnalyticsOverlay
+            videoElement={videoRef.current}
+            audioStream={stream}
+            isActive={hasStarted}
+            onToggleMinimize={() => setAnalyticsMinimized(!analyticsMinimized)}
+            isMinimized={analyticsMinimized}
+          />
+
           {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
             <AIInterviewer 
@@ -581,7 +595,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
           {/* Text mode input - bottom overlay */}
           {!isVoiceMode && hasStarted && (
-            <div className="absolute bottom-6 left-6 right-6 bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 border border-gray-800 z-20">
+            <div className={`absolute bottom-6 left-6 ${showAnalytics && !analyticsMinimized ? 'right-[22rem]' : 'right-6'} bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 border border-gray-800 z-20 transition-all duration-300`}>
               <div className="flex space-x-3">
                 <textarea
                   value={userMessage}
@@ -603,7 +617,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           )}
 
           {/* User video - picture in picture style */}
-          <div className="absolute bottom-6 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10">
+          <div className={`absolute bottom-6 ${showAnalytics && !analyticsMinimized ? 'right-[22rem]' : 'right-6'} w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10 transition-all duration-300`}>
             <video
               ref={videoRef}
               autoPlay
@@ -615,6 +629,15 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
           {/* Camera controls */}
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-gray-900/90 backdrop-blur-sm px-6 py-3 rounded-full border border-gray-800 z-20">
+            <button
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              className={`p-2 rounded-full transition-colors ${
+                showAnalytics ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-800 hover:bg-gray-700'
+              }`}
+            >
+              <Brain className="w-5 h-5 text-white" />
+            </button>
+            
             {isVoiceMode && (
               <button
                 onClick={toggleMute}
