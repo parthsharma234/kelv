@@ -1,14 +1,13 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
 import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt } from '../utils/promptTemplates';
-import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { InterviewSetup } from '../types/interview';
 import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
-import { sophisticatedAnalyticsEngine } from '../utils/sophisticatedAnalytics';
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetricEntry {
@@ -26,7 +25,7 @@ const generateUUID = () => {
 };
 
 interface UseRealtimeInterviewOptions {
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   interviewType?: string;
   focusedType?: string; // Add focused interview type
   mediaStream?: MediaStream | null; // Allow null values
@@ -39,8 +38,6 @@ const getInterviewDuration = (interviewType?: string): number => {
   switch (interviewType) {
     case 'standard':
       return 20; // 20 minutes for standard interviews
-    case 'college':
-      return 10; // 10 minutes for college interviews
     case 'focused':
       return 8;  // Default focused interview duration
     default:
@@ -676,9 +673,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     stopTimer();
     setStatus('processing');
     
-    // Stop sophisticated analytics
-    sophisticatedAnalyticsEngine.stopAnalysis();
-
     try {
       let voiceMetrics: SpeechMetricEntry[] | null = null;
       let voiceTimeline: VoiceTimelinePoint[] = [];
@@ -793,15 +787,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       }
       // --- End Voice Timeline Metrics Extraction ---
 
-      // Get sophisticated analytics report
-      let sophisticatedReport = null;
-      try {
-        sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
-        console.log('Sophisticated analytics report generated:', sophisticatedReport.summary.overallScore);
-      } catch (error) {
-        console.error('Error generating sophisticated analytics report:', error);
-      }
-
       if (clientRef.current) {
         clientRef.current.disconnect();
       }
@@ -845,11 +830,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             interviewType,
             focusedType,
             completedAt: new Date().toISOString(),
-            speechMetrics: finalSpeechMetrics, // Include speech metrics like college interviews
+            speechMetrics: finalSpeechMetrics,
             voice_metrics_summary: finalSpeechMetrics.length > 0 ? finalSpeechMetrics[0].metrics : null,
             responseTimes: responseTimesRef.current,
-            voiceTimeline, // <-- Add the timeline here
-            sophisticatedAnalytics: sophisticatedReport // <-- Add sophisticated analytics
+            voiceTimeline // <-- Add the timeline here
           };
 
           // Save structured interview data for viewing in recent interviews
@@ -879,14 +863,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             voiceTimeline
           };
           
-          // Add sophisticated analytics to fallback data too
-          try {
-            const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
-            (fallbackData as any).sophisticatedAnalytics = sophisticatedReport;
-          } catch (error) {
-            console.log('No sophisticated analytics available for fallback');
-          }
-          
           console.log('Calling onComplete with fallback data...');
           onComplete?.(fallbackData);
         }
@@ -904,14 +880,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           voiceTimeline
         };
         
-        // Try to add sophisticated analytics even to minimal data
-        try {
-          const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
-          (minimalData as any).sophisticatedAnalytics = sophisticatedReport;
-        } catch (error) {
-          console.log('No sophisticated analytics available for minimal data');
-        }
-        
         onComplete?.(minimalData);
       }
     } catch (error) {
@@ -928,14 +896,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         error: 'An unexpected error occurred during interview finalization.',
         voiceTimeline: []
       };
-      
-      // Try to add sophisticated analytics even to error data
-      try {
-        const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
-        (fallbackData as any).sophisticatedAnalytics = sophisticatedReport;
-      } catch (error) {
-        console.log('No sophisticated analytics available for error data');
-      }
       
       onComplete?.(fallbackData);
     }

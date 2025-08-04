@@ -104,12 +104,14 @@ export class OpenAIRealtimeClient extends EventEmitter {
     // If instructions is not set, use a default system prompt
     let instructions = config.instructions;
     if (!instructions) {
+      const startTime = Date.now();
       const options: PromptTemplateOptions = {
         tone: 'warm',
         pacing: 'normal',
         depth: 'moderate',
         type: 'default',
         responseStyle: 'elaborate',
+        context: { interviewStart: startTime }
       };
       instructions = buildSystemPrompt(options);
     }

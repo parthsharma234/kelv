@@ -1,30 +1,29 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  TrendingUp, 
-  Clock, 
-  Brain, 
-  MessageSquare, 
-  Target, 
-  ChevronLeft,
+import {
+  Clock,
+  Brain,
+  MessageSquare,
+  Target,
   BarChart3,
-  PieChart,
   Activity,
   Award,
   Zap,
   Volume2,
   Mic,
-  Gauge,
   X,
   User
 } from 'lucide-react';
+import { Metric } from '../types/analytics';
 
 interface AnalyticsProps {
   isOpen: boolean;
   onClose: () => void;
+  voiceMetrics?: Metric[];
+  contentMetrics?: Metric[];
 }
 
-const voiceMetrics = [
+const defaultVoiceMetrics: Metric[] = [
   {
     name: "Communication Clarity",
     score: 85,
@@ -67,7 +66,7 @@ const voiceMetrics = [
   }
 ];
 
-const contentMetrics = [
+const defaultContentMetrics: Metric[] = [
   {
     name: "Technical Depth",
     score: 92,
@@ -118,7 +117,12 @@ const contentMetrics = [
   }
 ];
 
-const PerformanceAnalytics: React.FC<AnalyticsProps> = ({ isOpen, onClose }) => {
+const PerformanceAnalytics: React.FC<AnalyticsProps> = ({
+  isOpen,
+  onClose,
+  voiceMetrics = defaultVoiceMetrics,
+  contentMetrics = defaultContentMetrics
+}) => {
   return (
     <AnimatePresence>
       {isOpen && (

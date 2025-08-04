@@ -503,7 +503,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
       ? finalResponses.reduce((sum, r) => sum + (r.analysis?.score || 0), 0) / finalResponses.length * 10
       : 0;
 
-    // Calculate voice metrics averages if available (to match college interview format)
+    // Calculate voice metrics averages if available
     let voiceMetrics = null;
     if (speechMetrics && speechMetrics.length > 0) {
       const validMetrics = speechMetrics.map((m: any) => m.metrics).filter(Boolean);

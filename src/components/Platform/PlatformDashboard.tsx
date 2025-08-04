@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Brain, 
-  Play, 
-  BarChart3, 
-  Clock, 
-  Target, 
+  Brain,
+  Play,
+  BarChart3,
+  Clock,
+  Target,
   TrendingUp,
   Calendar,
   Award,
@@ -13,9 +13,6 @@ import {
   Plus,
   CheckCircle,
   AlertCircle,
-  GraduationCap,
-  Shield,
-  Star,
   MessageSquare
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
@@ -49,65 +46,8 @@ const formatInterviewType = (type: string): string => {
     .replace(/\b\w/g, letter => letter.toUpperCase());
 };
 
-// Utility function to format college interview titles
-const formatCollegeInterviewTitle = (setup: any): string => {
-  // For college interviews, setup contains schoolType, program, major directly
-  if (setup.schoolType && setup.major) {
-    const { schoolType, major } = setup;
-    
-    // Format school type
-    const schoolTypeMap: { [key: string]: string } = {
-      'public': 'Public University',
-      'private': 'Private University',
-      'ivy-league': 'Ivy League',
-      'liberal-arts': 'Liberal Arts College',
-      'community': 'Community College',
-      'technical': 'Technical Institute'
-    };
-    
-    // Format major (convert kebab-case to Title Case)
-    const formattedMajor = major
-      .split('-')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
-    
-    return `${formattedMajor} - ${formattedSchoolType}`;
-  }
-  
-  // Fallback for legacy format or if data is missing
-  if (typeof setup === 'string') {
-    // Handle legacy format: "schoolType - major"
-    const parts = setup.split(' - ');
-    if (parts.length !== 2) return setup;
-    
-    const [schoolType, major] = parts;
-    
-    const schoolTypeMap: { [key: string]: string } = {
-      'public': 'Public University',
-      'private': 'Private University',
-      'ivy-league': 'Ivy League',
-      'liberal-arts': 'Liberal Arts College',
-      'community': 'Community College',
-      'technical': 'Technical Institute'
-    };
-    
-    const formattedMajor = major
-      .split('-')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    const formattedSchoolType = schoolTypeMap[schoolType] || schoolType.charAt(0).toUpperCase() + schoolType.slice(1);
-    
-    return `${formattedMajor} - ${formattedSchoolType}`;
-  }
-  
-  return 'College Interview';
-};
-
 interface PlatformDashboardProps {
-  onStartRealtimeInterview: (type: 'standard' | 'focused' | 'college', focusedType?: string) => void;
+  onStartRealtimeInterview: (type: 'standard' | 'focused', focusedType?: string) => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
 }
 
@@ -121,10 +61,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
     improvement: 0,
     focusedInterviews: 0,
     focusedAverageScore: 0,
-    collegeInterviews: 0,
-    collegeAverageScore: 0,
-    collegeAuthenticity: 0,
-    collegePassion: 0,
     mostPracticedType: ''
   });
   const [strengthsAndWeaknesses, setStrengthsAndWeaknesses] = useState({
@@ -157,29 +93,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
           }))
         });
         
-        // Calculate college interview specific metrics
-        const collegeInterviews = history.filter(interview => 
-          interview.interviewType === 'college' || interview.setup.industry === 'Education'
-        );
-        
-        // Only calculate metrics if there are college interviews with metrics data
-        const collegeInterviewsWithMetrics = collegeInterviews.filter(interview => interview.speechMetricsAverage);
-        
-        const collegeStats = {
-          collegeInterviews: collegeInterviews.length,
-          collegeAverageScore: collegeInterviews.length > 0 
-            ? Math.round(collegeInterviews.reduce((sum, interview) => sum + interview.overallScore, 0) / collegeInterviews.length)
-            : 0,
-          collegeAuthenticity: collegeInterviewsWithMetrics.length > 0
-            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.speechMetricsAverage?.overallConfidence || 0), 0) / collegeInterviewsWithMetrics.length)
-            : 0,
-          collegePassion: collegeInterviewsWithMetrics.length > 0
-            ? Math.round(collegeInterviewsWithMetrics.reduce((sum, interview) => sum + (interview.speechMetricsAverage?.fluencyScore || 0), 0) / collegeInterviewsWithMetrics.length)
-            : 0
-        };
-        
         setInterviewHistory(history);
-        setStats({ ...statsData, ...collegeStats });
+        setStats(statsData);
         setStrengthsAndWeaknesses(swData);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -223,12 +138,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
             onClick={() => setInterviewTypeFilter('focused')}
           >
             View Focused Practice
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'college' ? 'bg-purple-600 text-white border-purple-700' : 'bg-dark-800 text-purple-400 border-purple-700 hover:bg-purple-900/40'}`}
-            onClick={() => setInterviewTypeFilter('college')}
-          >
-            View College Interviews
           </button>
           <button
             className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'dynamic' ? 'bg-orange-600 text-white border-orange-700' : 'bg-dark-800 text-orange-400 border-orange-700 hover:bg-orange-900/40'}`}
@@ -279,77 +188,66 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
               {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5))
                 .filter(interview => {
                   if (!interviewTypeFilter) return true;
-                  if (interviewTypeFilter === 'focused') return interview.interviewType && interview.interviewType !== 'college' && interview.interviewType !== 'dynamic';
-                  if (interviewTypeFilter === 'college') return interview.interviewType === 'college';
+                  if (interviewTypeFilter === 'focused') return interview.interviewType && interview.interviewType !== 'dynamic';
                   if (interviewTypeFilter === 'dynamic') return !interview.interviewType || interview.interviewType === 'general' || interview.interviewType === 'dynamic';
                   return true;
                 })
                 .map((interview) => {
-                  const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined && interview.interviewType !== 'college';
-                  const isCollegeInterview = interview.interviewType === 'college';
-                  
+                  const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined;
+
                   console.log('Dashboard: Rendering interview:', {
                     id: interview.id,
                     interviewType: interview.interviewType,
                     isFocused: isFocusedInterview,
-                    isCollege: isCollegeInterview,
                     date: interview.date,
                     status: interview.status
                   });
-                  
+
                   return (
                     <div
                       key={interview.id}
                       className={`flex items-center justify-between p-4 rounded-xl hover:bg-dark-700/50 transition-colors cursor-pointer border ${
-                        isCollegeInterview
-                          ? 'bg-gradient-to-r from-purple-900/70 to-indigo-900/40 border-purple-500/50 shadow-purple-500/20'
-                          : isFocusedInterview 
-                          ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20' 
+                        isFocusedInterview
+                          ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20'
                           : 'bg-dark-700/30 border-dark-700'
                       }`}
                       onClick={() => onViewInterviewResults(interview.id, interview.interviewType)}
                     >
                       <div className="flex items-center gap-4">
                         <div className={`p-2 rounded-lg ${
-                          isCollegeInterview ? 'bg-purple-500/30' :
                           isFocusedInterview ? 'bg-blue-500/30' : 'bg-orange-500/20'
-                        }`}> 
+                        }`}>
                           <Calendar className={`w-4 h-4 ${
-                            isCollegeInterview ? 'text-purple-300' :
                             isFocusedInterview ? 'text-blue-300' : 'text-orange-400'
                           }`} />
-                        </div>                          <div>                            <h4 className="font-medium text-white flex items-center gap-2">
-                              {isCollegeInterview 
-                                ? formatCollegeInterviewTitle(interview.setup)
-                                : `${interview.setup.jobType} - ${interview.setup.industry}`
-                              }
-                              {isCollegeInterview && (
-                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-500/40 text-purple-200 border border-purple-400/50" title="College Interview">College</span>
-                              )}
-                              {isFocusedInterview && !isCollegeInterview && (
-                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 text-blue-200 border border-blue-400/50" title="Targeted (Focused) Interview">Focused</span>
-                              )}
-                            </h4>
-                            <p className="text-sm text-gray-400">
-                              {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
-                            </p>
-                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            interview.overallScore >= 80
-                              ? 'bg-green-500/20 text-green-400'
-                              : interview.overallScore >= 60
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {interview.overallScore}%
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <h4 className="font-medium text-white flex items-center gap-2">
+                            {`${interview.setup.jobType} - ${interview.setup.industry}`}
+                            {isFocusedInterview && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 text-blue-200 border border-blue-400/50" title="Targeted (Focused) Interview">Focused</span>
+                            )}
+                          </h4>
+                          <p className="text-sm text-gray-400">
+                            {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-3">
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          interview.overallScore >= 80
+                            ? 'bg-green-500/20 text-green-400'
+                            : interview.overallScore >= 60
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {interview.overallScore}%
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-500" />
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
@@ -636,89 +534,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
           </motion.div>
         )}
 
-        {/* College Interview Stats - Only show when user has completed college interviews */}
-        {stats.collegeInterviews > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-12"
-          >
-            {/* College Stats Header */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <GraduationCap className="w-5 h-5 text-purple-400" />
-              </div>
-              <h2 className="text-xl font-semibold text-white">College Interview Performance</h2>
-              <div className="px-3 py-1 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full border border-purple-500/30">
-                College
-              </div>
-            </div>
-
-            {/* College Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-gradient-to-br from-purple-900/70 to-indigo-900/40 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-500/30 rounded-lg">
-                    <GraduationCap className="w-5 h-5 text-purple-300" />
-                  </div>
-                  <span className="text-purple-200 text-sm font-medium">College Sessions</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {stats.collegeInterviews}
-                </div>
-                <div className="text-xs text-purple-300 mt-2">
-                  Admissions interviews completed
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-900/70 to-indigo-900/40 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-500/30 rounded-lg">
-                    <Award className="w-5 h-5 text-purple-300" />
-                  </div>
-                  <span className="text-purple-200 text-sm font-medium">Overall Score</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {stats.collegeAverageScore}%
-                </div>
-                <div className="text-xs text-purple-300 mt-2">
-                  Average admissions performance
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-900/70 to-indigo-900/40 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-500/30 rounded-lg">
-                    <Shield className="w-5 h-5 text-purple-300" />
-                  </div>
-                  <span className="text-purple-200 text-sm font-medium">Authenticity</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {stats.collegeAuthenticity > 0 ? `${stats.collegeAuthenticity}/10` : '--'}
-                </div>
-                <div className="text-xs text-purple-300 mt-2">
-                  Genuine self-presentation
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-900/70 to-indigo-900/40 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-500/30 rounded-lg">
-                    <Star className="w-5 h-5 text-purple-300" />
-                  </div>
-                  <span className="text-purple-200 text-sm font-medium">Passion</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {stats.collegePassion > 0 ? `${stats.collegePassion}/10` : '--'}
-                </div>
-                <div className="text-xs text-purple-300 mt-2">
-                  Enthusiasm for education
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* Strengths and Weaknesses */}
         <motion.div
@@ -967,14 +782,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                 </div>
               </div>
               
-              <button
-                onClick={() => onStartRealtimeInterview('college')}
-                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-semibold hover:from-purple-400 hover:to-indigo-400 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-3 group relative z-10"
-              >
-                <GraduationCap className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Start College Interview
-                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
             </div>
 
             {/* Quick Tips & Performance */}

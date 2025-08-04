@@ -28,17 +28,18 @@ export interface VoiceMetrics {
   };
 }
 
-export interface CollegeInterviewSetup {
-  schoolType: string;
-  program: string;
-  major: string;
-  interviewMode: 'voice' | 'text';
-}
-
 export interface InterviewSetup {
   industry: string;
   jobType: string;
   experienceLevel: string;
+  interviewMode: 'voice' | 'text';
+}
+
+// Deprecated: kept for backward compatibility
+export interface CollegeInterviewSetup {
+  schoolType: string;
+  program: string;
+  major: string;
   interviewMode: 'voice' | 'text';
 }
 

@@ -1012,8 +1012,7 @@ export const analyzeResponse = async (
     const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
 
     // Determine if this is a focused interview
-    const isFocusedInterview = interviewType && interviewType !== 'college';
-    const isCollegeInterview = interviewType === 'college';
+    const isFocusedInterview = !!interviewType;
 
     const prompt = `You are a senior ${setup.industry} hiring manager with 15+ years of experience evaluating candidates for ${setup.jobType} positions. You've interviewed hundreds of candidates and know exactly what separates top performers from average ones.
 
@@ -1023,7 +1022,7 @@ INTERVIEW CONTEXT:
 - Experience Level: ${setup.experienceLevel}
 - Question Type: ${question.type}
 - Question Asked: "${question.text}"
-- Interview Type: ${isFocusedInterview ? `Focused Interview (${interviewType})` : 'Standard Interview'}
+ - Interview Type: ${isFocusedInterview ? `Focused Interview (${interviewType})` : 'Standard Interview'}
 
 CANDIDATE RESPONSE:
 "${response}"
@@ -1207,8 +1206,7 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
   const hasQuantifiableResults = /(\d+%|\d+ percent|\$\d+|\d+ people|\d+ users|\d+ customers)/i.test(response);
   const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
   
-  const isFocusedInterview = interviewType && interviewType !== 'college';
-  const isCollegeInterview = interviewType === 'college';
+  const isFocusedInterview = !!interviewType;
   
   // More realistic confidence scoring based on response quality
   let confidenceScore = 1;
