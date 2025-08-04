@@ -151,6 +151,9 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<any>(null); // Store final session data after completion
+  const [gazeTimeline, setGazeTimeline] = useState<any[]>([]);
+  const [headPoseTimeline, setHeadPoseTimeline] = useState<any[]>([]);
+  const [postureTimeline, setPostureTimeline] = useState<any[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -248,6 +251,38 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
     }
   }, [hasStarted, stream]);
 
+  useEffect(() => {
+    let animationFrameId: number;
+    const processVideoFrame = () => {
+      if (videoRef.current) {
+        const results = processVideo(videoRef.current, performance.now());
+        if (results) {
+          const { faceResults, poseResults } = results;
+          const now = Date.now();
+          if (faceResults) {
+            const newGaze = analyzeGaze(faceResults.faceLandmarks);
+            const newHeadPose = analyzeHeadPose(faceResults.faceLandmarks);
+            setGazeTimeline(prev => [...prev, { timestamp: now, value: newGaze.isLookingAtCamera ? 1 : 0 }]);
+            setHeadPoseTimeline(prev => [...prev, { timestamp: now, value: newHeadPose.isFacingForward ? 1 : 0 }]);
+          }
+          if (poseResults) {
+            const newPosture = analyzePosture(poseResults.landmarks);
+            setPostureTimeline(prev => [...prev, { timestamp: now, value: newPosture.isSlouching ? 0 : 1 }]);
+          }
+        }
+      }
+      animationFrameId = requestAnimationFrame(processVideoFrame);
+    };
+
+    if (hasStarted) {
+      processVideoFrame();
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [hasStarted]);
+
   // Handle microphone toggle
   const toggleMute = () => {
     if (stream) {
@@ -280,8 +315,9 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
     if (typeof onProcessingStart === 'function') {
       onProcessingStart();
     }
-    await endInterview();
-  }, [endInterview, onProcessingStart]);
+    const sessionData = await endInterview();
+    onComplete({ ...sessionData, gaze: gazeTimeline, headPose: headPoseTimeline, posture: postureTimeline });
+  }, [endInterview, onProcessingStart, onComplete, gazeTimeline, headPoseTimeline, postureTimeline]);
 
   // Send text message
   const handleSendMessage = useCallback(() => {

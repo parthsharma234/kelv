@@ -2,9 +2,10 @@ import { useEffect, useCallback, useRef } from 'react';
 import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
 import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt } from '../utils/promptTemplates';
 import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
-import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
+import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession, uploadAudioBlob } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
+import { transcribeAudio } from '../utils/assemblyai';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
@@ -88,6 +89,7 @@ export function useRealtimeInterview({
   }>>([]);
   // Add a ref to collect transcript chunks for the current user response
   const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
+  const voiceMetricsTimelineRef = useRef<any[]>([]);
 
   // Generate adaptive system prompt
   const generateAdaptiveInstructions = useCallback((
@@ -211,6 +213,13 @@ export function useRealtimeInterview({
       }
       currentUserChunksRef.current = [];
       // --- End Voice Timeline Segmentation ---
+    }
+
+    if (chunk.speaker === 'user' && chunk.text.trim().length > 0) {
+      const words = chunk.text.trim().split(' ');
+      const durationInMinutes = (chunk.timestamp - (questionTimestampRef.current || chunk.timestamp)) / 1000 / 60;
+      const wpm = durationInMinutes > 0 ? Math.round(words.length / durationInMinutes) : 0;
+      voiceMetricsTimelineRef.current.push({ timestamp: chunk.timestamp, value: wpm });
     }
   }, [state.sessionId, updateInterviewerBehavior, setup.interviewMode]);
 
@@ -835,8 +844,28 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             speechMetrics: finalSpeechMetrics, // Include speech metrics like college interviews
             voice_metrics_summary: finalSpeechMetrics.length > 0 ? finalSpeechMetrics[0].metrics : null,
             responseTimes: responseTimesRef.current,
-            voiceTimeline // <-- Add the timeline here
+            voiceTimeline, // <-- Add the timeline here
+            assemblyai_data: null,
           };
+
+          if (setup.interviewMode === 'voice' && clientRef.current) {
+            const allAudioChunks = clientRef.current.getAllAudioChunks();
+            if (allAudioChunks.length > 0) {
+              const totalLength = allAudioChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+              const combinedBuffer = new Uint8Array(totalLength);
+              let offset = 0;
+              for (const chunk of allAudioChunks) {
+                combinedBuffer.set(new Uint8Array(chunk), offset);
+                offset += chunk.byteLength;
+              }
+              const combinedPcm = new Float32Array(combinedBuffer.buffer);
+              const fullAudioBlob = pcmToWav(combinedPcm, 16000);
+              const audioUrl = await uploadAudioBlob(state.sessionId, fullAudioBlob);
+              if (audioUrl) {
+                sessionData.assemblyai_data = await transcribeAudio(audioUrl);
+              }
+            }
+          }
 
           // Save structured interview data for viewing in recent interviews
           try {
