@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
+import SophisticatedResultsView from './SophisticatedResultsView';
 
 // Utility function to format category labels for standard interviews
 const formatCategoryLabel = (category: string): string => {
@@ -108,6 +109,10 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   // Add state for selected metric
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
+  // Check if sophisticated analytics are available
+  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && 
+    sessionData.sophisticatedAnalytics.summary && 
+    sessionData.sophisticatedAnalytics.timeline;
   if (!sessionData) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
@@ -325,6 +330,74 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     return <InterviewMetricDetail metric={selectedMetric} sessionData={sessionData} onBack={() => setSelectedMetric(null)} />;
   }
 
+  // Show sophisticated analytics if available
+  if (hasSophisticatedAnalytics) {
+    return (
+      <div className="min-h-screen bg-dark-900 pt-24 pb-16">
+        <div className="container max-w-6xl mx-auto px-4">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-12"
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <button
+                onClick={() => {
+                  onBackToDashboard();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-400" />
+              </button>
+              <div>
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-orange-500 rounded-full flex items-center justify-center mb-4">
+                  <Brain className="w-10 h-10 text-white" />
+                </div>
+                <h1 className="text-4xl font-bold gradient-text-orange mb-4">Sophisticated AI Analysis Complete!</h1>
+                <p className="text-gray-400 text-lg">
+                  Advanced computer vision and voice analytics have analyzed every aspect of your performance.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Sophisticated Results */}
+          <SophisticatedResultsView analyticsReport={sessionData.sophisticatedAnalytics} />
+
+          {/* Action Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-col sm:flex-row gap-4 justify-center mt-12"
+          >
+            <button
+              onClick={() => {
+                onStartNewInterview();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-8 py-4 bg-gradient-to-r from-purple-500 to-orange-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-purple-500/25"
+            >
+              <Play className="w-5 h-5" />
+              Practice Another Interview
+            </button>
+            
+            <button
+              onClick={() => {
+                onBackToDashboard();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-8 py-4 bg-dark-800 hover:bg-dark-700 text-gray-300 rounded-xl font-semibold transition-colors border border-gray-700"
+            >
+              Back to Dashboard
+            </button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-dark-900 pt-24 pb-16">
       <div className="container max-w-6xl mx-auto px-4">

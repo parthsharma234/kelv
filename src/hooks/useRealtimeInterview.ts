@@ -8,6 +8,7 @@ import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
+import { sophisticatedAnalyticsEngine } from '../utils/sophisticatedAnalytics';
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetricEntry {
@@ -674,6 +675,9 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     console.log('Ending realtime interview...');
     stopTimer();
     setStatus('processing');
+    
+    // Stop sophisticated analytics
+    sophisticatedAnalyticsEngine.stopAnalysis();
 
     try {
       let voiceMetrics: SpeechMetricEntry[] | null = null;
@@ -789,6 +793,15 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       }
       // --- End Voice Timeline Metrics Extraction ---
 
+      // Get sophisticated analytics report
+      let sophisticatedReport = null;
+      try {
+        sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
+        console.log('Sophisticated analytics report generated:', sophisticatedReport.summary.overallScore);
+      } catch (error) {
+        console.error('Error generating sophisticated analytics report:', error);
+      }
+
       if (clientRef.current) {
         clientRef.current.disconnect();
       }
@@ -835,7 +848,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             speechMetrics: finalSpeechMetrics, // Include speech metrics like college interviews
             voice_metrics_summary: finalSpeechMetrics.length > 0 ? finalSpeechMetrics[0].metrics : null,
             responseTimes: responseTimesRef.current,
-            voiceTimeline // <-- Add the timeline here
+            voiceTimeline, // <-- Add the timeline here
+            sophisticatedAnalytics: sophisticatedReport // <-- Add sophisticated analytics
           };
 
           // Save structured interview data for viewing in recent interviews
@@ -864,6 +878,15 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             speechMetrics: getSpeechMetrics(),
             voiceTimeline
           };
+          
+          // Add sophisticated analytics to fallback data too
+          try {
+            const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
+            (fallbackData as any).sophisticatedAnalytics = sophisticatedReport;
+          } catch (error) {
+            console.log('No sophisticated analytics available for fallback');
+          }
+          
           console.log('Calling onComplete with fallback data...');
           onComplete?.(fallbackData);
         }
@@ -880,6 +903,15 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           speechMetrics: getSpeechMetrics(),
           voiceTimeline
         };
+        
+        // Try to add sophisticated analytics even to minimal data
+        try {
+          const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
+          (minimalData as any).sophisticatedAnalytics = sophisticatedReport;
+        } catch (error) {
+          console.log('No sophisticated analytics available for minimal data');
+        }
+        
         onComplete?.(minimalData);
       }
     } catch (error) {
@@ -896,6 +928,15 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         error: 'An unexpected error occurred during interview finalization.',
         voiceTimeline: []
       };
+      
+      // Try to add sophisticated analytics even to error data
+      try {
+        const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
+        (fallbackData as any).sophisticatedAnalytics = sophisticatedReport;
+      } catch (error) {
+        console.log('No sophisticated analytics available for error data');
+      }
+      
       onComplete?.(fallbackData);
     }
   }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
