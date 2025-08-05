@@ -18,7 +18,9 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
     for (let i = 0; i < data.length; i += 4) {
       lighting += data[i] + data[i + 1] + data[i + 2];
     }
-    lighting = lighting / (data.length / 4) / 255; // 0..1
+    // Average RGB brightness and normalise to 0..1 range
+    lighting = lighting / (data.length / 4) / (255 * 3);
+    lighting = Math.min(Math.max(lighting, 0), 1);
   }
 
   // Very naive eye contact detection – if FaceDetector is available we
@@ -49,13 +51,16 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   if (eyeContact < 0.5) suggestions.push('Try to look toward the camera lens.');
   if (suggestions.length === 0) suggestions.push('Great camera presence.');
 
-  return {
+  const result: CameraPresence = {
     lighting: Number(lighting.toFixed(2)),
     eyeContact: Number(eyeContact.toFixed(2)),
     smile: 0, // Placeholder – real model would be required
     attentiveness: 0.5,
     suggestions,
   };
+
+  console.debug('Camera analysis result', result);
+  return result;
 }
 
 /**
@@ -78,12 +83,14 @@ export async function analyzePosture(video: HTMLVideoElement): Promise<PostureSc
         const centerY = boundingBox.y + boundingBox.height / 2;
         const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
         const confidence = Number(Math.max(0, 1 - distY).toFixed(2));
-        return {
+        const posture: PostureScore = {
           confidence,
           suggestions: confidence < 0.7
             ? ['Sit upright and center yourself in the frame.']
             : ['Good posture maintained.']
         };
+        console.debug('Posture analysis result', posture);
+        return posture;
       }
     } catch {
       /* ignore */

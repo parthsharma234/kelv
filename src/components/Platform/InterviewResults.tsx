@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
+import {
   Target,
   ArrowLeft,
   Trophy,
@@ -19,7 +19,7 @@ import {
   MessageSquare,
   AlertCircle,
   Clock,
-  Video
+  Eye
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
@@ -854,38 +854,46 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               </div>
             </motion.div>
 
-            {hasCameraAnalytics && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.32 }}
-                className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-              >
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Video className="w-5 h-5 text-orange-400" />
-                  Camera Feedback
-                </h3>
-                {analyticsReport?.cameraPresence && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
-                    <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                      <li>Lighting: {Math.round(analyticsReport.cameraPresence.lighting * 100)}%</li>
-                      <li>Eye Contact: {Math.round(analyticsReport.cameraPresence.eyeContact * 100)}%</li>
-                    </ul>
-                    <p className="text-xs text-gray-400">{analyticsReport.cameraPresence.suggestions.join(' ')}</p>
-                  </div>
-                )}
-                {analyticsReport?.posture && (
-                  <div>
-                    <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
-                    <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                      <li>Confidence: {Math.round(analyticsReport.posture.confidence * 100)}%</li>
-                    </ul>
-                    <p className="text-xs text-gray-400">{analyticsReport.posture.suggestions.join(' ')}</p>
-                  </div>
-                )}
-              </motion.div>
-            )}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.32 }}
+              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-orange-400" />
+                Computer Vision
+              </h3>
+              {(() => {
+                console.debug('Rendering computer vision analytics', analyticsReport?.cameraPresence, analyticsReport?.posture);
+                if (!hasCameraAnalytics) {
+                  return <p className="text-sm text-gray-400">No camera data collected.</p>;
+                }
+                return (
+                  <>
+                    {analyticsReport?.cameraPresence && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
+                        <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                          <li>Lighting: {Math.round(analyticsReport.cameraPresence.lighting * 100)}%</li>
+                          <li>Eye Contact: {Math.round(analyticsReport.cameraPresence.eyeContact * 100)}%</li>
+                        </ul>
+                        <p className="text-xs text-gray-400">{analyticsReport.cameraPresence.suggestions.join(' ')}</p>
+                      </div>
+                    )}
+                    {analyticsReport?.posture && (
+                      <div>
+                        <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
+                        <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                          <li>Confidence: {Math.round(analyticsReport.posture.confidence * 100)}%</li>
+                        </ul>
+                        <p className="text-xs text-gray-400">{analyticsReport.posture.suggestions.join(' ')}</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </motion.div>
 
             {/* Interview Type Advice */}
             <motion.div
