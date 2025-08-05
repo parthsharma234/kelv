@@ -445,23 +445,55 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
   // Parse transcript into structured Q&A pairs for analysis
   const parseTranscriptIntoQAPairs = useCallback(async (transcriptChunks: TranscriptChunk[]) => {
-    const questions: Array<{ id: string; text: string; category: string }> = [];
+    const questions: Array<{ id: string; text: string; category: string; type?: string }> = [];
     const responses: Array<{ questionId: string; response: string; analysis: any }> = [];
-    
+
+    const SMALL_TALK_PHRASES = [
+      'how are you',
+      "how's your day",
+      'your day been',
+      'what’s up',
+      'how have you been'
+    ];
+
+    const classifyQuestion = (text: string, index: number): string => {
+      const q = text.toLowerCase();
+      if (index < 2 && SMALL_TALK_PHRASES.some(p => q.includes(p))) {
+        return 'small_talk';
+      }
+      if (/tell me about|describe a time|give me an example|have you ever|situation|challenge|conflict|time when/.test(q)) {
+        return 'behavioral';
+      }
+      if (/technical|code|algorithm|programming|data structure|complexity|system design/.test(q)) {
+        return 'technical';
+      }
+      if (/goal|future|career|plan|five year/.test(q)) {
+        return 'goals';
+      }
+      if (/team|collaborat|coworker|work with others/.test(q)) {
+        return 'teamwork';
+      }
+      if (/why do you want|company|culture|fit|values/.test(q)) {
+        return 'fit';
+      }
+      return 'behavioral';
+    };
+
     // Convert transcript chunks to text and group by speaker
     let currentQuestion = '';
     let currentQuestionId = '';
     let currentResponse = '';
     let isCollectingResponse = false;
-    
+
     for (let i = 0; i < transcriptChunks.length; i++) {
       const chunk = transcriptChunks[i];
-      
+
       if (chunk.speaker === 'assistant') {
         // If we were collecting a response, save it before starting new question
         if (isCollectingResponse && currentResponse.trim() && currentQuestionId) {
+          const prevQuestion = questions.find(q => q.id === currentQuestionId);
           const analysis = await analyzeResponseWithAI(
-            { text: currentQuestion, type: 'behavioral', id: `q${Date.now()}` },
+            { text: currentQuestion, type: prevQuestion?.category || 'behavioral', id: `q${Date.now()}` },
             currentResponse.trim(),
             'jobType' in setup ? setup : {
               jobType: 'General',
@@ -475,49 +507,36 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           responses.push({
             questionId: currentQuestionId,
             response: currentResponse.trim(),
-            analysis: analysis
+            analysis
           });
           currentResponse = '';
           isCollectingResponse = false;
         }
-        
+
         // Start new question
         currentQuestion = chunk.text.trim();
         currentQuestionId = `q_${questions.length + 1}_${Date.now()}`;
-        
-        // Determine category based on question content
-        let category = 'behavioral';
-        const questionLower = currentQuestion.toLowerCase();
-        if (questionLower.includes('technical') || questionLower.includes('code') ||
-            questionLower.includes('algorithm') || questionLower.includes('programming')) {
-          category = 'technical';
-        } else if (questionLower.includes('situation') || questionLower.includes('challenge') ||
-                   questionLower.includes('conflict') || questionLower.includes('time when')) {
-          category = 'situational';
-        } else if (questionLower.includes('goal') || questionLower.includes('future') ||
-                   questionLower.includes('career') || questionLower.includes('plan')) {
-          category = 'goals';
-        } else if (questionLower.includes('team') || questionLower.includes('collaboration')) {
-          category = 'teamwork';
-        }
-        
+
+        const category = classifyQuestion(currentQuestion, questions.length);
         questions.push({
           id: currentQuestionId,
           text: currentQuestion,
-          category: category
+          category,
+          type: category
         });
-        
+
       } else if (chunk.speaker === 'user' && currentQuestionId) {
         // Collect user response
         currentResponse += ' ' + chunk.text;
         isCollectingResponse = true;
       }
     }
-    
+
     // Handle the last response if exists
     if (isCollectingResponse && currentResponse.trim() && currentQuestionId) {
+      const prevQuestion = questions.find(q => q.id === currentQuestionId);
       const analysis = await analyzeResponseWithAI(
-        { text: currentQuestion, type: 'behavioral', id: `q${Date.now()}` },
+        { text: currentQuestion, type: prevQuestion?.category || 'behavioral', id: `q${Date.now()}` },
         currentResponse.trim(),
         'jobType' in setup ? setup : {
           jobType: 'General',
@@ -531,12 +550,12 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       responses.push({
         questionId: currentQuestionId,
         response: currentResponse.trim(),
-        analysis: analysis
+        analysis
       });
     }
-    
+
     return { questions, responses };
-  }, []);
+  }, [setup, focusedType]);
 
   // Public interface methods
   const startInterview = useCallback(async () => {

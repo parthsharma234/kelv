@@ -180,6 +180,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         const posture = await analyzePosture(videoRef.current);
         enriched = {
           ...(data as Record<string, unknown>),
+          cameraPresence,
+          posture,
           sophisticatedAnalytics: {
             ...(data as Record<string, unknown>)?.sophisticatedAnalytics,
             cameraPresence,

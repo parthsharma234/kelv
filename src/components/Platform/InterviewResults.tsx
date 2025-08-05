@@ -41,6 +41,7 @@ const formatCategoryLabel = (category: string): string => {
     'goals': 'Goals',
     'fit': 'Fit',
     'challenge': 'Challenge',
+    'small_talk': 'Small Talk',
   };
   
   return categoryMappings[category] || category.split('_').map(word => 
@@ -111,8 +112,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const analyticsReport = sessionData.sophisticatedAnalytics;
-  const hasCameraAnalytics =
-    analyticsReport && (analyticsReport.cameraPresence || analyticsReport.posture);
+  const cameraPresence = analyticsReport?.cameraPresence || sessionData.cameraPresence;
+  const posture = analyticsReport?.posture || sessionData.posture;
+  const hasCameraAnalytics = cameraPresence || posture;
   const hasFullAnalytics =
     analyticsReport && (analyticsReport.summary || analyticsReport.timeline);
   if (!sessionData) {
@@ -720,7 +722,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-medium text-gray-400">Q{index + 1}</span>
                               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400">
-                                {formatCategoryLabel(question?.category || 'General')}
+                                {formatCategoryLabel(question?.category || question?.type || 'General')}
                               </span>
                             </div>
                             <p className="text-white text-sm font-medium">{question?.text || response.question}</p>
@@ -864,35 +866,31 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 <Eye className="w-5 h-5 text-orange-400" />
                 Computer Vision
               </h3>
-              {(() => {
-                console.debug('Rendering computer vision analytics', analyticsReport?.cameraPresence, analyticsReport?.posture);
-                if (!hasCameraAnalytics) {
-                  return <p className="text-sm text-gray-400">No camera data collected.</p>;
-                }
-                return (
-                  <>
-                    {analyticsReport?.cameraPresence && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
-                        <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                          <li>Lighting: {Math.round(analyticsReport.cameraPresence.lighting * 100)}%</li>
-                          <li>Eye Contact: {Math.round(analyticsReport.cameraPresence.eyeContact * 100)}%</li>
-                        </ul>
-                        <p className="text-xs text-gray-400">{analyticsReport.cameraPresence.suggestions.join(' ')}</p>
-                      </div>
-                    )}
-                    {analyticsReport?.posture && (
-                      <div>
-                        <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
-                        <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                          <li>Confidence: {Math.round(analyticsReport.posture.confidence * 100)}%</li>
-                        </ul>
-                        <p className="text-xs text-gray-400">{analyticsReport.posture.suggestions.join(' ')}</p>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              {hasCameraAnalytics ? (
+                <>
+                  {cameraPresence && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
+                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                        <li>Lighting: {Math.round(cameraPresence.lighting * 100)}%</li>
+                        <li>Eye Contact: {Math.round(cameraPresence.eyeContact * 100)}%</li>
+                      </ul>
+                      <p className="text-xs text-gray-400">{cameraPresence.suggestions.join(' ')}</p>
+                    </div>
+                  )}
+                  {posture && (
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
+                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                        <li>Confidence: {Math.round(posture.confidence * 100)}%</li>
+                      </ul>
+                      <p className="text-xs text-gray-400">{posture.suggestions.join(' ')}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">No camera data collected.</p>
+              )}
             </motion.div>
 
             {/* Interview Type Advice */}

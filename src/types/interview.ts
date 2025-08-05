@@ -46,7 +46,7 @@ export interface CollegeInterviewSetup {
 export interface Question {
   id: string;
   text: string;
-  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment' | 'closing'; // Added 'closing' type
+  type: 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment' | 'closing'; // 'small_talk' captures brief warm-up questions; 'closing' covers wrap-up prompts
   category?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   followUp?: string;
