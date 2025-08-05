@@ -18,7 +18,9 @@ import {
   Play,
   MessageSquare,
   AlertCircle,
-  Clock
+  Clock,
+  Camera,
+  User
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
@@ -159,6 +161,10 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     startTime: sessionData.startTime || new Date(),
     interviewType: sessionData.interviewType || 'general'
   };
+
+  // Basic camera analytics may be stored directly on the session object
+  const cameraPresence = sessionData.sophisticatedAnalytics?.cameraPresence ?? sessionData.cameraPresence;
+  const posture = sessionData.sophisticatedAnalytics?.posture ?? sessionData.posture;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -646,20 +652,73 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 </div>
                 
                 {/* Voice Timeline within Advanced Voice Analysis */}
-                {safeSessionData.voiceTimeline && (
-                  <div className="mt-8">
-                    <VoiceTimeline 
-                      voiceTimeline={safeSessionData.voiceTimeline} 
-                    />
-                  </div>
-                )}
-              </motion.div>
+            {safeSessionData.voiceTimeline && (
+              <div className="mt-8">
+                <VoiceTimeline
+                  voiceTimeline={safeSessionData.voiceTimeline}
+                />
+              </div>
             )}
+          </motion.div>
+        )}
 
-            {/* Question-by-Question Analysis - Compact Style */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+        {/* Computer Vision Analysis */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+            <Camera className="w-5 h-5 text-orange-400" />
+            Computer Vision
+          </h3>
+          {(cameraPresence !== undefined && cameraPresence !== null) || (posture !== undefined && posture !== null) ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {cameraPresence !== undefined && cameraPresence !== null && (
+                <div className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500">
+                      <Camera className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">Camera Presence</span>
+                        <span className="text-lg font-semibold text-white">
+                          {typeof cameraPresence === 'number' ? `${Math.round(cameraPresence)}%` : cameraPresence}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {posture !== undefined && posture !== null && (
+                <div className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">Posture</span>
+                        <span className="text-lg font-semibold text-white">
+                          {typeof posture === 'number' ? `${Math.round(posture)}%` : posture}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No camera data collected</p>
+          )}
+        </motion.div>
+
+        {/* Question-by-Question Analysis - Compact Style */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >

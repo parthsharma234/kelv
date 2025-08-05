@@ -16,7 +16,9 @@ import {
   Mic,
   AlertCircle,
   BookOpen,
-  Play
+  Play,
+  Camera,
+  User
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
@@ -140,6 +142,10 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
     startTime: sessionData.startTime || new Date(),
     interviewType: sessionData.interviewType || 'general'
   };
+
+  // Basic camera analytics may appear on the session directly
+  const cameraPresence = sessionData.sophisticatedAnalytics?.cameraPresence ?? sessionData.cameraPresence;
+  const posture = sessionData.sophisticatedAnalytics?.posture ?? sessionData.posture;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -739,15 +745,71 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                         <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
                       </div>
                     </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
+              ))}
+            </div>
+          </motion.div>
+        )}
 
-            {/* Question-by-Question Analysis - Compact Style with Kelv Branding */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+        {/* Computer Vision Analysis */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+            <Camera className="w-5 h-5 text-blue-400" />
+            Computer Vision
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full font-medium">
+              Focused Interview Optimized
+            </span>
+          </h3>
+          {(cameraPresence !== undefined && cameraPresence !== null) || (posture !== undefined && posture !== null) ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {cameraPresence !== undefined && cameraPresence !== null && (
+                <div className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                      <Camera className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">Camera Presence</span>
+                        <span className="text-lg font-semibold text-white">
+                          {typeof cameraPresence === 'number' ? `${Math.round(cameraPresence)}%` : cameraPresence}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {posture !== undefined && posture !== null && (
+                <div className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">Posture</span>
+                        <span className="text-lg font-semibold text-white">
+                          {typeof posture === 'number' ? `${Math.round(posture)}%` : posture}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No camera data collected</p>
+          )}
+        </motion.div>
+
+        {/* Question-by-Question Analysis - Compact Style with Kelv Branding */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
