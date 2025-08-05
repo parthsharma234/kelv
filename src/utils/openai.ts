@@ -106,48 +106,49 @@ export const processVoiceInput = async (audioBlob: Blob): Promise<string> => {
   }
 };
 
-// Extract speech metrics using advanced speech analysis
-export const extractSpeechMetrics = async (audioBlob: Blob, transcription: string, duration: number, responseTimes?: number[]) => {
+// Extract speech metrics using a lightweight in-file analysis
+export async function extractSpeechMetrics(
+  audioBlob: Blob,
+  transcription: string,
+  duration: number
+) {
   try {
-    // Import the enhanced speech analyzer
-    const { analyzeEnhancedVoiceMetrics } = await import('./enhancedSpeech');
-    
-    // Analyze voice metrics using the enhanced system
-    const voiceMetrics = await analyzeEnhancedVoiceMetrics(audioBlob, transcription, duration, Date.now(), responseTimes);
+    const legacy = await extractSpeechMetricsOld(audioBlob, transcription, duration);
 
-    // Return enhanced metrics with legacy compatibility
+    if (!legacy) {
+      throw new Error('Legacy speech metrics unavailable');
+    }
+
     return {
-      speechRate: voiceMetrics.speechRate,
-      fluencyScore: voiceMetrics.fluencyScore || voiceMetrics.fluency * 10,
-      voiceConfidence: voiceMetrics.voiceConfidence,
-      deliveryScore: voiceMetrics.deliveryScore || voiceMetrics.delivery * 10,
-      clarityScore: voiceMetrics.clarityScore || voiceMetrics.clarity * 10,
-      fillerWordCount: voiceMetrics.fillerWordCount,
-      pauseAnalysis: voiceMetrics.pauseAnalysis || {
+      speechRate: legacy.speechRate,
+      fluencyScore: legacy.fluencyScore,
+      voiceConfidence: legacy.voiceConfidence,
+      deliveryScore: legacy.delivery,
+      clarityScore: legacy.clarity,
+      fillerWordCount: legacy.fillerWordCount,
+      pauseAnalysis: {
         averagePauseLength: 0,
-        pauseFrequency: 0,
+        pauseFrequency: legacy.pauseRatio,
         strategicPauses: 0
       },
-      pitchAnalysis: voiceMetrics.pitchAnalysis || {
-        averagePitch: 0,
+      pitchAnalysis: {
+        averagePitch: legacy.estimatedPitch,
         pitchVariation: 0,
         pitchStability: 0
       },
-      energyAnalysis: voiceMetrics.energyAnalysis || {
-        averageEnergy: 0,
+      energyAnalysis: {
+        averageEnergy: legacy.averageVolume,
         energyConsistency: 0,
         dynamicRange: 0
       },
-      timestamp: voiceMetrics.timestamp,
-      // Include enhanced metrics for future use
-      fluency: voiceMetrics.fluency,
-      delivery: voiceMetrics.delivery,
-      clarity: voiceMetrics.clarity,
-      duration: typeof voiceMetrics.duration === 'number' ? voiceMetrics.duration : duration
+      timestamp: Date.now(),
+      fluency: legacy.fluencyScore / 10,
+      delivery: legacy.delivery,
+      clarity: legacy.clarity,
+      duration: legacy.duration
     };
   } catch (error) {
-    console.error('Error extracting enhanced speech metrics:', error);
-    // Return default metrics if analysis fails
+    console.error('Error extracting speech metrics:', error);
     return {
       speechRate: 0,
       fluencyScore: 0,
@@ -170,13 +171,17 @@ export const extractSpeechMetrics = async (audioBlob: Blob, transcription: strin
         energyConsistency: 0,
         dynamicRange: 0
       },
+      timestamp: Date.now(),
+      fluency: 0,
+      delivery: 0,
+      clarity: 0,
       duration
     };
   }
-};
+}
 
-// Enhanced speech metrics extraction
-export const extractSpeechMetricsOld = async (audioBlob: Blob, transcription: string, duration: number) => {
+// Enhanced speech metrics extraction (legacy basic implementation)
+export async function extractSpeechMetricsOld(audioBlob: Blob, transcription: string, duration: number) {
   try {
     // Basic metrics from transcription
     const words = transcription.toLowerCase().split(/\s+/).filter(word => word.length > 0);
@@ -314,7 +319,7 @@ export const extractSpeechMetricsOld = async (audioBlob: Blob, transcription: st
     console.error('Error extracting speech metrics:', error);
     return null;
   }
-};
+}
 
 // Pitch calculation using autocorrelation
 const calculatePitch = (data: Float32Array, sampleRate: number): number => {
