@@ -1149,11 +1149,7 @@ Return ONLY this JSON format:
   "problem_solving": 1-10,
   "communication": 1-10,
   "depth": 1-10,
-  "relevance": 1-10` : isCollegeInterview ? `,
-  "authenticity": 1-10,
-  "passion": 1-10,
-  "clarity": 1-10,
-  "specificity": 1-10` : ''}
+  "relevance": 1-10` : ''}
 }
 
 No additional text - just the JSON object.`;
@@ -1275,16 +1271,8 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
       depth: responseLength < 20 ? 1 : (hasSpecificExamples ? 6 : 3),
       relevance: Math.min(10, Math.max(1, responseLength < 20 ? 1 : Math.floor(response.length / 30) + 2))
     };
-  } else if (isCollegeInterview) {
-    return {
-      ...baseAnalysis,
-      authenticity: responseLength < 20 ? 2 : (showsEnthusiasm ? 7 : 4),
-      passion: responseLength < 20 ? 1 : (showsEnthusiasm ? 7 : 3),
-      clarity: Math.min(10, Math.max(1, responseLength < 20 ? 1 : Math.floor(response.length / 20) + 1)),
-      specificity: responseLength < 20 ? 1 : (hasSpecificExamples ? 6 : 2)
-    };
   }
-  
+
   return baseAnalysis;
 };
 
