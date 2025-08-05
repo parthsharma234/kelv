@@ -1,5 +1,6 @@
 import { InterviewSetup, Question, InterviewResponse, AIInterviewerState } from '../types/interview';
 import { synthesizeSpeechWithElevenLabs } from './elevenLabsTTS';
+import { analyzeVerbalResponse } from './verbalFeedback';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -1196,6 +1197,7 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
   const hasSTARStructure = /(situation|task|action|result|challenge|solution|outcome)/i.test(response);
   const hasQuantifiableResults = /(\d+%|\d+ percent|\$\d+|\d+ people|\d+ users|\d+ customers)/i.test(response);
   const showsEnthusiasm = /(excited|passionate|love|enjoy|thrilled|motivated|inspired)/i.test(response);
+  const verbal = analyzeVerbalResponse(response);
   
   const isFocusedInterview = !!interviewType;
   
@@ -1217,6 +1219,10 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
     if (hasSTARStructure) confidenceScore += 1;
     if (hasQuantifiableResults) confidenceScore += 1;
   }
+  // Adjust confidence by verbal analysis (filler words and sentiment)
+  confidenceScore -= verbal.fillerCount * 0.5;
+  confidenceScore += (verbal.sentiment - 0.5) * 4;
+  confidenceScore = Math.max(1, Math.min(10, Math.round(confidenceScore)));
   
   // Determine feedback and strengths based on response quality
   let feedback, strengths, areasForImprovement;
@@ -1233,12 +1239,23 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
     strengths = ["Clear Communication", "Relevant Experience", "Professional Tone"];
     areasForImprovement = ["Add Specific Examples", "Include Quantifiable Results", "Provide More Detail"];
   }
+
+  if (verbal.fillerCount > 0) {
+    areasForImprovement.push('Reduce filler words');
+  }
+  if (verbal.sentiment < 0.4) {
+    areasForImprovement.push('Maintain a calmer, more confident tone');
+  }
+  if (verbal.suggestions.length) {
+    feedback += ` ${verbal.suggestions.join(' ')}`;
+  }
   
   const baseAnalysis = {
     score: Math.min(10, Math.max(1, Math.floor(response.length / 20) + (wordCount > 5 ? 2 : 1))),
     feedback,
     strengths,
     areasForImprovement,
+    confidence: confidenceScore,
     confidenceIndicators: {
       responseLength: responseLength,
       specificExamples: hasSpecificExamples,

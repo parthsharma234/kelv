@@ -18,7 +18,8 @@ import {
   Play,
   MessageSquare,
   AlertCircle,
-  Clock
+  Clock,
+  Video
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
@@ -109,13 +110,11 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   // Add state for selected metric
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
-  // Check if sophisticated analytics are available
-  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && (
-    sessionData.sophisticatedAnalytics.summary ||
-    sessionData.sophisticatedAnalytics.timeline ||
-    sessionData.sophisticatedAnalytics.cameraPresence ||
-    sessionData.sophisticatedAnalytics.posture
-  );
+  const analyticsReport = sessionData.sophisticatedAnalytics;
+  const hasCameraAnalytics =
+    analyticsReport && (analyticsReport.cameraPresence || analyticsReport.posture);
+  const hasFullAnalytics =
+    analyticsReport && (analyticsReport.summary || analyticsReport.timeline);
   if (!sessionData) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
@@ -334,7 +333,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   }
 
   // Show sophisticated analytics if available
-  if (hasSophisticatedAnalytics) {
+  if (hasFullAnalytics) {
     return (
       <div className="min-h-screen bg-dark-900 pt-24 pb-16">
         <div className="container max-w-6xl mx-auto px-4">
@@ -854,6 +853,39 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 </button>
               </div>
             </motion.div>
+
+            {hasCameraAnalytics && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.32 }}
+                className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+              >
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-orange-400" />
+                  Camera Feedback
+                </h3>
+                {analyticsReport?.cameraPresence && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
+                    <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                      <li>Lighting: {Math.round(analyticsReport.cameraPresence.lighting * 100)}%</li>
+                      <li>Eye Contact: {Math.round(analyticsReport.cameraPresence.eyeContact * 100)}%</li>
+                    </ul>
+                    <p className="text-xs text-gray-400">{analyticsReport.cameraPresence.suggestions.join(' ')}</p>
+                  </div>
+                )}
+                {analyticsReport?.posture && (
+                  <div>
+                    <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
+                    <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                      <li>Confidence: {Math.round(analyticsReport.posture.confidence * 100)}%</li>
+                    </ul>
+                    <p className="text-xs text-gray-400">{analyticsReport.posture.suggestions.join(' ')}</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
             {/* Interview Type Advice */}
             <motion.div
