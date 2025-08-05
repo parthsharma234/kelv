@@ -75,9 +75,12 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   }, []);
 
   // Check if sophisticated analytics are available
-  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && 
-    sessionData.sophisticatedAnalytics.summary && 
-    sessionData.sophisticatedAnalytics.timeline;
+  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && (
+    sessionData.sophisticatedAnalytics.summary ||
+    sessionData.sophisticatedAnalytics.timeline ||
+    sessionData.sophisticatedAnalytics.cameraPresence ||
+    sessionData.sophisticatedAnalytics.posture
+  );
   // Add safety checks for sessionData
   if (!sessionData) {
     return (

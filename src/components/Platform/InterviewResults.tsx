@@ -110,9 +110,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   // Check if sophisticated analytics are available
-  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && 
-    sessionData.sophisticatedAnalytics.summary && 
-    sessionData.sophisticatedAnalytics.timeline;
+  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && (
+    sessionData.sophisticatedAnalytics.summary ||
+    sessionData.sophisticatedAnalytics.timeline ||
+    sessionData.sophisticatedAnalytics.cameraPresence ||
+    sessionData.sophisticatedAnalytics.posture
+  );
   if (!sessionData) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">

@@ -105,11 +105,9 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       let isMounted = true;
       setViewingSessionData(null); // Reset data when starting to load
       
-      console.log('PlatformContainer: Loading interview data for ID:', viewingInterviewId, 'State:', currentState);
       
       import('../../utils/supabase-interview').then(({ getInterviewById }) => {
         getInterviewById(viewingInterviewId).then((data: any) => {
-          console.log('PlatformContainer: Received interview data:', data);
           if (isMounted) {
             setViewingSessionData(data);
           }

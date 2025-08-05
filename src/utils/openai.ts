@@ -194,11 +194,9 @@ export async function extractSpeechMetricsOld(audioBlob: Blob, transcription: st
     if (duration < 1) {
       // Duration might be in milliseconds, convert to seconds
       safeDuration = duration / 1000;
-      console.log('Duration converted from milliseconds to seconds:', duration, '->', safeDuration);
     } else if (duration > 3600) {
       // Duration might be in wrong units, assume it's reasonable
       safeDuration = Math.min(duration, 300); // Cap at 5 minutes
-      console.log('Duration capped to reasonable value:', duration, '->', safeDuration);
     }
     
     // Account for natural pauses and hesitations in speech
@@ -211,13 +209,6 @@ export async function extractSpeechMetricsOld(audioBlob: Blob, transcription: st
     // Clamp output to 60–250 WPM for realistic range
     speechRate = Math.max(60, Math.min(250, speechRate));
     
-    console.log('Speech rate calculation debug:', {
-      wordCount,
-      rawDuration: duration,
-      safeDuration,
-      calculatedWPM: (wordCount * 60) / safeDuration,
-      clampedWPM: speechRate
-    });
     
     // Enhanced filler word detection
     const fillerWords = [
@@ -736,7 +727,6 @@ No additional text - just the JSON array.`;
       
       return questions;
     } catch (parseError) {
-      console.log(jsonMatch[0]);
       console.error('Failed to parse AI response:', questionsText);
       throw new Error('Failed to parse AI-generated questions');
     }
@@ -1610,7 +1600,6 @@ Generate exactly ${config.maxQuestions} questions. No additional text - just the
       
       return questions;
     } catch (parseError) {
-      console.log(jsonMatch[0]);
       console.error('Failed to parse AI response:', questionsText);
       throw new Error('Failed to parse AI-generated focused questions');
     }

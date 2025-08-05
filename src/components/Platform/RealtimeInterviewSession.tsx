@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, MessageCircle, AlertCircle, TrendingUp, CheckCircle, Brain } from 'lucide-react';
+import { analyzeCameraPresence, analyzePosture } from '../../utils/cameraFeedback';
 import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
@@ -171,9 +172,26 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const actualInterviewType = isFocusedInterview ? 'focused' : interviewType;
 
   // Memoize the hook options to prevent recreation on each render
-  const handleComplete = useCallback((data: unknown) => {
-    setSessionData(data);
-    onComplete(data);
+  const handleComplete = useCallback(async (data: unknown) => {
+    let enriched = data;
+    if (videoRef.current) {
+      try {
+        const cameraPresence = await analyzeCameraPresence(videoRef.current);
+        const posture = await analyzePosture(videoRef.current);
+        enriched = {
+          ...(data as Record<string, unknown>),
+          sophisticatedAnalytics: {
+            ...(data as Record<string, unknown>)?.sophisticatedAnalytics,
+            cameraPresence,
+            posture
+          }
+        };
+      } catch (err) {
+        console.error('Camera analysis failed:', err);
+      }
+    }
+    setSessionData(enriched);
+    onComplete(enriched);
   }, [onComplete]);
 
   const hookOptions = useMemo(() => ({
@@ -210,6 +228,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   // Camera setup - only initialize once
   useEffect(() => {
     let mounted = true;
+    let currentStream: MediaStream | null = null;
 
     const setupCamera = async () => {
       try {
@@ -227,6 +246,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           return;
         }
 
+        currentStream = mediaStream;
         setStream(mediaStream);
         setCameraError(null);
       } catch (error) {
@@ -241,11 +261,9 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
     return () => {
       mounted = false;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      currentStream?.getTracks().forEach(track => track.stop());
     };
-    }, [isVoiceMode, stream]);
+  }, [isVoiceMode]);
 
   // Handle video element assignment separately
   useEffect(() => {

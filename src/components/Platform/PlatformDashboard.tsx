@@ -81,16 +81,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
           getUserStrengthsAndWeaknesses()
         ]);
         
-        console.log('Dashboard: Loaded interview history:', {
-          total: history.length,
-          histories: history.map(h => ({
-            id: h.id,
-            interviewType: h.interviewType,
-            date: h.date,
-            status: h.status,
-            overallScore: h.overallScore
-          }))
-        });
         
         setInterviewHistory(history);
         setStats(statsData);
@@ -194,13 +184,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                 .map((interview) => {
                   const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined;
 
-                  console.log('Dashboard: Rendering interview:', {
-                    id: interview.id,
-                    interviewType: interview.interviewType,
-                    isFocused: isFocusedInterview,
-                    date: interview.date,
-                    status: interview.status
-                  });
 
                   return (
                     <div

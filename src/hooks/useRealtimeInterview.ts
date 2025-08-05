@@ -351,15 +351,13 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       });
 
       clientRef.current.on('transcript.update', (chunk: TranscriptChunk) => {
-        console.log(`[Realtime] Transcript Update (${chunk.speaker}):`, chunk);
-        
         if (chunk.speaker === 'user') {
           handleUserTranscript(chunk.text, !chunk.isPartial);
         } else if (chunk.speaker === 'assistant') {
           // Use handleAssistantResponse for AI text, which manages buffering
           handleAssistantResponse(chunk.text, !chunk.isPartial);
         }
-        
+
         // Save complete chunks to the database
         if (!chunk.isPartial) {
           handleCompleteTranscriptChunk(chunk);
@@ -388,7 +386,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       });
 
       clientRef.current.on('response.done', () => {
-        console.log('[Realtime] Response Done (AI)');
         setSpeakerStatus('ai', false);
         // Finalize any buffered text for the assistant's response
         handleAssistantResponse('', true);
@@ -399,13 +396,11 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         if (event.delta) {
           // Audio delta is handled by the OpenAI client internally
           // We'll retrieve audio chunks directly from the client when needed
-          console.log('Audio delta received from assistant');
         }
       });
 
       clientRef.current.on('input_audio_buffer.committed', () => {
         // User audio is committed, we can analyze it
-        console.log('[Realtime] User audio committed');
       });
 
     } catch (error) {
@@ -657,10 +652,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       const fullTranscription = state.transcript.filter(t => t.speaker === 'user').map(t => t.text).join(' ');
       const duration = state.duration;
 
-      console.log('Processing voice analytics post-interview...');
             const metrics = await extractSpeechMetrics(fullAudioBlob, fullTranscription, duration, responseTimesRef.current);
 
-      console.log('Post-interview voice metrics:', metrics);
       return metrics ? [{ questionId: 'summary', metrics }] : [];
     } catch (error) {
       console.error('Error processing voice analytics:', error);
@@ -669,7 +662,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
   }, [setup.interviewMode, state.transcript, state.duration]);
 
   const endInterview = useCallback(async () => {
-    console.log('Ending realtime interview...');
     stopTimer();
     setStatus('processing');
     
@@ -677,9 +669,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       let voiceMetrics: SpeechMetricEntry[] | null = null;
       let voiceTimeline: VoiceTimelinePoint[] = [];
       try {
-        console.log('Starting voice analytics processing...');
         voiceMetrics = await processVoiceAnalytics();
-        console.log('Voice analytics processing finished.');
       } catch (error) {
         console.error('Error during voice analytics processing:', error);
         // Continue without voice metrics if processing fails
@@ -796,7 +786,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       // Update realtime session in Supabase with final data
       if (state.sessionId) {
         try {
-          console.log('Updating realtime session in Supabase...');
           await updateRealtimeSession(state.sessionId, {
             end_time: new Date().toISOString(),
             status: 'completed',
@@ -805,7 +794,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           });
 
           // Parse transcript into structured Q&A pairs for analysis
-          console.log('Parsing transcript into Q&A pairs...');
           const { questions, responses } = await parseTranscriptIntoQAPairs(state.transcript);
           
           // Calculate overall score from responses
@@ -815,7 +803,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           
           // Prepare session data for completion
           const finalSpeechMetrics = voiceMetrics || getSpeechMetrics();
-          console.log('Speech metrics collected:', finalSpeechMetrics.length, 'entries');
           
           const sessionData = {
             sessionId: state.sessionId,
@@ -838,14 +825,12 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
           // Save structured interview data for viewing in recent interviews
           try {
-            console.log('Saving realtime interview session...');
             await saveRealtimeInterviewSession(sessionData);
           } catch (saveError) {
             console.error('Failed to save realtime interview session:', saveError);
             // Continue even if save fails
           }
 
-          console.log('Calling onComplete with session data...');
           onComplete?.(sessionData);
         } catch (supabaseError) {
           console.error('Failed to update realtime session in Supabase:', supabaseError);
@@ -863,7 +848,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             voiceTimeline
           };
           
-          console.log('Calling onComplete with fallback data...');
           onComplete?.(fallbackData);
         }
       } else {

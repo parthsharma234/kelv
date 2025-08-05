@@ -206,7 +206,6 @@ export class OpenAIRealtimeClient extends EventEmitter {
   private handleMessage(event: MessageEvent): void {
     try {
       const data = JSON.parse(event.data);
-      console.log('[WebSocket] Received:', data); // Add this line for debugging
 
       // Check for error messages from the server
       if (data.type === 'error') {
