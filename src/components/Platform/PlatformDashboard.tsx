@@ -342,123 +342,117 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                 Dynamic
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {/* Sessions Card */}
-              <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-orange-500/30 rounded-lg">
-                    <BarChart3 className="w-5 h-5 text-orange-300" />
-                  </div>
-                  <span className="text-orange-200 text-sm font-medium">Dynamic Sessions</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic').length}
-                </div>
-                <div className="text-xs text-orange-300 mt-2">
-                  Adaptive interviews completed
-                </div>
-              </div>
-              {/* Overall Score Card */}
-              <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-orange-500/30 rounded-lg">
-                    <Award className="w-5 h-5 text-orange-300" />
-                  </div>
-                  <span className="text-orange-200 text-sm font-medium">Overall Score</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {(() => {
-                    const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                    if (dynamic.length === 0) return '--';
-                    return Math.round(dynamic.reduce((sum, i) => sum + i.overallScore, 0) / dynamic.length) + '%';
-                  })()}
-                </div>
-                <div className="text-xs text-orange-300 mt-2">
-                  Average dynamic interview score
-                </div>
-              </div>
-            </div>
-            {/* 2x2 grid for metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Problem Solving Card */}
+              {/* Column 1: Sessions + Problem/Communication */}
+              <div className="space-y-6">
+                {/* Sessions Card */}
                 <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <Target className="w-5 h-5 text-orange-300" />
+                      <BarChart3 className="w-5 h-5 text-orange-300" />
                     </div>
-                    <span className="text-orange-200 text-sm font-medium">Problem Solving</span>
+                    <span className="text-orange-200 text-sm font-medium">Dynamic Sessions</span>
                   </div>
                   <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.problem_solving ? [(i as any).metrics.problem_solving] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
+                    {interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic').length}
                   </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. problem solving score
+                  <div className="text-xs text-orange-300 mt-2">Adaptive interviews completed</div>
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Problem Solving Card */}
+                  <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-orange-500/30 rounded-lg">
+                        <Target className="w-5 h-5 text-orange-300" />
+                      </div>
+                      <span className="text-orange-200 text-sm font-medium">Problem Solving</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white">
+                      {(() => {
+                        const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                        const scores = dynamic.flatMap(i => (i as any).metrics?.problem_solving ? [(i as any).metrics.problem_solving] : []);
+                        if (scores.length === 0) return '--';
+                        return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                      })()}
+                    </div>
+                    <div className="text-xs text-orange-300 mt-2">Avg. problem solving score</div>
+                  </div>
+                  {/* Communication Card */}
+                  <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-orange-500/30 rounded-lg">
+                        <MessageSquare className="w-5 h-5 text-orange-300" />
+                      </div>
+                      <span className="text-orange-200 text-sm font-medium">Communication</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white">
+                      {(() => {
+                        const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                        const scores = dynamic.flatMap(i => (i as any).metrics?.communication ? [(i as any).metrics.communication] : []);
+                        if (scores.length === 0) return '--';
+                        return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                      })()}
+                    </div>
+                    <div className="text-xs text-orange-300 mt-2">Avg. communication score</div>
                   </div>
                 </div>
-                {/* Communication Card */}
+              </div>
+
+              {/* Column 2: Overall Score + Depth/Relevance */}
+              <div className="space-y-6">
+                {/* Overall Score Card */}
                 <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <MessageSquare className="w-5 h-5 text-orange-300" />
+                      <Award className="w-5 h-5 text-orange-300" />
                     </div>
-                    <span className="text-orange-200 text-sm font-medium">Communication</span>
+                    <span className="text-orange-200 text-sm font-medium">Overall Score</span>
                   </div>
                   <div className="text-3xl font-bold text-white">
                     {(() => {
                       const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.communication ? [(i as any).metrics.communication] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                      if (dynamic.length === 0) return '--';
+                      return Math.round(dynamic.reduce((sum, i) => sum + i.overallScore, 0) / dynamic.length) + '%';
                     })()}
                   </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. communication score
-                  </div>
+                  <div className="text-xs text-orange-300 mt-2">Average dynamic interview score</div>
                 </div>
-                {/* Depth Card */}
-                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <Brain className="w-5 h-5 text-orange-300" />
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Depth Card */}
+                  <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-orange-500/30 rounded-lg">
+                        <Brain className="w-5 h-5 text-orange-300" />
+                      </div>
+                      <span className="text-orange-200 text-sm font-medium">Depth</span>
                     </div>
-                    <span className="text-orange-200 text-sm font-medium">Depth</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.depth ? [(i as any).metrics.depth] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
-                  </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. depth score
-                  </div>
-                </div>
-                {/* Relevance Card */}
-                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <CheckCircle className="w-5 h-5 text-orange-300" />
+                    <div className="text-3xl font-bold text-white">
+                      {(() => {
+                        const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                        const scores = dynamic.flatMap(i => (i as any).metrics?.depth ? [(i as any).metrics.depth] : []);
+                        if (scores.length === 0) return '--';
+                        return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                      })()}
                     </div>
-                    <span className="text-orange-200 text-sm font-medium">Relevance</span>
+                    <div className="text-xs text-orange-300 mt-2">Avg. depth score</div>
                   </div>
-                  <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.relevance ? [(i as any).metrics.relevance] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
-                  </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. relevance score
+                  {/* Relevance Card */}
+                  <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-orange-500/30 rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-orange-300" />
+                      </div>
+                      <span className="text-orange-200 text-sm font-medium">Relevance</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white">
+                      {(() => {
+                        const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+                        const scores = dynamic.flatMap(i => (i as any).metrics?.relevance ? [(i as any).metrics.relevance] : []);
+                        if (scores.length === 0) return '--';
+                        return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
+                      })()}
+                    </div>
+                    <div className="text-xs text-orange-300 mt-2">Avg. relevance score</div>
                   </div>
                 </div>
               </div>
