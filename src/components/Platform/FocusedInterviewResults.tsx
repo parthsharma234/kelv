@@ -753,11 +753,49 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
               </motion.div>
             )}
 
+            {/* Computer Vision */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28 }}
+              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-blue-400" />
+                Computer Vision
+              </h3>
+              {hasCameraAnalytics ? (
+                <>
+                  {cameraPresence && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
+                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                        <li>Lighting: {Math.round(cameraPresence.lighting * 100)}%</li>
+                        <li>Eye Contact: {Math.round(cameraPresence.eyeContact * 100)}%</li>
+                      </ul>
+                      <p className="text-xs text-gray-400">{cameraPresence.suggestions.join(' ')}</p>
+                    </div>
+                  )}
+                  {posture && (
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
+                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
+                        <li>Confidence: {Math.round(posture.confidence * 100)}%</li>
+                      </ul>
+                      <p className="text-xs text-gray-400">{posture.suggestions.join(' ')}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">No camera data collected.</p>
+              )}
+            </motion.div>
+
             {/* Question-by-Question Analysis - Compact Style with Kelv Branding */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.32 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
               <div className="flex items-center gap-3 mb-6">
@@ -917,44 +955,6 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                   Practice Again
                 </button>
               </div>
-            </motion.div>
-
-            {/* Computer Vision */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.32 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Eye className="w-5 h-5 text-blue-400" />
-                Computer Vision
-              </h3>
-              {hasCameraAnalytics ? (
-                <>
-                  {cameraPresence && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
-                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                        <li>Lighting: {Math.round(cameraPresence.lighting * 100)}%</li>
-                        <li>Eye Contact: {Math.round(cameraPresence.eyeContact * 100)}%</li>
-                      </ul>
-                      <p className="text-xs text-gray-400">{cameraPresence.suggestions.join(' ')}</p>
-                    </div>
-                  )}
-                  {posture && (
-                    <div>
-                      <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
-                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                        <li>Confidence: {Math.round(posture.confidence * 100)}%</li>
-                      </ul>
-                      <p className="text-xs text-gray-400">{posture.suggestions.join(' ')}</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-gray-400">No camera data collected.</p>
-              )}
             </motion.div>
 
             {/* Interview Type Advice */}

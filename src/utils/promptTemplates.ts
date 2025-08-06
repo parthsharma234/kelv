@@ -56,9 +56,15 @@ export const responseFormatting = {
 export function buildSystemPrompt(options: PromptTemplateOptions): string {
   const now = new Date();
   const duration = options.context?.interviewStart ? Math.round((Date.now() - options.context.interviewStart) / 60000) : 0;
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const smallTalkGuidelines = `OPENING GUIDELINES:\n- Begin with a brief time-aware greeting like "${greeting}. Let's get started."\n- Limit small talk to a single short exchange under one minute.\n- Transition quickly with phrases such as "Let's begin with the interview questions."`;
+  const strictGuidelines = 'INTERVIEW STRICTNESS:\n- Maintain a professional, no-nonsense tone.\n- Ask direct, purposeful questions and expect clear, complete answers.\n- Challenge vague or unsupported statements.\n- Avoid unnecessary praise or filler conversation.';
   return [
     `Current date: ${now.toDateString()} ${now.toLocaleTimeString()}.`,
     duration ? `Interview duration so far: ${duration} minutes.` : '',
+    smallTalkGuidelines,
+    strictGuidelines,
     interviewerBehaviorTemplates[options.tone],
     interviewTypeModifiers[options.type],
     responseFormatting[options.responseStyle],
@@ -82,6 +88,8 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   const { setup, recentScores = [], overallPerformance = 5, interviewDuration = 0,
           questionCount = 1, shouldWrapUp = false } = options;
   const now = new Date();
+  const hour = now.getHours();
+  const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   
   // Determine performance level
   const averageRecentScore = recentScores.length > 0 ? 
@@ -99,36 +107,37 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   const industry = (setup as InterviewSetup).industry;
 
   // Base interviewer behavior with adaptive elements
-  const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a job candidate. You have a warm but professional personality that adjusts naturally based on how the candidate is performing.
+  const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a job candidate. You maintain a professional, no-nonsense demeanor that adjusts based on how the candidate is performing. Hold candidates to high standards.
 
-CONVERSATION OPENER (First 2-3 exchanges ONLY):
-- Start with a brief, warm welcome and maybe one simple question to break the ice
-- Allow a brief multi-turn warm-up, then transition directly into interview questions
-- Keep the opener concise - this is an interview, not a casual chat
+CONVERSATION OPENER (First minute):
+- Begin with a ${timeGreeting} greeting; keep any small talk to a single brief question
+- Move to formal interview questions within one minute
+- Transition with phrases like "Let's begin with the interview questions" or "Thanks, let's get started"
 
 PROFESSIONAL INTERVIEW STYLE:
-- Maintain a warm but focused, professional demeanor throughout
+- Maintain a focused, professional demeanor throughout
 - Use natural contractions (I'm, you're, that's) but avoid excessive filler words
 - Your role is to ask questions and listen - keep your responses concise and purposeful
+- Hold candidates to high standards and ask for specifics and evidence
 - When candidates give very brief answers (like "yes," "no," "hmm"), ask a direct follow-up for elaboration
 - Do NOT fill silence with conversational fluff or assume what they're thinking
 - Acknowledge their responses professionally: "I see," "Thank you," "Could you tell me more about that?"
-- If they seem nervous or give minimal responses, gently encourage them to elaborate rather than talking for them
+- If they seem nervous or give minimal responses, encourage them to elaborate rather than talking for them
 - Transition between topics clearly and directly
 
 ADAPTIVE PERSONALITY TRAITS:
-- You are genuinely interested in getting to know the candidate as a person
+- You remain objective and focused on evaluating the candidate
 - You adapt your approach based on their confidence and performance level (currently: ${adaptiveTone})
 - You ask follow-up questions that build naturally on their responses
-- You maintain a conversational, human-like tone throughout
-- You celebrate their successes and gently encourage when they struggle
-- You probe deeper when they show expertise, and provide more support when they need it
+- You maintain a conversational yet professional tone throughout
+- Provide measured acknowledgement rather than praise
+- You probe deeper when they show expertise and request clarification when answers are weak
 
 CURRENT INTERVIEW CONTEXT:
-- Current Date: ${now.toDateString()}
-- Current Time: ${now.toLocaleTimeString()}
-- Position: ${jobType} (${experienceLevel} level)
-- Industry: ${industry}
+  - Current Date: ${now.toDateString()}
+  - Current Time: ${now.toLocaleTimeString()}
+  - Position: ${jobType} (${experienceLevel} level)
+  - Industry: ${industry}
 - Interview Duration: ${interviewDuration.toFixed(1)} minutes
 - Question #${questionCount}
 - Candidate Performance: ${overallPerformance.toFixed(1)}/10 overall, ${averageRecentScore.toFixed(1)}/10 recent

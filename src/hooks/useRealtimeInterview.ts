@@ -456,9 +456,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       'how have you been'
     ];
 
-    const classifyQuestion = (text: string, index: number): string => {
+    const classifyQuestion = (text: string, index: number, timestamp: number): string => {
       const q = text.toLowerCase();
-      if (index < 2 && SMALL_TALK_PHRASES.some(p => q.includes(p))) {
+      const isEarly = startTimeRef.current ? (timestamp - startTimeRef.current.getTime()) <= 60 * 1000 : true;
+      if (index < 2 && isEarly && SMALL_TALK_PHRASES.some(p => q.includes(p))) {
         return 'small_talk';
       }
       if (/tell me about|describe a time|give me an example|have you ever|situation|challenge|conflict|time when/.test(q)) {
@@ -517,7 +518,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         currentQuestion = chunk.text.trim();
         currentQuestionId = `q_${questions.length + 1}_${Date.now()}`;
 
-        const category = classifyQuestion(currentQuestion, questions.length);
+        const category = classifyQuestion(currentQuestion, questions.length, chunk.timestamp);
         questions.push({
           id: currentQuestionId,
           text: currentQuestion,
