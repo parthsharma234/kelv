@@ -174,10 +174,27 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   // Memoize the hook options to prevent recreation on each render
   const handleComplete = useCallback(async (data: unknown) => {
     let enriched = data;
-    if (videoRef.current) {
-      try {
-        const cameraPresence = await analyzeCameraPresence(videoRef.current);
-        const posture = await analyzePosture(videoRef.current);
+    let videoElement: HTMLVideoElement | null = null;
+
+    try {
+      if (videoRef.current && videoRef.current.readyState >= 2) {
+        console.debug('Using active video element for camera analysis');
+        videoElement = videoRef.current;
+      } else if (stream) {
+        console.debug('Creating temporary video element for camera analysis');
+        const tempVideo = document.createElement('video');
+        tempVideo.srcObject = stream;
+        await new Promise<void>(resolve => {
+          tempVideo.onloadedmetadata = () => resolve();
+        });
+        videoElement = tempVideo;
+      } else {
+        console.warn('No video element or stream available for analysis');
+      }
+
+      if (videoElement) {
+        const cameraPresence = await analyzeCameraPresence(videoElement);
+        const posture = await analyzePosture(videoElement);
         enriched = {
           ...(data as Record<string, unknown>),
           cameraPresence,
@@ -188,13 +205,14 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
             posture
           }
         };
-      } catch (err) {
-        console.error('Camera analysis failed:', err);
       }
+    } catch (err) {
+      console.error('Camera analysis failed:', err);
     }
+
     setSessionData(enriched);
     onComplete(enriched);
-  }, [onComplete]);
+  }, [onComplete, stream]);
 
   const hookOptions = useMemo(() => ({
     setup,
@@ -234,6 +252,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
     const setupCamera = async () => {
       try {
+        console.debug('Requesting camera access');
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 1280 },
@@ -247,8 +266,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           mediaStream.getTracks().forEach(track => track.stop());
           return;
         }
-
         currentStream = mediaStream;
+        console.debug('Camera stream obtained', mediaStream);
         setStream(mediaStream);
         setCameraError(null);
       } catch (error) {

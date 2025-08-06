@@ -665,7 +665,7 @@ export const deleteCollegeInterviewSetup = async (setupId: string): Promise<bool
 
 export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
   if (!isSupabaseConfigured()) {
-    // Return localStorage data as fallback
+    console.warn('Supabase not configured - using local interview history');
     const localHistory = localStorage.getItem('kelv-interview-history');
     return localHistory ? JSON.parse(localHistory) : [];
   }
@@ -726,7 +726,7 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
 
 export const getInterviewStats = async () => {
   if (!isSupabaseConfigured()) {
-    // Calculate from localStorage
+    console.warn('Supabase not configured - calculating stats from localStorage');
     const localHistory = localStorage.getItem('kelv-interview-history');
     const history = localHistory ? JSON.parse(localHistory) : [];
     
@@ -768,6 +768,7 @@ export const getInterviewStats = async () => {
   }
 
   try {
+    console.debug('Fetching interview stats from Supabase');
     const { data, error } = await supabase
       .from('interview_sessions')
       .select('overall_score, duration, created_at, speech_metrics, responses, interview_type')
@@ -871,10 +872,12 @@ export const getInterviewStats = async () => {
 
 export const getUserStrengthsAndWeaknesses = async () => {
   if (!isSupabaseConfigured()) {
+    console.warn('Supabase not configured - cannot fetch strengths and weaknesses');
     return { strengths: [], weaknesses: [], categories: {} };
   }
 
   try {
+    console.debug('Fetching strengths and weaknesses from Supabase');
     const { data, error } = await supabase
       .from('interview_sessions')
       .select('responses, overall_score, created_at')
@@ -886,6 +889,8 @@ export const getUserStrengthsAndWeaknesses = async () => {
       console.error('Error fetching interview data for analysis:', error);
       return { strengths: [], weaknesses: [], categories: {} };
     }
+
+    console.debug(`Retrieved ${data.length} sessions for analysis`);
 
     // Analyze responses for patterns
     const allResponses = data.flatMap(session => session.responses || []);
