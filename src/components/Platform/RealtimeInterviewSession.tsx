@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, MessageCircle, AlertCircle, TrendingUp, CheckCircle, Brain } from 'lucide-react';
 import { analyzeCameraPresence, analyzePosture } from '../../utils/cameraFeedback';
+import type { CameraPresence, PostureScore, CameraTimelinePoint } from '../../types/analytics';
 import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
@@ -22,6 +23,7 @@ interface VoiceMetric {
   color: string;
   detail: string;
 }
+
 
 function extractVoiceMetrics(sessionData: unknown): VoiceMetric[] | null {
   if (!sessionData) return null;
@@ -162,6 +164,10 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<unknown>(null); // Store final session data after completion
+  const [analysisTimeline, setAnalysisTimeline] = useState<CameraTimelinePoint[]>([]);
+
+  const recordedChunks = useRef<Blob[]>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -192,27 +198,39 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         console.warn('No video element or stream available for analysis');
       }
 
+      let cameraPresence: CameraPresence | undefined;
+      let posture: PostureScore | undefined;
       if (videoElement) {
-        const cameraPresence = await analyzeCameraPresence(videoElement);
-        const posture = await analyzePosture(videoElement);
-        enriched = {
-          ...(data as Record<string, unknown>),
+        cameraPresence = await analyzeCameraPresence(videoElement);
+        posture = await analyzePosture(videoElement);
+      }
+
+      const recordingBlob = recordedChunks.current.length
+        ? new Blob(recordedChunks.current, { type: 'video/webm' })
+        : null;
+      const recordingUrl = recordingBlob ? URL.createObjectURL(recordingBlob) : undefined;
+
+      enriched = {
+        ...(data as Record<string, unknown>),
+        cameraPresence,
+        posture,
+        analysisTimeline,
+        recordingUrl,
+        sophisticatedAnalytics: {
+          ...(data as Record<string, unknown>)?.sophisticatedAnalytics,
           cameraPresence,
           posture,
-          sophisticatedAnalytics: {
-            ...(data as Record<string, unknown>)?.sophisticatedAnalytics,
-            cameraPresence,
-            posture
-          }
-        };
-      }
+          analysisTimeline,
+          recordingUrl
+        }
+      };
     } catch (err) {
       console.error('Camera analysis failed:', err);
     }
 
     setSessionData(enriched);
     onComplete(enriched);
-  }, [onComplete, stream]);
+  }, [analysisTimeline, onComplete, stream]);
 
   const hookOptions = useMemo(() => ({
     setup,
@@ -296,6 +314,46 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       }
     }
   }, [hasStarted, stream]);
+
+  // Record the session video and collect camera metrics over time
+  useEffect(() => {
+    if (!stream) return;
+    try {
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    } catch (err) {
+      console.warn('Falling back to default MediaRecorder options', err);
+      mediaRecorderRef.current = new MediaRecorder(stream);
+    }
+    const recorder = mediaRecorderRef.current;
+    recorder.ondataavailable = event => {
+      if (event.data.size > 0) {
+        recordedChunks.current.push(event.data);
+      }
+    };
+    recorder.start();
+    return () => {
+      recorder.stop();
+    };
+  }, [stream]);
+
+  useEffect(() => {
+    if (!stream) return;
+    const interval = window.setInterval(async () => {
+      const el = videoRef.current;
+      if (!el || el.readyState < 2) return;
+      try {
+        const cameraPresence = await analyzeCameraPresence(el);
+        const posture = await analyzePosture(el);
+        setAnalysisTimeline(prev => [
+          ...prev,
+          { timestamp: Date.now(), cameraPresence, posture }
+        ]);
+      } catch (err) {
+        console.warn('Periodic camera analysis failed', err);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [analyzeCameraPresence, analyzePosture, stream]);
 
   // Handle microphone toggle
   const toggleMute = () => {
