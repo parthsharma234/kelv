@@ -22,6 +22,12 @@ export interface PostureScore {
   suggestions: string[]; // Actionable posture tips
 }
 
+export interface CameraTimelinePoint {
+  timestamp: number;
+  cameraPresence: CameraPresence;
+  posture: PostureScore;
+}
+
 export interface VerbalFeedback {
   fillerCount: number;
   sentiment: number; // 0..1 where 0.5 is neutral

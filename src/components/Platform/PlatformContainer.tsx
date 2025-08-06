@@ -74,10 +74,12 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
   const [viewingInterviewId, setViewingInterviewId] = useState<string>('');
-  
+  const [processingComplete, setProcessingComplete] = useState(false);
+  const [focusedProcessingComplete, setFocusedProcessingComplete] = useState(false);
+
   // State for viewing interview results - moved to top level to avoid conditional hooks
   const [viewingSessionData, setViewingSessionData] = useState<any>(null);
-  
+
   // State for viewing metric details
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   
@@ -124,6 +126,20 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       };
     }
   }, [currentState, viewingInterviewId]);
+
+  React.useEffect(() => {
+    if (processingComplete && sessionData) {
+      setCurrentState('results');
+      setProcessingComplete(false);
+    }
+  }, [processingComplete, sessionData]);
+
+  React.useEffect(() => {
+    if (focusedProcessingComplete && sessionData) {
+      setCurrentState('focused-results');
+      setFocusedProcessingComplete(false);
+    }
+  }, [focusedProcessingComplete, sessionData]);
 
   if (loading) {
     return (
@@ -172,6 +188,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleInterviewComplete = (data: any) => {
     setSessionData(data);
+    setProcessingComplete(false);
     setCurrentState('processing');
     scrollToTop();
   };
@@ -190,6 +207,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   const handleFocusedInterviewComplete = (data: any) => {
     setSessionData(data);
+    setFocusedProcessingComplete(false);
     setCurrentState('processing-focused');
     scrollToTop();
   };
@@ -377,7 +395,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           setup={interviewSetup as InterviewSetup}
           interviewType="standard"
           onComplete={handleInterviewComplete}
-          onProcessingStart={() => { setCurrentState('processing'); scrollToTop(); }}
+          onProcessingStart={() => { setProcessingComplete(false); setCurrentState('processing'); scrollToTop(); }}
           onBack={handleBackToDashboard}
         />
       )}
@@ -387,20 +405,20 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
           setup={interviewSetup as InterviewSetup}
           interviewType={focusedInterviewType}
           onComplete={handleFocusedInterviewComplete}
-          onProcessingStart={() => { setCurrentState('processing-focused'); scrollToTop(); }}
+          onProcessingStart={() => { setFocusedProcessingComplete(false); setCurrentState('processing-focused'); scrollToTop(); }}
           onBack={handleBackToDashboard}
         />
       )}
 
       {currentState === 'processing' && (
         <InterviewProcessing
-          onComplete={() => setCurrentState('results')}
+          onComplete={() => setProcessingComplete(true)}
         />
       )}
 
       {currentState === 'processing-focused' && (
         <InterviewProcessing
-          onComplete={() => setCurrentState('focused-results')}
+          onComplete={() => setFocusedProcessingComplete(true)}
         />
       )}
 
