@@ -26,10 +26,14 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   // Very naive eye contact detection – if FaceDetector is available we
   // assume eye contact when a face is found near the center of the frame.
   let eyeContact = 0.5;
+  let framing = 0.5;
+  let headPositionStability = 0.5;
+  let facialExpressiveness = 0.5;
+  let blinkRate = 0.5;
   if ('FaceDetector' in window) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const detector = new (window as any).FaceDetector();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detector = new (window as any).FaceDetector();
       const faces = await detector.detect(canvas);
       if (faces.length > 0) {
         const { boundingBox } = faces[0];
@@ -38,8 +42,14 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
         const distX = Math.abs(centerX - canvas.width / 2) / (canvas.width / 2);
         const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
         eyeContact = Math.max(0, 1 - (distX + distY) / 2);
+        framing = Math.max(0, 1 - Math.max(distX, distY));
+        // Placeholders – real implementations would require temporal analysis
+        headPositionStability = 0.5;
+        facialExpressiveness = 0.5;
+        blinkRate = 0.5;
       } else {
         eyeContact = 0;
+        framing = 0;
       }
     } catch {
       /* FaceDetector not available */
@@ -47,8 +57,18 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   }
 
   const suggestions: string[] = [];
-  if (lighting < 0.4) suggestions.push('Increase lighting in front of you.');
-  if (eyeContact < 0.5) suggestions.push('Try to look toward the camera lens.');
+  if (lighting < 0.4)
+    suggestions.push('Add a front-facing light source like a lamp or sit facing a window.');
+  if (eyeContact < 0.5)
+    suggestions.push('Look more directly into your webcam, not at your screen.');
+  if (headPositionStability < 0.6)
+    suggestions.push('Keep your head steady and minimize unnecessary movement.');
+  if (framing < 0.6)
+    suggestions.push('Center your face within the webcam view with appropriate headroom.');
+  if (facialExpressiveness < 0.4)
+    suggestions.push('Use more varied facial expressions to appear engaged.');
+  if (blinkRate < 0.4)
+    suggestions.push('Maintain focus on the camera and avoid distractions.');
   if (suggestions.length === 0) suggestions.push('Great camera presence.');
 
   const result: CameraPresence = {
@@ -56,6 +76,10 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
     eyeContact: Number(eyeContact.toFixed(2)),
     smile: 0, // Placeholder – real model would be required
     attentiveness: 0.5,
+    facialExpressiveness,
+    headPositionStability,
+    framing,
+    blinkRate,
     suggestions,
   };
 
@@ -86,7 +110,7 @@ export async function analyzePosture(video: HTMLVideoElement): Promise<PostureSc
         const posture: PostureScore = {
           confidence,
           suggestions: confidence < 0.7
-            ? ['Sit upright and center yourself in the frame.']
+            ? ['Sit upright, center your face, and avoid leaning.']
             : ['Good posture maintained.']
         };
         console.debug('Posture analysis result', posture);

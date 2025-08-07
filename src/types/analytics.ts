@@ -14,6 +14,10 @@ export interface CameraPresence {
   eyeContact: number; // 0..1
   smile: number; // 0..1 placeholder
   attentiveness: number; // 0..1 placeholder
+  facialExpressiveness?: number; // 0..1 placeholder
+  headPositionStability?: number; // 0..1 placeholder
+  framing?: number; // 0..1 placeholder
+  blinkRate?: number; // 0..1 placeholder
   suggestions: string[]; // Actionable feedback
 }
 
@@ -26,6 +30,15 @@ export interface CameraTimelinePoint {
   timestamp: number;
   cameraPresence: CameraPresence;
   posture: PostureScore;
+}
+
+export interface VoiceMetricsSummary {
+  speechRate?: number; // words per minute
+  fluencyScore?: number; // 0-100
+  voiceConfidence?: number; // 0-100
+  deliveryScore?: number; // 0-100
+  clarityScore?: number; // 0-100
+  fillerWordCount?: number; // count
 }
 
 export interface VerbalFeedback {

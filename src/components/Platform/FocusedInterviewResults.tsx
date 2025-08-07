@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
-import SophisticatedResultsView from './SophisticatedResultsView';
+import CameraFeedback from './CameraFeedback';
 
 // Utility function to format category labels for focused interviews
 const formatCategoryLabel = (category: string): string => {
@@ -80,6 +80,8 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
   const analyticsReport = sessionData.sophisticatedAnalytics;
   const cameraPresence = analyticsReport?.cameraPresence || sessionData.cameraPresence;
   const posture = analyticsReport?.posture || sessionData.posture;
+  const recordingUrl = analyticsReport?.recordingUrl || sessionData.recordingUrl;
+  const timeline = analyticsReport?.analysisTimeline || sessionData.analysisTimeline;
   const hasCameraAnalytics = cameraPresence || posture;
   const hasSophisticatedAnalytics = analyticsReport && (
     analyticsReport.summary ||
@@ -385,9 +387,6 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
               </div>
             </div>
           </motion.div>
-
-          {/* Sophisticated Results */}
-          <SophisticatedResultsView analyticsReport={sessionData.sophisticatedAnalytics} />
 
           {/* Action Buttons */}
           <motion.div
@@ -765,27 +764,12 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                 Computer Vision
               </h3>
               {hasCameraAnalytics ? (
-                <>
-                  {cameraPresence && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium text-white mb-2">Presence</h4>
-                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                        <li>Lighting: {Math.round(cameraPresence.lighting * 100)}%</li>
-                        <li>Eye Contact: {Math.round(cameraPresence.eyeContact * 100)}%</li>
-                      </ul>
-                      <p className="text-xs text-gray-400">{cameraPresence.suggestions.join(' ')}</p>
-                    </div>
-                  )}
-                  {posture && (
-                    <div>
-                      <h4 className="text-sm font-medium text-white mb-2">Posture</h4>
-                      <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-                        <li>Confidence: {Math.round(posture.confidence * 100)}%</li>
-                      </ul>
-                      <p className="text-xs text-gray-400">{posture.suggestions.join(' ')}</p>
-                    </div>
-                  )}
-                </>
+                <CameraFeedback
+                  cameraPresence={cameraPresence}
+                  posture={posture}
+                  recordingUrl={recordingUrl}
+                  timeline={timeline}
+                />
               ) : (
                 <p className="text-sm text-gray-400">No camera data collected.</p>
               )}
