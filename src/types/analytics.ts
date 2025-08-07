@@ -13,6 +13,8 @@ export interface CameraPresence {
   lighting: number; // 0..1
   eyeContact: number; // 0..1
   smile: number; // 0..1 placeholder
+  smileFrequency?: number; // 0..1, proportion of time smiling
+  gestureMagnitude?: number; // 0..1, average hand/pose movement
   attentiveness: number; // 0..1 placeholder
   facialExpressiveness?: number; // 0..1 placeholder
   headPositionStability?: number; // 0..1 placeholder
@@ -22,6 +24,7 @@ export interface CameraPresence {
   offFrame?: number; // 0..1, percentage of time face is off frame
   suggestions: string[]; // Actionable feedback
   triggers?: string[]; // Threshold messages with durations
+  confidenceTips?: string[]; // Combined confidence coaching cues
 }
 
 export interface PostureScore {
@@ -43,6 +46,9 @@ export interface VoiceMetricsSummary {
   deliveryScore?: number; // 0-100
   clarityScore?: number; // 0-100
   fillerWordCount?: number; // count
+  vocalEnergy?: number; // 0-100 average vocal energy
+  sentimentPaceBalance?: number; // 0-100 balance of sentiment vs pace
+  confidenceTips?: string[]; // Voice-related confidence tips
 }
 
 export interface VerbalFeedback {

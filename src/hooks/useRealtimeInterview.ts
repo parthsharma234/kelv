@@ -77,6 +77,7 @@ export function useRealtimeInterview({
   const currentQuestionRef = useRef<string>('');
   const questionTimestampRef = useRef<number | null>(null);
   const responseTimesRef = useRef<number[]>([]);
+  const endInterviewRef = useRef<() => void>();
   // Add a ref to store per-response segments for the voice timeline
   const voiceTimelineSegmentsRef = useRef<Array<{
     transcript: string;
@@ -147,13 +148,31 @@ export function useRealtimeInterview({
     // Send the updated instructions to the AI
     if (clientRef.current) {
       clientRef.current.updateSystemPrompt(updatedInstructions);
-      
+
       // Also send context as a user message to influence the next question
       setTimeout(() => {
         clientRef.current?.sendUserMessage(
           `[INTERNAL CONTEXT FOR NEXT QUESTION: ${followUpPrompt}]`
         );
       }, 500);
+
+      // Auto-end conditions
+      if (
+        recentScores.slice(-2).every(s => s <= 3) &&
+        state.questionCount >= 3
+      ) {
+        clientRef.current.createResponse(
+          'It seems this conversation is no longer productive, so I will end the interview here.'
+        );
+        setTimeout(() => endInterviewRef.current?.(), 500);
+      } else if (
+        state.questionCount >= 5 && overallPerformance >= 8
+      ) {
+        clientRef.current.createResponse(
+          'Thanks, I have enough information for now. Let\'s wrap up the interview.'
+        );
+        setTimeout(() => endInterviewRef.current?.(), 500);
+      }
     }
   }, [generateAdaptiveInstructions, state.questionCount]);
 
@@ -458,7 +477,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
     const classifyQuestion = (text: string, index: number, timestamp: number): string => {
       const q = text.toLowerCase();
-      const isEarly = startTimeRef.current ? (timestamp - startTimeRef.current.getTime()) <= 60 * 1000 : true;
+      const isEarly = startTimeRef.current ? (timestamp - startTimeRef.current.getTime()) <= 120 * 1000 : true;
       if (index < 2 && isEarly && SMALL_TALK_PHRASES.some(p => q.includes(p))) {
         return 'small_talk';
       }
@@ -672,9 +691,13 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       const fullTranscription = state.transcript.filter(t => t.speaker === 'user').map(t => t.text).join(' ');
       const duration = state.duration;
 
-            const metrics = await extractSpeechMetrics(fullAudioBlob, fullTranscription, duration, responseTimesRef.current);
-
-      return metrics ? [{ questionId: 'summary', metrics }] : [];
+      const metrics = await extractSpeechMetrics(fullAudioBlob, fullTranscription, duration, responseTimesRef.current);
+      if (metrics) {
+        const feedback = generateActionableFeedback(metrics, fullTranscription, undefined);
+        metrics.confidenceTips = feedback.confidenceTips;
+        return [{ questionId: 'summary', metrics }];
+      }
+      return [];
     } catch (error) {
       console.error('Error processing voice analytics:', error);
       return null;
@@ -904,6 +927,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       onComplete?.(fallbackData);
     }
   }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
+
+  useEffect(() => {
+    endInterviewRef.current = endInterview;
+  }, [endInterview]);
 
   const startRecording = useCallback(async () => {
     if (!clientRef.current || state.status !== 'interviewing') {

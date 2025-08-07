@@ -1,6 +1,7 @@
 // Advanced Speech Analysis Utilities for College Interview Voice Metrics
 // Focused on high-quality voice metrics for college interview feedback
 
+import { analyzeVerbalResponse } from './verbalFeedback';
 export interface VoiceMetrics {
   speechRate: number;        // Words per minute
   fluencyScore: number;      // 0-100 score based on flow and smoothness
@@ -23,6 +24,8 @@ export interface VoiceMetrics {
     energyConsistency: number;
     dynamicRange: number;
   };
+  vocalEnergy?: number; // 0-100 scaled average energy
+  sentimentPaceBalance?: number; // 0-100 balance of sentiment and pace
   timestamp: number;         // When this analysis was taken
   duration: number;          // Duration of the analyzed segment
 }
@@ -41,6 +44,7 @@ export interface ActionableFeedback {
   specificTips: string[];
   score: number;
   category: 'excellent' | 'good' | 'fair' | 'needs_improvement';
+  confidenceTips?: string[];
 }
 
 export interface AudioAnalysisResult {
@@ -1417,6 +1421,7 @@ export function generateActionableFeedback(
   const strengths: string[] = [];
   const improvements: string[] = [];
   const specificTips: string[] = [];
+  const confidenceTips: string[] = [];
 
   // --- Speech Rate ---
   let speechRateMsg = '';
@@ -1490,6 +1495,7 @@ export function generateActionableFeedback(
     improvements.push("Voice lacks energy and enthusiasm.");
     specificTips.push("Vary your tone and energy level to emphasize key points.");
     energyMsg = "Try to add more energy and variation to your voice to keep your audience interested.";
+    confidenceTips.push('Increase vocal energy to project confidence.');
   } else {
     energyMsg = "Aim for a bit more vocal variety to make your delivery even more engaging.";
   }
@@ -1505,6 +1511,18 @@ export function generateActionableFeedback(
     pauseMsg = "Try to keep your pauses shorter to maintain a steady flow.";
   } else {
     pauseMsg = "Consider using strategic pauses to highlight important ideas.";
+  }
+
+  // --- Sentiment to Pace Balance ---
+  const verbal = analyzeVerbalResponse(transcription);
+  const sentimentPaceBalance = Math.max(0, 1 - Math.abs(verbal.sentiment - 0.5) * 2 - Math.abs(metrics.speechRate - 160) / 160);
+  metrics.sentimentPaceBalance = Math.round(sentimentPaceBalance * 100);
+  metrics.vocalEnergy = metrics.vocalEnergy ?? Math.round(metrics.energyAnalysis.averageEnergy * 100);
+  if (sentimentPaceBalance < 0.5) {
+    confidenceTips.push('Balance your positive tone with a steady pace.');
+  }
+  if ((metrics.vocalEnergy || 0) < 40) {
+    confidenceTips.push('Speak with more vocal energy to sound confident.');
   }
 
   // --- Compose overall message ---
@@ -1553,6 +1571,7 @@ export function generateActionableFeedback(
     improvements,
     specificTips,
     score: overallScore,
-    category
+    category,
+    confidenceTips
   };
 }

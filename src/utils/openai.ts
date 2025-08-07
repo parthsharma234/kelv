@@ -146,7 +146,14 @@ export async function extractSpeechMetrics(
       fluency: legacy.fluencyScore / 10,
       delivery: legacy.delivery,
       clarity: legacy.clarity,
-      duration: legacy.duration
+      duration: legacy.duration,
+      vocalEnergy: Math.round(legacy.averageVolume * 100),
+      sentimentPaceBalance: Math.round(
+        Math.max(
+          0,
+          1 - Math.abs(analyzeVerbalResponse(transcription).sentiment - 0.5) * 2 - Math.abs(legacy.speechRate - 160) / 160
+        ) * 100
+      )
     };
   } catch (error) {
     console.error('Error extracting speech metrics:', error);

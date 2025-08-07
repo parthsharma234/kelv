@@ -182,6 +182,12 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const focusedType = isFocusedInterview ? interviewType : undefined;
   const actualInterviewType = isFocusedInterview ? 'focused' : interviewType;
 
+  const summaryVoiceMetrics = useMemo(() => extractVoiceMetrics(sessionData), [sessionData]);
+  const confidenceTips = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (sessionData as any)?.voice_metrics_summary?.confidenceTips as string[] | undefined;
+  }, [sessionData]);
+
   // Memoize the hook options to prevent recreation on each render
   const handleComplete = useCallback(async (data: unknown) => {
     let enriched = data;
@@ -794,14 +800,14 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           </div>
         </div>
       </div>
-      {sessionData && sessionData.setup && sessionData.setup.interviewMode === 'voice' && !!extractVoiceMetrics(sessionData) && (
+      {sessionData && sessionData.setup && sessionData.setup.interviewMode === 'voice' && !!summaryVoiceMetrics && (
         <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 mt-8 max-w-2xl mx-auto">
           <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
             <Mic className="w-5 h-5 text-blue-400" />
             Advanced Voice Analysis
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {extractVoiceMetrics(sessionData)!.map((metric) => (
+              {summaryVoiceMetrics!.map((metric) => (
                 <div
                   key={metric.name}
                 className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
@@ -824,13 +830,20 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
                     style={{ width: `${metric.score * 10}%`, transition: 'width 1.5s' }}
                   />
                 </div>
-                <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
-              </div>
-            ))}
-          </div>
+              <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+            </div>
+          ))}
         </div>
-      )}
-    </div>
+        {confidenceTips && confidenceTips.length > 0 && (
+          <ul className="mt-4 text-sm text-blue-200 list-disc list-inside">
+            {confidenceTips.map((tip, i) => (
+              <li key={i}>{tip}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )}
+  </div>
   );
 };
 

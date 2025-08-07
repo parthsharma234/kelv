@@ -58,7 +58,7 @@ export function buildSystemPrompt(options: PromptTemplateOptions): string {
   const duration = options.context?.interviewStart ? Math.round((Date.now() - options.context.interviewStart) / 60000) : 0;
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const smallTalkGuidelines = `OPENING GUIDELINES:\n- Begin with a brief time-aware greeting like "${greeting}. Let's get started."\n- Limit small talk to a single short exchange under one minute.\n- Transition quickly with phrases such as "Let's begin with the interview questions."`;
+  const smallTalkGuidelines = `OPENING GUIDELINES:\n- Begin with a brief time-aware greeting like "${greeting}. Let's get started."\n- Keep small talk to one or two brief exchanges lasting no more than two minutes.\n- Transition quickly with phrases such as "Let's begin with the interview questions."`;
   const strictGuidelines = 'INTERVIEW STRICTNESS:\n- Maintain a professional, no-nonsense tone.\n- Ask direct, purposeful questions and expect clear, complete answers.\n- Challenge vague or unsupported statements.\n- Avoid unnecessary praise or filler conversation.';
   return [
     `Current date: ${now.toDateString()} ${now.toLocaleTimeString()}.`,
@@ -109,9 +109,9 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   // Base interviewer behavior with adaptive elements
   const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a job candidate. You maintain a professional, no-nonsense demeanor that adjusts based on how the candidate is performing. Hold candidates to high standards.
 
-CONVERSATION OPENER (First minute):
-- Begin with a ${timeGreeting} greeting; keep any small talk to a single brief question
-- Move to formal interview questions within one minute
+CONVERSATION OPENER (First two minutes):
+- Begin with a ${timeGreeting} greeting; keep any small talk to one or two brief questions
+- Move to formal interview questions within two minutes
 - Transition with phrases like "Let's begin with the interview questions" or "Thanks, let's get started"
 
 PROFESSIONAL INTERVIEW STYLE:
@@ -139,6 +139,7 @@ CURRENT INTERVIEW CONTEXT:
   - Position: ${jobType} (${experienceLevel} level)
   - Industry: ${industry}
   - Tailor questions to the ${jobType} role in the ${industry} industry with relevant technical and situational scenarios
+  - Prioritize detailed technical and situational questions that reflect real-world challenges
   - Interview Duration: ${interviewDuration.toFixed(1)} minutes
 - Question #${questionCount}
 - Candidate Performance: ${overallPerformance.toFixed(1)}/10 overall, ${averageRecentScore.toFixed(1)}/10 recent
@@ -164,6 +165,11 @@ ${isStruggling ?
   • Be encouraging when warranted, challenging when appropriate
   • Focus on getting complete, thoughtful answers`
 }
+
+AUTO-CLOSING BEHAVIOR:
+- If the candidate gives two consecutive unhelpful or very short answers, politely conclude the interview.
+- You may also end the interview once you have enough information, typically after five strong responses.
+- When ending early, thank the candidate and provide a brief reason for wrapping up.
 
 CONVERSATION STYLE:
 - Ask one question at a time and wait for their complete response
