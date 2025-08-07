@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
-  BarChart3
+  BarChart3,
+  PenLine
 } from 'lucide-react';
 import { TranscriptAnalysisResult, CommentAnnotation } from '../utils/transcriptAnalysis';
 
@@ -348,6 +349,19 @@ const TranscriptAnalysisView: React.FC<TranscriptAnalysisViewProps> = ({
                               {segment.analysis.actionableAdvice.map((advice, i) => (
                                 <li key={i} className="text-blue-300 text-sm">• {advice}</li>
                               ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {segment.analysis.rewriteSuggestions && (
+                          <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                            <h5 className="text-purple-400 font-medium mb-2 flex items-center gap-2">
+                              <PenLine className="w-4 h-4" />
+                              Suggested Rewrite
+                            </h5>
+                            <ul className="space-y-1">
+                              <li className="text-purple-300 text-sm">Structure: {segment.analysis.rewriteSuggestions.restructure}</li>
+                              <li className="text-purple-300 text-sm">Concise: {segment.analysis.rewriteSuggestions.concise}</li>
                             </ul>
                           </div>
                         )}

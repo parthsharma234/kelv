@@ -167,6 +167,10 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [sessionData, setSessionData] = useState<unknown>(null); // Store final session data after completion
   const [analysisTimeline, setAnalysisTimeline] = useState<CameraTimelinePoint[]>([]);
 
+  const metricThresholds = { eyeContact: 0.4, lighting: 0.4 };
+  const lowStartTimes = useRef<{ [key: string]: number | null }>({ eyeContact: null, lighting: null });
+  const offFrameStats = useRef({ off: 0, total: 0 });
+
   const recordedChunks = useRef<Blob[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
@@ -204,6 +208,11 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       if (videoElement) {
         cameraPresence = await analyzeCameraPresence(videoElement);
         posture = await analyzePosture(videoElement);
+        const offPct =
+          offFrameStats.current.total > 0
+            ? offFrameStats.current.off / offFrameStats.current.total
+            : 0;
+        cameraPresence.offFrame = Number(offPct.toFixed(2));
       }
 
       const baseOverall = (data as { overallScore?: number }).overallScore ?? 0;
@@ -356,9 +365,36 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       try {
         const cameraPresence = await analyzeCameraPresence(el);
         const posture = await analyzePosture(el);
+        const now = Date.now();
+
+        offFrameStats.current.total += 1;
+        if (cameraPresence.offFrame && cameraPresence.offFrame > 0) {
+          offFrameStats.current.off += 1;
+        }
+        const offFramePct = offFrameStats.current.off / offFrameStats.current.total;
+
+        const triggers: string[] = [];
+        (Object.keys(metricThresholds) as Array<keyof typeof metricThresholds>).forEach((metric) => {
+          const value = cameraPresence[metric as keyof CameraPresence] as number;
+          const threshold = metricThresholds[metric];
+          if (value < threshold) {
+            if (!lowStartTimes.current[metric]) lowStartTimes.current[metric] = now;
+            const duration = now - (lowStartTimes.current[metric] as number);
+            triggers.push(`${metric} < ${Math.round(threshold * 100)}% for ${Math.round(duration / 1000)}s`);
+          } else {
+            lowStartTimes.current[metric] = null;
+          }
+        });
+
+        const updatedPresence: CameraPresence = {
+          ...cameraPresence,
+          offFrame: Number(offFramePct.toFixed(2)),
+          triggers,
+        };
+
         setAnalysisTimeline(prev => [
           ...prev,
-          { timestamp: Date.now(), cameraPresence, posture }
+          { timestamp: now, cameraPresence: updatedPresence, posture, triggers }
         ]);
       } catch (err) {
         console.warn('Periodic camera analysis failed', err);

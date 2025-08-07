@@ -27,6 +27,10 @@ export interface TranscriptFeedback {
   };
   category: 'excellent' | 'good' | 'fair' | 'needs_improvement';
   actionableAdvice: string[];
+  rewriteSuggestions?: {
+    restructure: string;
+    concise: string;
+  };
 }
 
 export interface CommentAnnotation {
@@ -115,6 +119,10 @@ ANALYSIS REQUIREMENTS:
    - Leadership indicators
    - Problem-solving approach
 
+5. ANSWER REWRITE SUGGESTIONS:
+   - Provide a clearer structure recommendation
+   - Provide a more concise phrasing
+
 Return your analysis in this exact JSON format:
 {
   "overall": "One sentence summary of performance",
@@ -140,7 +148,11 @@ Return your analysis in this exact JSON format:
     "overall": 7
   },
   "category": "excellent|good|fair|needs_improvement",
-  "actionableAdvice": ["concrete advice 1", "concrete advice 2"]
+  "actionableAdvice": ["concrete advice 1", "concrete advice 2"],
+  "rewriteSuggestions": {
+    "restructure": "here's how to restructure that answer",
+    "concise": "try this phrasing instead — it's more concise"
+  }
 }
 
 IMPORTANT:
@@ -423,7 +435,11 @@ Provide analysis in this JSON format:
         overall: 5
       },
       category: 'fair',
-      actionableAdvice: []
+      actionableAdvice: [],
+      rewriteSuggestions: {
+        restructure: '',
+        concise: ''
+      }
     };
   }
 

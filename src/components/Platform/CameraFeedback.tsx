@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Eye, Smile, Move, Square, Activity, UserCheck, Video } from 'lucide-react';
+import { Sun, Eye, Smile, Move, Square, Activity, UserCheck, Video, Maximize, XCircle } from 'lucide-react';
 import type { CameraPresence, PostureScore, CameraTimelinePoint } from '../../types/analytics';
 
 interface Props {
@@ -17,6 +17,8 @@ const metricIcons: Record<string, React.ComponentType<{ className?: string }>> =
   framing: Square,
   blinkRate: Activity,
   confidence: UserCheck,
+  distance: Maximize,
+  offFrame: XCircle,
 };
 
 const metricLabels: Record<string, string> = {
@@ -27,6 +29,8 @@ const metricLabels: Record<string, string> = {
   framing: 'Framing',
   blinkRate: 'Blink Rate',
   confidence: 'Posture Confidence',
+  distance: 'Distance to Camera',
+  offFrame: 'Off-Frame Time',
 };
 
 const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl, timeline }) => {
@@ -117,17 +121,24 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
       {timeline && timeline.length > 0 && (
         <div>
           <h5 className="text-sm font-medium text-white mb-2">Timeline Flags</h5>
-          <ul className="text-xs text-gray-300 space-y-1 max-h-48 overflow-y-auto pr-2">
+          <ul className="text-xs text-gray-300 space-y-2 max-h-48 overflow-y-auto pr-2">
             {timeline.map((point) => {
               const offset = (point.timestamp - startTime) / 1000;
               return (
-                <li key={point.timestamp} className="flex justify-between">
-                  <span className="text-gray-400">
-                    {new Date(offset * 1000).toISOString().substr(14, 5)}
-                  </span>
-                  <span>
-                    Eye {Math.round(point.cameraPresence.eyeContact * 100)}% · Light {Math.round(point.cameraPresence.lighting * 100)}% · Conf {Math.round(point.posture.confidence * 100)}%
-                  </span>
+                <li key={point.timestamp}>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">
+                      {new Date(offset * 1000).toISOString().substr(14, 5)}
+                    </span>
+                    <span>
+                      Eye {Math.round(point.cameraPresence.eyeContact * 100)}% · Light {Math.round(point.cameraPresence.lighting * 100)}% · Conf {Math.round(point.posture.confidence * 100)}%
+                    </span>
+                  </div>
+                  {point.triggers && point.triggers.length > 0 && (
+                    <div className="text-orange-400">
+                      {point.triggers.join(' | ')}
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -18,7 +18,10 @@ export interface CameraPresence {
   headPositionStability?: number; // 0..1 placeholder
   framing?: number; // 0..1 placeholder
   blinkRate?: number; // 0..1 placeholder
+  distance?: number; // 0..1, ideal face size relative to frame
+  offFrame?: number; // 0..1, percentage of time face is off frame
   suggestions: string[]; // Actionable feedback
+  triggers?: string[]; // Threshold messages with durations
 }
 
 export interface PostureScore {
@@ -30,6 +33,7 @@ export interface CameraTimelinePoint {
   timestamp: number;
   cameraPresence: CameraPresence;
   posture: PostureScore;
+  triggers?: string[];
 }
 
 export interface VoiceMetricsSummary {

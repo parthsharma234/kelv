@@ -873,7 +873,7 @@ export const getInterviewStats = async () => {
 export const getUserStrengthsAndWeaknesses = async () => {
   if (!isSupabaseConfigured()) {
     console.warn('Supabase not configured - cannot fetch strengths and weaknesses');
-    return { strengths: [], weaknesses: [], categories: {} };
+    return { strengths: [], weaknesses: [], categories: {}, weakSpots: [] };
   }
 
   try {
@@ -887,7 +887,7 @@ export const getUserStrengthsAndWeaknesses = async () => {
 
     if (error) {
       console.error('Error fetching interview data for analysis:', error);
-      return { strengths: [], weaknesses: [], categories: {} };
+      return { strengths: [], weaknesses: [], categories: {}, weakSpots: [] };
     }
 
     console.debug(`Retrieved ${data.length} sessions for analysis`);
@@ -897,6 +897,7 @@ export const getUserStrengthsAndWeaknesses = async () => {
     const categoryScores: { [key: string]: number[] } = {};
     const strengths: string[] = [];
     const weaknesses: string[] = [];
+    const weakSpots: string[] = [];
 
     // Group responses by question type/category
     allResponses.forEach(response => {
@@ -906,6 +907,30 @@ export const getUserStrengthsAndWeaknesses = async () => {
           categoryScores[questionType] = [];
         }
         categoryScores[questionType].push(response.analysis.score);
+
+        // Collect weak spot signals
+        const speechRate = response.voiceMetrics?.speechRate || response.speechMetrics?.timing?.speechRate;
+        if (speechRate) {
+          if (!categoryScores.speechRates) {
+            // @ts-expect-error: tracking dynamic speech rate array
+            categoryScores.speechRates = [];
+          }
+          // @ts-expect-error: push dynamic speech rate
+          categoryScores.speechRates.push(speechRate);
+        }
+
+        const improvements = response.analysis.areasForImprovement || [];
+        if (response.questionType === 'technical') {
+          const text = improvements.join(' ').toLowerCase();
+          if (text.includes('eye contact')) {
+            if (!categoryScores.eyeContactDrops) {
+              // @ts-expect-error: init eye contact drop counter
+              categoryScores.eyeContactDrops = 0;
+            }
+            // @ts-expect-error: increment eye contact drop counter
+            categoryScores.eyeContactDrops++;
+          }
+        }
       }
     });
 
@@ -954,18 +979,35 @@ export const getUserStrengthsAndWeaknesses = async () => {
       weaknesses.push('Overall interview performance needs improvement');
     }
 
+    // Detect weak spots from aggregated signals
+    // @ts-expect-error: accessing dynamic speech rate bucket
+    const speechRates: number[] = categoryScores.speechRates || [];
+    if (speechRates.length >= 3) {
+      const fastCount = speechRates.filter(rate => rate > 170).length;
+      if (fastCount / speechRates.length >= 0.6) {
+        weakSpots.push('You consistently speak too fast when nervous');
+      }
+    }
+    // @ts-expect-error: accessing dynamic eye contact counter
+    const eyeContactDrops = categoryScores.eyeContactDrops || 0;
+    if (eyeContactDrops >= 2) {
+      weakSpots.push('Your eye contact drops during technical questions');
+    }
+
     return {
       strengths: strengths.slice(0, 3), // Limit to top 3
       weaknesses: weaknesses.slice(0, 3), // Limit to top 3
-      categories: categoryAverages
+      categories: categoryAverages,
+      weakSpots
     };
 
   } catch (error) {
     console.error('Failed to analyze strengths and weaknesses:', error);
-    return { 
-      strengths: [], 
+    return {
+      strengths: [],
       weaknesses: [],
-      categories: {}
+      categories: {},
+      weakSpots: []
     };
   }
 };

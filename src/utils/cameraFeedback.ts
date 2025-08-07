@@ -30,6 +30,8 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   let headPositionStability = 0.5;
   let facialExpressiveness = 0.5;
   let blinkRate = 0.5;
+  let distance = 0.5;
+  let offFrame = 0;
   if ('FaceDetector' in window) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,6 +45,20 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
         const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
         eyeContact = Math.max(0, 1 - (distX + distY) / 2);
         framing = Math.max(0, 1 - Math.max(distX, distY));
+        // Face size relative to frame as a proxy for distance
+        const faceArea = boundingBox.width * boundingBox.height;
+        const frameArea = canvas.width * canvas.height;
+        const faceRatio = faceArea / frameArea;
+        const idealRatio = 0.1; // ~10% of frame
+        distance = Math.max(0, 1 - Math.abs(faceRatio - idealRatio) / idealRatio);
+        // Determine if face is mostly within central 70% of frame
+        const withinX =
+          boundingBox.x > canvas.width * 0.15 &&
+          boundingBox.x + boundingBox.width < canvas.width * 0.85;
+        const withinY =
+          boundingBox.y > canvas.height * 0.15 &&
+          boundingBox.y + boundingBox.height < canvas.height * 0.85;
+        offFrame = withinX && withinY ? 0 : 1;
         // Placeholders – real implementations would require temporal analysis
         headPositionStability = 0.5;
         facialExpressiveness = 0.5;
@@ -50,6 +66,8 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
       } else {
         eyeContact = 0;
         framing = 0;
+        distance = 0;
+        offFrame = 1;
       }
     } catch {
       /* FaceDetector not available */
@@ -69,6 +87,10 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
     suggestions.push('Use more varied facial expressions to appear engaged.');
   if (blinkRate < 0.4)
     suggestions.push('Maintain focus on the camera and avoid distractions.');
+  if (distance < 0.4)
+    suggestions.push('Move closer or further so your face fills about 10% of the frame.');
+  if (offFrame > 0)
+    suggestions.push('Keep your face within the camera frame.');
   if (suggestions.length === 0) suggestions.push('Great camera presence.');
 
   const result: CameraPresence = {
@@ -80,6 +102,8 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
     headPositionStability,
     framing,
     blinkRate,
+    distance: Number(distance.toFixed(2)),
+    offFrame,
     suggestions,
   };
 

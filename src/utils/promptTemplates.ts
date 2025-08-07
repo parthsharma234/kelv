@@ -138,7 +138,8 @@ CURRENT INTERVIEW CONTEXT:
   - Current Time: ${now.toLocaleTimeString()}
   - Position: ${jobType} (${experienceLevel} level)
   - Industry: ${industry}
-- Interview Duration: ${interviewDuration.toFixed(1)} minutes
+  - Tailor questions to the ${jobType} role in the ${industry} industry with relevant technical and situational scenarios
+  - Interview Duration: ${interviewDuration.toFixed(1)} minutes
 - Question #${questionCount}
 - Candidate Performance: ${overallPerformance.toFixed(1)}/10 overall, ${averageRecentScore.toFixed(1)}/10 recent
 - Status: ${isStruggling ? 'Candidate needs encouragement - be more supportive' : 
@@ -302,7 +303,8 @@ export function extractKeyTopics(text: string): string {
 // Focused interview prompts - direct and to the point
 export function getFocusedInterviewPrompt(focusedType: string, setup: InterviewSetup): string {
   const baseSetup = `Position: ${(setup as InterviewSetup).jobType || 'Student'} (${(setup as InterviewSetup).experienceLevel || 'Entry'} level)
-Industry: ${(setup as InterviewSetup).industry || 'General'}`;
+Industry: ${(setup as InterviewSetup).industry || 'General'}
+Tailor all questions to this role and industry with appropriate technical or situational depth.`;
 
   const prompts: Record<string, string> = {
     technical: `You are conducting a focused technical interview session. Be direct, efficient, and technical.

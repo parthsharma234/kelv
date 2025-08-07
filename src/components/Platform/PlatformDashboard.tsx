@@ -65,7 +65,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
   const [strengthsAndWeaknesses, setStrengthsAndWeaknesses] = useState({
     strengths: [] as string[],
     weaknesses: [] as string[],
-    categories: {} as { [key: string]: number }
+    categories: {} as { [key: string]: number },
+    weakSpots: [] as string[]
   });
   const [isLoading, setIsLoading] = useState(true);
   const [interviewTypeFilter, setInterviewTypeFilter] = useState<string | null>(null);
@@ -516,7 +517,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
         >
           {/* Strengths */}
           <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-2xl p-6 border border-green-500/20">
@@ -571,6 +572,34 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
               </div>
             ) : (
               <p className="text-gray-400 text-sm">Great job! Keep practicing to maintain your skills</p>
+            )}
+          </div>
+
+          {/* Personalized Weak Spots */}
+          <div className="bg-gradient-to-br from-purple-500/10 to-violet-500/5 rounded-2xl p-6 border border-purple-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <MessageSquare className="w-5 h-5 text-purple-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Coaching Insights</h3>
+            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse"></div>
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-3/4"></div>
+                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-1/2"></div>
+              </div>
+            ) : strengthsAndWeaknesses.weakSpots.length > 0 ? (
+              <div className="space-y-3">
+                {strengthsAndWeaknesses.weakSpots.map((spot, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-gray-300 text-sm">{spot}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm">Complete more sessions to uncover patterns</p>
             )}
           </div>
         </motion.div>
