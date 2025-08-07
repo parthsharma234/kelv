@@ -359,10 +359,12 @@ const TranscriptAnalysisView: React.FC<TranscriptAnalysisViewProps> = ({
                               <PenLine className="w-4 h-4" />
                               Suggested Rewrite
                             </h5>
-                            <ul className="space-y-1">
-                              <li className="text-purple-300 text-sm">Structure: {segment.analysis.rewriteSuggestions.restructure}</li>
-                              <li className="text-purple-300 text-sm">Concise: {segment.analysis.rewriteSuggestions.concise}</li>
-                            </ul>
+                            <p className="text-purple-300 text-sm mb-2">
+                              {segment.analysis.rewriteSuggestions.restructure}
+                            </p>
+                            <p className="text-purple-300 text-sm">
+                              {segment.analysis.rewriteSuggestions.concise}
+                            </p>
                           </div>
                         )}
 

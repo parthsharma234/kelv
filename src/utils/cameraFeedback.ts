@@ -1,5 +1,12 @@
 import type { CameraPresence, PostureScore } from '../types/analytics';
 
+// Persist basic state between frames for temporal metrics
+let prevCenter: { x: number; y: number } | null = null;
+let prevFaceData: Uint8ClampedArray | null = null;
+let prevEyeBrightness = 0;
+let blinkCount = 0;
+const blinkStart = Date.now();
+
 /**
  * Basic camera presence analysis using Canvas API.
  * Evaluates lighting by averaging pixel brightness and
@@ -59,10 +66,55 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
           boundingBox.y > canvas.height * 0.15 &&
           boundingBox.y + boundingBox.height < canvas.height * 0.85;
         offFrame = withinX && withinY ? 0 : 1;
-        // Placeholders – real implementations would require temporal analysis
-        headPositionStability = 0.5;
-        facialExpressiveness = 0.5;
-        blinkRate = 0.5;
+
+        // Head movement compared to previous frame
+        if (prevCenter) {
+          const moveX = Math.abs(centerX - prevCenter.x) / canvas.width;
+          const moveY = Math.abs(centerY - prevCenter.y) / canvas.height;
+          const movement = Math.sqrt(moveX * moveX + moveY * moveY);
+          headPositionStability = Math.max(0, 1 - movement * 5);
+        } else {
+          headPositionStability = 1;
+        }
+        prevCenter = { x: centerX, y: centerY };
+
+        // Facial expressiveness via frame difference inside face box
+        const faceData = ctx?.getImageData(
+          boundingBox.x,
+          boundingBox.y,
+          boundingBox.width,
+          boundingBox.height
+        ).data;
+        if (faceData && prevFaceData && faceData.length === prevFaceData.length) {
+          let diff = 0;
+          for (let i = 0; i < faceData.length; i += 4) {
+            diff +=
+              Math.abs(faceData[i] - prevFaceData[i]) +
+              Math.abs(faceData[i + 1] - prevFaceData[i + 1]) +
+              Math.abs(faceData[i + 2] - prevFaceData[i + 2]);
+          }
+          diff /= (faceData.length / 4) * 255 * 3;
+          facialExpressiveness = Math.min(1, diff * 3);
+        }
+        prevFaceData = faceData || null;
+
+        // Blink detection from eye-region brightness
+        if (faceData) {
+          const eyeHeight = Math.floor(boundingBox.height * 0.2);
+          let brightness = 0;
+          for (let y = 0; y < eyeHeight; y++) {
+            for (let x = 0; x < boundingBox.width; x++) {
+              const idx = (y * boundingBox.width + x) * 4;
+              brightness += faceData[idx] + faceData[idx + 1] + faceData[idx + 2];
+            }
+          }
+          brightness = brightness / (eyeHeight * boundingBox.width) / (255 * 3);
+          if (prevEyeBrightness - brightness > 0.25) blinkCount++;
+          prevEyeBrightness = brightness;
+          const elapsedMinutes = (Date.now() - blinkStart) / 60000;
+          const rate = blinkCount / (elapsedMinutes || 1);
+          blinkRate = Math.min(1, rate / 20); // assume 20 blinks per minute ideal
+        }
       } else {
         eyeContact = 0;
         framing = 0;

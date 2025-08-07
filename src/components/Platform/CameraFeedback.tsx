@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sun, Eye, Smile, Move, Square, Activity, UserCheck, Video, Maximize, XCircle } from 'lucide-react';
 import type { CameraPresence, PostureScore, CameraTimelinePoint } from '../../types/analytics';
+import VideoReview from './VideoReview';
 
 interface Props {
   cameraPresence?: CameraPresence;
@@ -55,11 +56,7 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
 
   return (
     <div className="space-y-6">
-      {recordingUrl && (
-        <div>
-          <video src={recordingUrl} controls className="w-full rounded-lg" />
-        </div>
-      )}
+      {recordingUrl && <VideoReview src={recordingUrl} />}
 
       {metrics.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
