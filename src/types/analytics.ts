@@ -14,6 +14,10 @@ export interface CameraPresence {
   eyeContact: number; // 0..1
   smile: number; // 0..1 placeholder
   attentiveness: number; // 0..1 placeholder
+  facialExpressiveness?: number; // 0..1 placeholder
+  headPositionStability?: number; // 0..1 placeholder
+  framing?: number; // 0..1 placeholder
+  blinkRate?: number; // 0..1 placeholder
   suggestions: string[]; // Actionable feedback
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, MessageCircle, AlertCircle, TrendingUp, CheckCircle, Brain } from 'lucide-react';
 import { analyzeCameraPresence, analyzePosture } from '../../utils/cameraFeedback';
+import { calculateOverallScore } from '../../utils/overallScore';
 import type { CameraPresence, PostureScore, CameraTimelinePoint } from '../../types/analytics';
 import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
@@ -205,6 +206,13 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         posture = await analyzePosture(videoElement);
       }
 
+      const baseOverall = (data as { overallScore?: number }).overallScore ?? 0;
+      const overallScore = calculateOverallScore({
+        responseScore: baseOverall,
+        cameraPresence,
+        posture,
+      });
+
       const recordingBlob = recordedChunks.current.length
         ? new Blob(recordedChunks.current, { type: 'video/webm' })
         : null;
@@ -212,12 +220,14 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
       enriched = {
         ...(data as Record<string, unknown>),
+        overallScore,
         cameraPresence,
         posture,
         analysisTimeline,
         recordingUrl,
         sophisticatedAnalytics: {
           ...(data as Record<string, unknown>)?.sophisticatedAnalytics,
+          overallScore,
           cameraPresence,
           posture,
           analysisTimeline,

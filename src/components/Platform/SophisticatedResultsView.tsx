@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import type { CameraPresence, PostureScore, CameraTimelinePoint } from '../../types/analytics';
+import CameraFeedback from './CameraFeedback';
 
 interface SophisticatedResultsViewProps {
   analyticsReport: unknown;
@@ -68,23 +69,10 @@ const SophisticatedResultsView: React.FC<SophisticatedResultsViewProps> = ({ ana
           />
         </div>
       )}
-      {cameraPresence && (
+      {(cameraPresence || posture) && (
         <div>
-          <h4 className="text-lg font-semibold text-white mb-2">Camera Presence</h4>
-          <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-            <li>Lighting: {Math.round(cameraPresence.lighting * 100)}%</li>
-            <li>Eye Contact: {Math.round(cameraPresence.eyeContact * 100)}%</li>
-          </ul>
-          <p className="text-sm text-gray-400">{cameraPresence.suggestions.join(' ')}</p>
-        </div>
-      )}
-      {posture && (
-        <div>
-          <h4 className="text-lg font-semibold text-white mb-2">Posture</h4>
-          <ul className="text-sm text-gray-300 mb-2 list-disc list-inside">
-            <li>Confidence: {Math.round(posture.confidence * 100)}%</li>
-          </ul>
-          <p className="text-sm text-gray-400">{posture.suggestions.join(' ')}</p>
+          <h4 className="text-lg font-semibold text-white mb-2">Camera Feedback</h4>
+          <CameraFeedback cameraPresence={cameraPresence} posture={posture} />
         </div>
       )}
       {timeline && timeline.length > 0 && (
