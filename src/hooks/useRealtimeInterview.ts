@@ -8,11 +8,17 @@ import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
+import { getQuestions } from '../utils/questionBank';
 
 // Simple interface for speech metrics in realtime interviews
+interface SpeechMetrics {
+  [key: string]: unknown;
+  confidenceTips?: string[];
+}
+
 interface SpeechMetricEntry {
   questionId?: string;
-  metrics: any;
+  metrics: SpeechMetrics;
 }
 
 // Generate a simple UUID v4
@@ -22,6 +28,15 @@ const generateUUID = () => {
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+};
+
+const classifyQuestionCategory = (text: string): string => {
+  const q = text.toLowerCase();
+  if (/describe a time|tell me about|give me an example|have you ever|situation|challenge/.test(q)) return 'behavioral';
+  if (/technical|code|algorithm|programming|data structure|system design/.test(q)) return 'technical';
+  if (/scenario|how would you|what would you do/.test(q)) return 'situational';
+  if (/why do you want|company|culture|fit|values/.test(q)) return 'fit';
+  return 'general';
 };
 
 interface UseRealtimeInterviewOptions {
@@ -75,10 +90,12 @@ export function useRealtimeInterview({
   const candidateResponsesRef = useRef<string[]>([]);
   const speechMetricsRef = useRef<SpeechMetricEntry[]>([]);
   const currentQuestionRef = useRef<string>('');
+  const currentQuestionCategoryRef = useRef<string>('general');
   const questionTimestampRef = useRef<number | null>(null);
   const responseTimesRef = useRef<number[]>([]);
   const endInterviewRef = useRef<() => void>();
   const categoryCountsRef = useRef<Record<string, number>>({});
+  const categoryStruggleCountsRef = useRef<Record<string, number>>({});
   // Add a ref to store per-response segments for the voice timeline
   const voiceTimelineSegmentsRef = useRef<Array<{
     transcript: string;
@@ -102,7 +119,11 @@ export function useRealtimeInterview({
       overallPerformance,
       interviewDuration: duration,
       questionCount,
-      shouldWrapUp: duration >= maxDuration || (duration >= maxDuration * 0.8 && overallPerformance <= 4)
+      shouldWrapUp:
+        duration >= maxDuration ||
+        (duration >= maxDuration * 0.8 && overallPerformance <= 4),
+      categoryCounts: categoryCountsRef.current,
+      categoryStruggles: categoryStruggleCountsRef.current
     };
     return buildAdaptiveSystemPrompt(options);
   }, [setup, maxDuration]);
@@ -110,11 +131,17 @@ export function useRealtimeInterview({
   // Update the AI's behavior based on candidate performance
   const updateInterviewerBehavior = useCallback((
     candidateResponse: string,
-    estimatedScore: number = 5
+    estimatedScore: number = 5,
+    questionCategory: string = 'general'
   ) => {
     // Store the response and score for adaptive behavior
     candidateResponsesRef.current.push(candidateResponse);
     performanceScoresRef.current.push(estimatedScore);
+
+    if (estimatedScore <= 4) {
+      categoryStruggleCountsRef.current[questionCategory] =
+        (categoryStruggleCountsRef.current[questionCategory] || 0) + 1;
+    }
     
     // Calculate metrics for adaptive prompting
     const recentScores = performanceScoresRef.current.slice(-3);
@@ -198,6 +225,9 @@ export function useRealtimeInterview({
     // Track current question context for voice analysis
     if (chunk.speaker === 'assistant' && chunk.text.trim().endsWith('?')) {
       currentQuestionRef.current = chunk.text;
+      currentQuestionCategoryRef.current = classifyQuestionCategory(chunk.text);
+      categoryCountsRef.current[currentQuestionCategoryRef.current] =
+        (categoryCountsRef.current[currentQuestionCategoryRef.current] || 0) + 1;
       questionTimestampRef.current = chunk.timestamp;
     }
 
@@ -215,7 +245,7 @@ export function useRealtimeInterview({
       const estimatedScore = Math.min(10, Math.max(3, 
         (responseLength > 20 ? 7 : 5) + (hasKeywords ? 2 : 0)
       ));
-      updateInterviewerBehavior(chunk.text, estimatedScore);
+      updateInterviewerBehavior(chunk.text, estimatedScore, currentQuestionCategoryRef.current);
 
       // --- Voice Timeline Segmentation (fixed timestamps) ---
       // Use the first and last chunk timestamps for this response
@@ -330,7 +360,14 @@ export function useRealtimeInterview({
             ];
             
             const followUpPrompt = conversationalPrompts[Math.floor(Math.random() * conversationalPrompts.length)];
-            
+
+            const openingQuestion =
+              getQuestions(setup.jobType, setup.industry, 'behavioral')[0] ||
+              getQuestions(setup.jobType, setup.industry, 'situational')[0] ||
+              'Could you tell me a bit about your background?';
+
+            const bridgeInstruction = `After this brief chat, acknowledge their response and say something like "Thanks for sharing." Then ask: "${openingQuestion}"`;
+
             const veryHumanSmallTalkInstruction = `Start with this natural greeting: "${selectedGreeting}"
 
 Wait for their response, then continue with genuine curiosity by asking: "${followUpPrompt}"
@@ -347,6 +384,8 @@ Take 2-3 minutes for this natural conversation. Let it flow organically. When it
 - "Well, I'm really excited to learn more about you and your background..."
 - "This has been great getting to know you a bit! So let's dive into..."
 - "I love that! Okay, so let's talk about your experience..."
+
+${bridgeInstruction}
 
 Remember: Be genuinely human, not scripted. Listen actively and respond like a real person having a real conversation would.`;
             
@@ -1011,6 +1050,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     sendTextMessage,
     getSpeechMetrics,
     resetSpeechMetrics,
-    categoryCounts: categoryCountsRef.current
+    categoryCounts: categoryCountsRef.current,
+    categoryStruggles: categoryStruggleCountsRef.current
   };
 }

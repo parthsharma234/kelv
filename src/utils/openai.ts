@@ -644,27 +644,42 @@ const getTechnicalQuestions = (jobType: string, industry: string, _experienceLev
   ];
 };
 
-// Resume-based question templates
-const getResumeBasedQuestions = (_jobType: string, _industry: string, _experienceLevel: string): string[] => {
+// Resume-based question templates that keep the opening light and conversational
+const getResumeBasedQuestions = (
+  _jobType: string,
+  _industry: string,
+  _experienceLevel: string
+): string[] => {
   const templates = [
-    "I see you have experience in [specific area]. Can you walk me through your most relevant project in that field?",
-    "Your background shows [specific skill/technology]. How did you develop that expertise?",
-    "I'm interested in your experience with [specific tool/technology]. What was your biggest challenge working with it?",
-    "You've worked in [specific industry/role]. What drew you to this particular opportunity?",
-    "Looking at your experience, what would you say is your strongest technical skill?",
-    "I notice you have experience with [specific methodology]. How has that shaped your approach to [jobType]?",
-    "Your background includes [specific achievement]. Can you tell me more about that?",
-    "What aspects of your previous roles have best prepared you for this position?",
-    "I'm curious about your transition from [previous experience] to [current focus]. What motivated that change?",
-    "Based on your experience, what do you think sets you apart from other candidates for this role?"
+    'What sparked your interest in [industry], and how did you get started?',
+    'Looking back, what\'s a highlight from your time in [role] so far?',
+    'How did you first become interested in [specific skill/technology]?',
+    "What's one project or accomplishment you're especially proud of?",
+    'Which part of your background feels most relevant to this position?',
+    'What inspired you to move toward [current focus] in your career?',
+    'Is there a particular experience that shaped how you approach your work today?',
+    'When did you realize [industry/role] was the right path for you?'
   ];
 
   return templates;
 };
 
-export const generateInterviewQuestions = async (setup: InterviewSetup): Promise<Question[]> => {
+export const generateInterviewQuestions = async (
+  setup: InterviewSetup
+): Promise<Question[]> => {
+  // Prefer a role/industry-specific opening question from the local question bank
+  const bankQuestion =
+    getQuestions(setup.jobType, setup.industry, 'behavioral')[0] ||
+    getQuestions(setup.jobType, setup.industry, 'situational')[0];
+
+  if (bankQuestion) {
+    return [{ id: 'q1', text: bankQuestion, type: 'opening', difficulty: 'easy' }];
+  }
+
   if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
-    throw new Error('OpenAI API key is required for AI-generated questions. Please configure your API key to use the interview platform.');
+    throw new Error(
+      'OpenAI API key is required for AI-generated questions. Please configure your API key to use the interview platform.'
+    );
   }
 
   try {
@@ -1156,6 +1171,7 @@ ANALYSIS REQUIREMENTS:
 4. RELEVANT: Connect feedback directly to the role and question asked
 5. ENCOURAGING: Be constructive and supportive, but also critical
 6. CAPITALIZATION: Use proper title case for all strength and improvement items (e.g., "Technical Problem Solving", "Clear Communication")
+7. REWRITE: Offer improved phrasings of the candidate's response
 
 ${isFocusedInterview ? `
 FOCUSED INTERVIEW METRICS:
@@ -1189,7 +1205,11 @@ Return ONLY this JSON format:
   "nextQuestionType": "behavioral|technical|situational|follow_up|problem_solving|leadership|cultural_fit|closing",
   "performanceTrend": "${averagePreviousScore > 0 ? (averagePreviousScore > 5 ? 'improving' : 'stable') : 'new'}",
   "roleAlignment": "high|medium|low",
-  "culturalFit": "high|medium|low"${isFocusedInterview ? `,
+  "culturalFit": "high|medium|low",
+  "rewriteSuggestions": {
+    "restructure": "Improved structure suggestion",
+    "concise": "More concise version"
+  }${isFocusedInterview ? `,
   "problem_solving": 1-10,
   "communication": 1-10,
   "depth": 1-10,
@@ -1319,7 +1339,11 @@ const getFallbackAnalysis = (response: string, interviewType?: string) => {
     nextQuestionType: 'behavioral',
     performanceTrend: 'stable',
     roleAlignment: responseLength < 50 ? 'low' : 'medium',
-    culturalFit: responseLength < 50 ? 'low' : 'medium'
+    culturalFit: responseLength < 50 ? 'low' : 'medium',
+    rewriteSuggestions: {
+      restructure: '',
+      concise: ''
+    }
   };
   
   // Add specific metrics based on interview type

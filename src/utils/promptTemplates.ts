@@ -27,6 +27,8 @@ export interface AdaptivePromptOptions {
   areasOfInterest?: string;
   hasAskedTechnical?: boolean;
   shouldWrapUp?: boolean;
+  categoryCounts?: Record<string, number>;
+  categoryStruggles?: Record<string, number>;
 }
 
 export const interviewerBehaviorTemplates = {
@@ -85,8 +87,16 @@ export interface PromptContext {
 
 // Adaptive interviewer system that adjusts based on candidate performance and context
 export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): string {
-  const { setup, recentScores = [], overallPerformance = 5, interviewDuration = 0,
-          questionCount = 1, shouldWrapUp = false } = options;
+  const {
+    setup,
+    recentScores = [],
+    overallPerformance = 5,
+    interviewDuration = 0,
+    questionCount = 1,
+    shouldWrapUp = false,
+    categoryCounts,
+    categoryStruggles,
+  } = options;
   const now = new Date();
   const hour = now.getHours();
   const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -105,6 +115,13 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   const jobType = (setup as InterviewSetup).jobType;
   const experienceLevel = (setup as InterviewSetup).experienceLevel;
   const industry = (setup as InterviewSetup).industry;
+
+  const coverage = categoryCounts
+    ? Object.entries(categoryCounts).map(([c, v]) => `- ${c}: ${v}`).join('\\n')
+    : 'No questions yet';
+  const struggles = categoryStruggles
+    ? Object.entries(categoryStruggles).map(([c, v]) => `- ${c}: ${v} low-score responses`).join('\\n')
+    : 'None observed';
 
   // Base interviewer behavior with adaptive elements
   const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a job candidate. You maintain a professional, no-nonsense demeanor that adjusts based on how the candidate is performing. Hold candidates to high standards.
@@ -143,9 +160,15 @@ CURRENT INTERVIEW CONTEXT:
   - Interview Duration: ${interviewDuration.toFixed(1)} minutes
 - Question #${questionCount}
 - Candidate Performance: ${overallPerformance.toFixed(1)}/10 overall, ${averageRecentScore.toFixed(1)}/10 recent
-- Status: ${isStruggling ? 'Candidate needs encouragement - be more supportive' : 
-           isPerformingWell ? 'Candidate is excelling - feel free to challenge them' : 
+- Status: ${isStruggling ? 'Candidate needs encouragement - be more supportive' :
+           isPerformingWell ? 'Candidate is excelling - feel free to challenge them' :
            'Candidate is doing moderately well - balanced approach'}
+
+QUESTION COVERAGE:
+${coverage}
+
+QUESTION STRUGGLES:
+${struggles}
 
 ADAPTIVE BEHAVIOR GUIDELINES:
 ${isStruggling ? 

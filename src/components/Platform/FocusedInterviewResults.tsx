@@ -17,7 +17,8 @@ import {
   AlertCircle,
   BookOpen,
   Play,
-  Eye
+  Eye,
+  PenLine
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
@@ -876,7 +877,7 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                                   ))}
                                 </ul>
                               </div>
-                              
+
                               <div>
                                 <h5 className="text-xs font-medium text-orange-400 mb-1 flex items-center gap-1">
                                   <Target className="w-3 h-3" />
@@ -892,6 +893,25 @@ const FocusedInterviewResults: React.FC<FocusedInterviewResultsProps> = ({
                                 </ul>
                               </div>
                             </div>
+
+                            {response.analysis.rewriteSuggestions && (
+                              <div className="mt-2 pt-2 border-t border-dark-600/30">
+                                <h5 className="text-xs font-medium text-purple-400 mb-1 flex items-center gap-1">
+                                  <PenLine className="w-3 h-3" />
+                                  Suggested Rewrite
+                                </h5>
+                                {response.analysis.rewriteSuggestions.restructure && (
+                                  <p className="text-xs text-gray-300 mb-1">
+                                    {response.analysis.rewriteSuggestions.restructure}
+                                  </p>
+                                )}
+                                {response.analysis.rewriteSuggestions.concise && (
+                                  <p className="text-xs text-gray-300">
+                                    {response.analysis.rewriteSuggestions.concise}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
