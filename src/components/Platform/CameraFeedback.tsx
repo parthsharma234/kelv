@@ -115,6 +115,17 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
         </div>
       )}
 
+      {cameraPresence?.triggers && cameraPresence.triggers.length > 0 && (
+        <div>
+          <h5 className="text-sm font-medium text-white mb-2">Alerts</h5>
+          <ul className="text-xs text-orange-400 list-disc list-inside space-y-1">
+            {cameraPresence.triggers.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {timeline && timeline.length > 0 && (
         <div>
           <h5 className="text-sm font-medium text-white mb-2">Timeline Flags</h5>

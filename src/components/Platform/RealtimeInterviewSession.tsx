@@ -169,6 +169,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
   const metricThresholds = { eyeContact: 0.4, lighting: 0.4 };
   const lowStartTimes = useRef<{ [key: string]: number | null }>({ eyeContact: null, lighting: null });
+  const lowDurations = useRef<{ [key: string]: number }>({ eyeContact: 0, lighting: 0 });
+  const lastSampleTime = useRef<number | null>(null);
   const offFrameStats = useRef({ off: 0, total: 0 });
 
   const recordedChunks = useRef<Blob[]>([]);
@@ -219,6 +221,16 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
             ? offFrameStats.current.off / offFrameStats.current.total
             : 0;
         cameraPresence.offFrame = Number(offPct.toFixed(2));
+        const durationTriggers: string[] = [];
+        Object.entries(metricThresholds).forEach(([metric, threshold]) => {
+          const total = lowDurations.current[metric];
+          if (total > 0) {
+            durationTriggers.push(
+              `${metric} < ${Math.round(threshold * 100)}% for ${Math.round(total / 1000)}s total`
+            );
+          }
+        });
+        cameraPresence.triggers = durationTriggers;
       }
 
       const baseOverall = (data as { overallScore?: number }).overallScore ?? 0;
@@ -372,6 +384,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         const cameraPresence = await analyzeCameraPresence(el);
         const posture = await analyzePosture(el);
         const now = Date.now();
+        const elapsed = lastSampleTime.current ? now - lastSampleTime.current : 0;
+        lastSampleTime.current = now;
 
         offFrameStats.current.total += 1;
         if (cameraPresence.offFrame && cameraPresence.offFrame > 0) {
@@ -385,6 +399,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           const threshold = metricThresholds[metric];
           if (value < threshold) {
             if (!lowStartTimes.current[metric]) lowStartTimes.current[metric] = now;
+            lowDurations.current[metric] += elapsed;
             const duration = now - (lowStartTimes.current[metric] as number);
             triggers.push(`${metric} < ${Math.round(threshold * 100)}% for ${Math.round(duration / 1000)}s`);
           } else {
