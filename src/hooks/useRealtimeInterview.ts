@@ -78,6 +78,7 @@ export function useRealtimeInterview({
   const questionTimestampRef = useRef<number | null>(null);
   const responseTimesRef = useRef<number[]>([]);
   const endInterviewRef = useRef<() => void>();
+  const categoryCountsRef = useRef<Record<string, number>>({});
   // Add a ref to store per-response segments for the voice timeline
   const voiceTimelineSegmentsRef = useRef<Array<{
     transcript: string;
@@ -134,7 +135,10 @@ export function useRealtimeInterview({
       recentContext,
       candidateStrengths,
       areasOfInterest,
-      performanceLevel
+      performanceLevel,
+      setup.jobType,
+      setup.industry,
+      categoryCountsRef.current
     );
 
     // Update the system prompt with adaptive behavior
@@ -544,6 +548,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           category,
           type: category
         });
+        categoryCountsRef.current[category] = (categoryCountsRef.current[category] || 0) + 1;
 
       } else if (chunk.speaker === 'user' && currentQuestionId) {
         // Collect user response
@@ -1005,6 +1010,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     stopRecording,
     sendTextMessage,
     getSpeechMetrics,
-    resetSpeechMetrics
+    resetSpeechMetrics,
+    categoryCounts: categoryCountsRef.current
   };
 }

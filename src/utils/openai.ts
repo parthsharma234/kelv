@@ -1,6 +1,7 @@
 import { InterviewSetup, Question, InterviewResponse, AIInterviewerState } from '../types/interview';
 import { synthesizeSpeechWithElevenLabs } from './elevenLabsTTS';
 import { analyzeVerbalResponse } from './verbalFeedback';
+import { getQuestions } from './questionBank';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -356,7 +357,10 @@ const getIndustryContext = (industry: string): string => {
     'Marketing': 'Creative, data-driven environment with focus on customer engagement and ROI. Companies value creativity, analytical skills, and understanding of consumer behavior. Current trends include digital marketing, personalization, and social media strategy.',
     'Consulting': 'Client-focused, problem-solving environment with emphasis on strategic thinking and communication. Companies value analytical skills, presentation abilities, and industry knowledge. Current challenges include digital transformation, remote consulting, and competitive differentiation.',
     'Manufacturing': 'Process-oriented, efficiency-focused environment with emphasis on quality control and continuous improvement. Companies value technical skills, problem-solving abilities, and safety awareness. Current trends include Industry 4.0, automation, and sustainable manufacturing.',
-    'Retail': 'Customer-centric, fast-paced environment with focus on sales performance and customer satisfaction. Companies value interpersonal skills, product knowledge, and adaptability. Current challenges include e-commerce integration, omnichannel retail, and customer experience optimization.'
+    'Retail': 'Customer-centric, fast-paced environment with focus on sales performance and customer satisfaction. Companies value interpersonal skills, product knowledge, and adaptability. Current challenges include e-commerce integration, omnichannel retail, and customer experience optimization.',
+    'Government': 'Policy-driven, public service environment with emphasis on accountability, transparency, and regulatory compliance. Organizations value policy knowledge, stakeholder communication, and ethical decision-making. Current priorities include digital services, cost efficiency, and community engagement.',
+    'Nonprofit': 'Mission-driven environment focused on social impact, fundraising, and community engagement. Organizations value resourcefulness, advocacy skills, and volunteer coordination. Current challenges include donor retention, impact measurement, and cross-sector partnerships.',
+    'Hospitality': 'Service-oriented environment emphasizing guest experience, operational efficiency, and adaptability. Companies value customer service, crisis management, and cultural sensitivity. Current trends include personalization, contactless services, and sustainability.'
   };
   return contexts[industry] || 'Dynamic, competitive environment with focus on innovation, customer satisfaction, and continuous improvement. Companies value adaptability, problem-solving skills, and industry knowledge.';
 };
@@ -372,7 +376,10 @@ const getRoleContext = (jobType: string, industry: string): string => {
     'Financial Analyst': 'Focus on financial modeling, data analysis, and strategic planning. Key skills include Excel, financial statements, forecasting, and business intelligence tools. Current priorities include automation, real-time reporting, and strategic financial planning.',
     'Operations Manager': 'Focus on process optimization, team management, and operational efficiency. Key skills include project management, data analysis, leadership, and problem-solving. Current priorities include digital transformation, supply chain optimization, and cost reduction.',
     'Designer': 'Focus on user experience, visual design, and creative problem-solving. Key skills include design tools, user research, prototyping, and design systems. Current priorities include user-centered design, accessibility, and design thinking methodologies.',
-    'Consultant': 'Focus on problem-solving, client relationships, and strategic recommendations. Key skills include analysis, presentation, project management, and industry knowledge. Current priorities include digital transformation, change management, and value creation.'
+    'Consultant': 'Focus on problem-solving, client relationships, and strategic recommendations. Key skills include analysis, presentation, project management, and industry knowledge. Current priorities include digital transformation, change management, and value creation.',
+    'Project Manager': 'Focus on planning, execution, and delivery of projects. Key skills include scheduling, stakeholder management, risk mitigation, and budgeting. Current priorities include agile adoption, cross-team coordination, and value delivery.',
+    'Nurse': 'Focus on patient care, clinical expertise, and interdisciplinary collaboration. Key skills include assessment, medication administration, and patient advocacy. Current priorities include telehealth, staffing efficiency, and evidence-based practice.',
+    'Teacher': 'Focus on student engagement, curriculum development, and assessment. Key skills include classroom management, lesson planning, and differentiated instruction. Current priorities include hybrid learning models, technology integration, and inclusive education.'
   };
   return roleContexts[jobType] || `Focus on delivering value in ${industry} through expertise, collaboration, and continuous improvement. Key skills include industry knowledge, problem-solving, communication, and adaptability.`;
 };
@@ -452,6 +459,20 @@ const getTechnicalQuestions = (jobType: string, industry: string, _experienceLev
         'How would you explain a complex model to a non-technical stakeholder?'
       ]
     },
+    'Nurse': {
+      'Healthcare': [
+        'What steps do you take to maintain accurate patient records?',
+        'How do you prioritize care during a high-acuity shift?',
+        'Can you explain proper protocol for medication reconciliation?'
+      ]
+    },
+    'Teacher': {
+      'Education': [
+        'How do you assess student understanding in real time?',
+        'What strategies do you use to engage students with different learning styles?',
+        'How do you incorporate technology to enhance learning outcomes?'
+      ]
+    },
     'Financial Analyst': {
       'Finance': [
         'What are the three main financial statements?',
@@ -488,6 +509,13 @@ const getTechnicalQuestions = (jobType: string, industry: string, _experienceLev
         'How do you measure brand awareness?',
         'What is the difference between reach and impressions?',
         'How would you optimize a marketing campaign for better performance?'
+      ]
+    },
+    'Project Manager': {
+      'Technology': [
+        'How do you manage project scope changes without derailing timelines?',
+        'What methods do you use for stakeholder communication?',
+        'How do you run retrospectives to improve future sprints?'
       ]
     },
     'Product Manager': {
@@ -606,7 +634,8 @@ const getTechnicalQuestions = (jobType: string, industry: string, _experienceLev
     }
   };
 
-  return questions[jobType]?.[industry] || [
+  const bank = getQuestions(jobType, industry, 'technical');
+  return questions[jobType]?.[industry] || bank || [
     'What are the key responsibilities of a ' + jobType + ' in ' + industry + '?',
     'How do you stay current with industry trends in ' + industry + '?',
     'What tools and technologies are essential for a ' + jobType + ' role?',
@@ -795,6 +824,19 @@ A${questionNum + 1}: ${r.response}`;
     const isStruggling = overallPerformance <= 4;
     const isPerformingWell = overallPerformance >= 7;
 
+    // Track question category coverage
+    const categoryCounts = responses.reduce((acc: Record<string, number>, r) => {
+      const q = globalQuestions.find(gq => gq.id === r.questionId);
+      if (q?.type) acc[q.type] = (acc[q.type] || 0) + 1;
+      return acc;
+    }, {});
+    const targetCategories = ['behavioral', 'technical', 'situational'];
+    const leastAskedCategory = targetCategories.reduce((min, cat) => {
+      const count = categoryCounts[cat] ?? 0;
+      const minCount = categoryCounts[min] ?? 0;
+      return count < minCount ? cat : min;
+    }, targetCategories[0]);
+
     // Determine if we should ask a technical question
     const questionTypesAsked = responses.map(r => {
       const question = globalQuestions.find(q => q.id === r.questionId);
@@ -803,9 +845,10 @@ A${questionNum + 1}: ${r.response}`;
     
     const hasAskedTechnical = questionTypesAsked.includes('technical');
     const shouldAskTechnical = !hasAskedTechnical && responses.length >= 2 && !isStruggling;
-    
-    // Get technical questions for this role/industry
+
+    // Get role/industry question examples
     const technicalQuestions = getTechnicalQuestions(setup.jobType, setup.industry, setup.experienceLevel);
+    const situationalExamples = getQuestions(setup.jobType, setup.industry, 'situational');
 
     const prompt = `You are a seasoned ${setup.industry} hiring manager continuing a real interview for a ${setup.experienceLevel} ${setup.jobType} position. Your goal is to keep the conversation flowing naturally, building on what the candidate has shared so far.
 
@@ -828,6 +871,9 @@ CANDIDATE ANALYSIS:
 - Areas of interest mentioned: ${extractKeyTopics(areasOfInterest)}
 - Performance trend: ${getPerformanceTrend(recentScores)}
 
+QUESTION COVERAGE:
+${targetCategories.map(c => `- ${c}: ${categoryCounts[c] || 0}`).join('\\n')}
+
 ADAPTIVE STRATEGY:
 ${isStruggling ? 
   'The candidate could use some encouragement. Ask clear, simple questions and help them feel comfortable.' :
@@ -844,7 +890,7 @@ Choose one of these or create a similar technical question that:
 - Relates to the role requirements
 - Can be answered in 2-3 minutes
 - Tests practical knowledge, not just memorization` :
-  'Continue with behavioral, situational, or follow-up questions based on the conversation.'
+  `Consider asking a ${leastAskedCategory} question to balance coverage.${leastAskedCategory === 'situational' && situationalExamples.length ? '\nExample prompts:\n' + situationalExamples.slice(0,3).map(q => `- "${q}"`).join('\n') : ''}`
 }
 
 INTERVIEW STRATEGY:

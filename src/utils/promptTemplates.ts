@@ -195,10 +195,13 @@ ${shouldWrapUp ?
 
 // Generate context-aware follow-up prompts for mid-interview updates
 export function buildFollowUpPrompt(
-  recentContext: string, 
-  candidateStrengths: string[], 
+  recentContext: string,
+  candidateStrengths: string[],
   areasOfInterest: string,
-  performanceLevel: 'struggling' | 'moderate' | 'excellent'
+  performanceLevel: 'struggling' | 'moderate' | 'excellent',
+  jobType?: string,
+  industry?: string,
+  categoryCounts?: Record<string, number>
 ): string {
   const adaptiveGuidance = {
     struggling: 'The candidate could use some encouragement. Ask clear, supportive questions that help them shine.',
@@ -209,14 +212,21 @@ export function buildFollowUpPrompt(
   return `RECENT CONVERSATION CONTEXT:
 ${recentContext}
 
+ROLE/INDUSTRY CONTEXT:
+- Role: ${jobType || 'General'}
+- Industry: ${industry || 'General'}
+
 CANDIDATE INSIGHTS:
 - Key strengths observed: ${candidateStrengths.slice(0, 3).join(', ')}
 - Areas of interest/passion: ${areasOfInterest}
 - Current performance level: ${performanceLevel}
 
+QUESTION COVERAGE:
+${categoryCounts ? Object.entries(categoryCounts).map(([c,v]) => `- ${c}: ${v}`).join('\\n') : 'No questions yet'}
+
 ADAPTIVE GUIDANCE: ${adaptiveGuidance[performanceLevel]}
 
-Your next question should build naturally on this conversation. Reference specific things they've mentioned, show genuine curiosity about their experiences, and adapt your questioning style to their current performance level.`;
+Your next question should build naturally on this conversation. Reference specific things they've mentioned, show genuine curiosity about their experiences, and adapt your questioning style to their current performance level. If certain categories have low coverage, prioritize them in your follow-up.`;
 }
 
 // Technical question integration helpers
