@@ -114,7 +114,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [selectedCvMetric, setSelectedCvMetric] = useState<string | null>(null);
   const [selectedCvMetricValue, setSelectedCvMetricValue] = useState<number>(0);
-  const [voiceExpandedKey, setVoiceExpandedKey] = useState<string | null>(null);
+  const [selectedVoiceMetric, setSelectedVoiceMetric] = useState<
+    { name: string; score: number; detail?: string } | null
+  >(null);
 
   const analyticsReport = sessionData.sophisticatedAnalytics;
   const cameraPresence = analyticsReport?.cameraPresence || sessionData.cameraPresence;
@@ -550,8 +552,17 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 </h3>
                 <div className="flex gap-4 items-stretch">
                   {(() => {
-                    const metricsObj = safeSessionData.voice_metrics_summary || safeSessionData.speech_metrics?.[0]?.metrics || {};
-                    const voiceMetrics: Array<{ name: string; score: number; icon: any; color: string; detail?: string }> = [];
+                    const metricsObj =
+                      safeSessionData.voice_metrics_summary ||
+                      safeSessionData.speech_metrics?.[0]?.metrics ||
+                      {};
+                    const voiceMetrics: Array<{
+                      name: string;
+                      score: number;
+                      icon: any;
+                      color: string;
+                      detail?: string;
+                    }> = [];
 
                     // 6 main voice metrics with realistic fallbacks
                     if (metricsObj.speechRate !== undefined) {
@@ -609,90 +620,54 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       voiceMetrics.push({ name: 'Response Time', score, icon: Clock, color: 'from-teal-500 to-cyan-500', detail: `${(avgResponseTime / 1000).toFixed(2)}s avg` });
                     }
 
-                    const selected = voiceExpandedKey ? voiceMetrics.find(v => v.name === voiceExpandedKey) : null;
-
                     return (
-                      <>
-                        {selected && (() => {
-                          const info = getVoiceMetricDetails(selected.name as any);
-                          return (
-                            <aside className="order-1 self-stretch w-[360px] bg-dark-800/90 border border-dark-700 rounded-xl shadow-xl p-4 mr-auto text-gray-200">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-white font-semibold text-base">{info.title}</div>
-                                <button
-                                  onClick={() => setVoiceExpandedKey(null)}
-                                  className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
-                                >
-                                  Close
-                                </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-1">
+                        {voiceMetrics.map((metric, index) => (
+                          <motion.div
+                            key={metric.name}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + index * 0.1 }}
+                            className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-700/50"
+                            onClick={() =>
+                              setSelectedVoiceMetric(prev =>
+                                prev?.name === metric.name ? null : metric
+                              )
+                            }
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
+                                <metric.icon className="w-4 h-4 text-white" />
                               </div>
-                              <div className="text-sm text-gray-300 mb-2">Score: <span className="font-semibold text-white">{selected.score}/10</span></div>
-                              {selected.detail && <div className="text-xs text-gray-400 mb-2">{selected.detail}</div>}
-                              <div className="space-y-3 text-xs text-gray-200">
-                                <div>
-                                  <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
-                                  <div>{info.whyItMatters}</div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-white">{metric.name}</span>
+                                  <span className="text-lg font-semibold text-white">{metric.score}/10</span>
                                 </div>
-                                <div>
-                                  <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
-                                  <div>{info.howItIsMeasured}</div>
-                                </div>
-                                {info.idealRange && (
-                                  <div>
-                                    <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
-                                    <div>{info.idealRange}</div>
-                                  </div>
+                              </div>
+                            </div>
+                            <div className="mb-3">
+                              <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${metric.score * 10}%` }}
+                                  transition={{ duration: 1.5, delay: 0.4 + index * 0.1 }}
+                                  className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              {metric.detail && <p className="text-xs text-gray-400">{metric.detail}</p>}
+                              <p className="text-xs text-gray-400">
+                                {getMetricInsight(
+                                  metric.name.toLowerCase(),
+                                  metric.score
                                 )}
-                                {info.perceptionImpact && (
-                                  <div>
-                                    <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
-                                    <div>{info.perceptionImpact}</div>
-                                  </div>
-                                )}
-                              </div>
-                            </aside>
-                          );
-                        })()}
-
-                        <div className="order-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-1">
-                          {voiceMetrics.map((metric, index) => (
-                            <motion.div
-                              key={metric.name}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.3 + index * 0.1 }}
-                              className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-700/50"
-                              onClick={() => setVoiceExpandedKey(prev => (prev === metric.name ? null : metric.name))}
-                            >
-                              <div className="flex items-center gap-3 mb-3">
-                                <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
-                                  <metric.icon className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-white">{metric.name}</span>
-                                    <span className="text-lg font-semibold text-white">{metric.score}/10</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mb-3">
-                                <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
-                                  <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${metric.score * 10}%` }}
-                                    transition={{ duration: 1.5, delay: 0.4 + index * 0.1 }}
-                                    className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                {metric.detail && <p className="text-xs text-gray-400">{metric.detail}</p>}
-                                <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </div>
-                      </>
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
                     );
                   })()}
                 </div>
@@ -900,12 +875,65 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Voice Metric Summary Aside */}
+            {selectedVoiceMetric && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700"
+              >
+                {(() => {
+                  const info = getVoiceMetricDetails(selectedVoiceMetric.name as any);
+                  return (
+                    <div className="text-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-white font-semibold text-base">{info.title}</div>
+                        <button
+                          onClick={() => setSelectedVoiceMetric(null)}
+                          className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-300 mb-2">
+                        Score: <span className="font-semibold text-white">{selectedVoiceMetric.score}/10</span>
+                      </div>
+                      {selectedVoiceMetric.detail && (
+                        <div className="text-xs text-gray-400 mb-2">{selectedVoiceMetric.detail}</div>
+                      )}
+                      <div className="space-y-3 text-xs text-gray-200">
+                        <div>
+                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
+                          <div>{info.whyItMatters}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
+                          <div>{info.howItIsMeasured}</div>
+                        </div>
+                        {info.idealRange && (
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
+                            <div>{info.idealRange}</div>
+                          </div>
+                        )}
+                        {info.perceptionImpact && (
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
+                            <div>{info.perceptionImpact}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </motion.div>
+            )}
             {/* CV Metric Summary Aside (right side of overall layout) */}
             {selectedCvMetric && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700 sticky top-24"
+                className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700"
               >
                 {(() => {
                   const info = getMetricDetails(selectedCvMetric as any);
@@ -921,7 +949,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                           Close
                         </button>
                       </div>
-                      <div className="text-sm text-gray-300 mb-2">Score: <span className="font-semibold text-white">{Math.round(selectedCvMetricValue * 100)}%</span></div>
+                      <div className="text-sm text-gray-300 mb-2">
+                        Score: <span className="font-semibold text-white">{Math.round(selectedCvMetricValue * 100)}%</span>
+                      </div>
                       <div className="space-y-3 text-xs text-gray-200">
                         <div>
                           <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>

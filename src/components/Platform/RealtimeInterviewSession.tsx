@@ -508,11 +508,14 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         ]);
         // Real-time encouragement nudge while the user is speaking and posture/metrics dip
         try {
-          if (state.isUserSpeaking) {
+          if (setup.showCues && state.isUserSpeaking) {
             const slouch = (posture?.confidence ?? 1) < 0.6;
             const unstable = (updatedPresence.headPositionStability ?? 1) < 0.45;
             const leaning = (updatedPresence.distance ?? 1) < 0.45;
-            if (slouch || unstable || leaning) {
+            const cueDelayMs = (setup.nudgeThreshold ?? 60) * 1000;
+            const now = Date.now();
+            const metricsLowLongEnough = Object.entries(lowStartTimes.current).some(([_, start]) => start && now - start >= cueDelayMs);
+            if (slouch || unstable || leaning || metricsLowLongEnough) {
               setShowNudge(true);
               if (nudgeTimeoutRef.current) window.clearTimeout(nudgeTimeoutRef.current);
               nudgeTimeoutRef.current = window.setTimeout(() => setShowNudge(false), 1600) as unknown as number;
@@ -531,7 +534,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       }
     }, 1500);
     return () => clearInterval(interval);
-  }, [analyzeCameraPresence, analyzePosture, stream]);
+  }, [analyzeCameraPresence, analyzePosture, stream, setup.showCues, setup.nudgeThreshold]);
 
   // Handle microphone toggle
   const toggleMute = () => {

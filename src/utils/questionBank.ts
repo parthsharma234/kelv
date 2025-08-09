@@ -11,6 +11,32 @@ interface RoleIndustryQuestions {
 }
 
 export const QUESTION_BANK: RoleIndustryQuestions = {
+  'Data Scientist': {
+    Technology: {
+      technical: [
+        'Given an unsorted array of integers, return the k most frequent elements and discuss the algorithmic complexity.',
+        'How would you design and evaluate an experiment to test a new recommendation algorithm?',
+        'Write a SQL query to compute the 7-day rolling average of signups for each product.',
+        'Describe how you would handle missing values and outliers before training a predictive model.'
+      ],
+      situational: [
+        'Tell me about a time you deployed a model that later underperformed. How did you diagnose and fix the issue?',
+        'Describe a project where you had to communicate complex findings to a non-technical audience.',
+        'Share an example of collaborating with engineers or product teams to productionize a data pipeline.'
+      ]
+    },
+    Finance: {
+      technical: [
+        'How would you detect fraudulent transactions using machine learning? Which features would you engineer?',
+        'Write a SQL query to compute the exposure of a portfolio given positions and market prices.',
+        'Explain the differences between ARIMA and LSTM models for time-series forecasting.'
+      ],
+      situational: [
+        'Describe a time you balanced model accuracy with regulatory explainability requirements.',
+        'Tell me about working with traders or risk analysts to integrate your analysis into decision-making.'
+      ]
+    }
+  },
   'Software Engineer': {
     Technology: {
       technical: [
@@ -50,6 +76,42 @@ export const QUESTION_BANK: RoleIndustryQuestions = {
       ],
       situational: [
         'Share an example of handling a sudden shift in consumer behavior.'
+      ]
+    }
+  },
+  'Sales Representative': {
+    Sales: {
+      technical: [
+        'How do you prioritize leads in your pipeline and which tools support this?',
+        'Walk me through your approach to researching a prospect before a cold call.'
+      ],
+      situational: [
+        'Describe a time you revived a stalled deal and closed it.',
+        'Tell me about handling a difficult negotiation where the client pushed back on price.'
+      ]
+    }
+  },
+  'Business Analyst': {
+    Consulting: {
+      technical: [
+        'How do you translate vague client requirements into clear analytical objectives?',
+        'Describe the steps to build a dashboard for tracking monthly revenue by region.'
+      ],
+      situational: [
+        'Tell me about a time your analysis changed an important business decision.',
+        'Describe a situation where stakeholders disagreed on metrics and how you resolved it.'
+      ]
+    }
+  },
+  'Customer Support Specialist': {
+    Technology: {
+      technical: [
+        'Which tools or ticketing systems have you used to manage customer inquiries?',
+        'How do you define and track first-response and resolution times?'
+      ],
+      situational: [
+        'Share an example of diffusing an escalated customer complaint.',
+        'Describe a time you collaborated with product teams to resolve a recurring support issue.'
       ]
     }
   },

@@ -2,6 +2,7 @@
 // Covers: interviewer behavior, interview type modifiers, response formatting, and adaptive chaining
 
 import { InterviewSetup } from '../types/interview';
+import { getRolePrompt } from './rolePrompts';
 
 export type InterviewerTone = 'warm' | 'neutral' | 'challenging' | 'stress';
 export type ResponseStyle = 'concise' | 'elaborate';
@@ -115,6 +116,7 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   const jobType = (setup as InterviewSetup).jobType;
   const experienceLevel = (setup as InterviewSetup).experienceLevel;
   const industry = (setup as InterviewSetup).industry;
+  const roleGuidance = getRolePrompt(jobType, industry, experienceLevel);
 
   const coverage = categoryCounts
     ? Object.entries(categoryCounts).map(([c, v]) => `- ${c}: ${v}`).join('\\n')
@@ -234,7 +236,7 @@ ${shouldWrapUp ?
   `INTERVIEW CONTINUATION:
   Continue the natural flow of conversation. The interview can go longer if the conversation is engaging.`}`;
 
-  return basePrompt;
+  return roleGuidance ? `${basePrompt}\nROLE-SPECIFIC GUIDELINES:\n${roleGuidance}` : basePrompt;
 }
 // Gentle opening helper for first post-small-talk question
 export function getGentleOpeningQuestion(role: string, industry: string, level: string): string {
@@ -376,9 +378,14 @@ export function extractKeyTopics(text: string): string {
 
 // Focused interview prompts - direct and to the point
 export function getFocusedInterviewPrompt(focusedType: string, setup: InterviewSetup): string {
+  const roleGuidance = getRolePrompt(
+    (setup as InterviewSetup).jobType,
+    (setup as InterviewSetup).industry,
+    (setup as InterviewSetup).experienceLevel
+  );
   const baseSetup = `Position: ${(setup as InterviewSetup).jobType || 'Student'} (${(setup as InterviewSetup).experienceLevel || 'Entry'} level)
 Industry: ${(setup as InterviewSetup).industry || 'General'}
-Tailor all questions to this role and industry with appropriate technical or situational depth.`;
+${roleGuidance ? `Role Guidelines: ${roleGuidance}\n` : ''}Tailor all questions to this role and industry with appropriate technical or situational depth.`;
 
   const prompts: Record<string, string> = {
     technical: `You are conducting a focused technical interview session. Be direct, efficient, and technical.
