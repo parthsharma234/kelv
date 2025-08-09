@@ -24,6 +24,8 @@ import {
 import VoiceTimeline from './VoiceTimeline';
 import RedPandaLogo from '../RedPandaLogo';
 import CameraFeedback from './CameraFeedback';
+import { getMetricDetails } from '../../utils/metricInfo';
+import { getVoiceMetricDetails } from '../../utils/voiceMetricInfo';
 
 // Utility function to format category labels for standard interviews
 const formatCategoryLabel = (category: string): string => {
@@ -110,6 +112,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
   // Add state for selected metric
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedCvMetric, setSelectedCvMetric] = useState<string | null>(null);
+  const [selectedCvMetricValue, setSelectedCvMetricValue] = useState<number>(0);
+  const [voiceExpandedKey, setVoiceExpandedKey] = useState<string | null>(null);
 
   const analyticsReport = sessionData.sophisticatedAnalytics;
   const cameraPresence = analyticsReport?.cameraPresence || sessionData.cameraPresence;
@@ -502,11 +507,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 + index * 0.1 }}
-                    className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-600/40 transition-colors"
-                    onClick={() => setSelectedMetric(metric.name.toLowerCase().replace(/\s/g, '_'))}
-                    role="button"
-                    tabIndex={0}
-                    onKeyPress={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedMetric(metric.name.toLowerCase().replace(/\s/g, '_')); }}
+                    className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 select-none"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
@@ -547,21 +548,20 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                   <Mic className="w-5 h-5 text-orange-400" />
                   Advanced Voice Analysis
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="flex gap-4 items-stretch">
                   {(() => {
                     const metricsObj = safeSessionData.voice_metrics_summary || safeSessionData.speech_metrics?.[0]?.metrics || {};
-                    const voiceMetrics = [];
-                    
+                    const voiceMetrics: Array<{ name: string; score: number; icon: any; color: string; detail?: string }> = [];
+
                     // 6 main voice metrics with realistic fallbacks
                     if (metricsObj.speechRate !== undefined) {
                       const score = Math.round(Math.min(10, Math.max(1, metricsObj.speechRate / 20)));
                       voiceMetrics.push({ name: 'Speech Rate', score, icon: TrendingUp, color: 'from-orange-500 to-amber-500', detail: `${Math.round(metricsObj.speechRate)} WPM` });
                     } else {
-                      // Fallback based on overall performance
                       const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
                       voiceMetrics.push({ name: 'Speech Rate', score: fallbackScore, icon: TrendingUp, color: 'from-orange-500 to-amber-500', detail: `${120 + (fallbackScore - 5) * 10} WPM` });
                     }
-                    
+
                     if (metricsObj.fluencyScore !== undefined) {
                       const score = Math.round(Math.min(10, Math.max(1, metricsObj.fluencyScore / 10)));
                       voiceMetrics.push({ name: 'Fluency', score, icon: Volume2, color: 'from-amber-500 to-orange-500', detail: `${Math.round(metricsObj.fluencyScore)}% fluency` });
@@ -569,7 +569,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
                       voiceMetrics.push({ name: 'Fluency', score: fallbackScore, icon: Volume2, color: 'from-amber-500 to-orange-500', detail: `${40 + fallbackScore * 6}% fluency` });
                     }
-                    
+
                     if (metricsObj.voiceConfidence !== undefined) {
                       const score = Math.round(Math.min(10, Math.max(1, metricsObj.voiceConfidence / 10)));
                       voiceMetrics.push({ name: 'Voice Confidence', score, icon: Mic, color: 'from-orange-600 to-amber-500', detail: `${Math.round(metricsObj.voiceConfidence)}% confidence` });
@@ -577,7 +577,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
                       voiceMetrics.push({ name: 'Voice Confidence', score: fallbackScore, icon: Mic, color: 'from-orange-600 to-amber-500', detail: `${45 + fallbackScore * 5}% confidence` });
                     }
-                    
+
                     if (metricsObj.deliveryScore !== undefined) {
                       const score = Math.round(Math.min(10, Math.max(1, metricsObj.deliveryScore / 10)));
                       voiceMetrics.push({ name: 'Delivery', score, icon: Play, color: 'from-amber-600 to-orange-500', detail: `${Math.round(metricsObj.deliveryScore)}% delivery` });
@@ -585,7 +585,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
                       voiceMetrics.push({ name: 'Delivery', score: fallbackScore, icon: Play, color: 'from-amber-600 to-orange-500', detail: `${50 + fallbackScore * 5}% delivery` });
                     }
-                    
+
                     if (metricsObj.clarityScore !== undefined) {
                       const score = Math.round(Math.min(10, Math.max(1, metricsObj.clarityScore / 10)));
                       voiceMetrics.push({ name: 'Clarity', score, icon: MessageSquare, color: 'from-orange-500 to-amber-600', detail: `${Math.round(metricsObj.clarityScore)}% clarity` });
@@ -593,9 +593,8 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                       const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
                       voiceMetrics.push({ name: 'Clarity', score: fallbackScore, icon: MessageSquare, color: 'from-orange-500 to-amber-600', detail: `${55 + fallbackScore * 4}% clarity` });
                     }
-                    
+
                     if (metricsObj.fillerWordCount !== undefined) {
-                      // Invert filler word count - fewer is better (max 10 for scoring)
                       const score = Math.round(Math.min(10, Math.max(1, 10 - Math.min(9, metricsObj.fillerWordCount))));
                       voiceMetrics.push({ name: 'Filler Words', score, icon: AlertCircle, color: 'from-amber-500 to-orange-600', detail: `${Math.round(metricsObj.fillerWordCount)} fillers` });
                     } else {
@@ -605,47 +604,97 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     }
 
                     if (safeSessionData.responseTimes && safeSessionData.responseTimes.length > 0) {
-                        const avgResponseTime = safeSessionData.responseTimes.reduce((a: number, b: number) => a + b, 0) / safeSessionData.responseTimes.length;
-                        const score = Math.round(Math.min(10, Math.max(1, 10 - (avgResponseTime / 1000))));
-                        voiceMetrics.push({ name: 'Response Time', score, icon: Clock, color: 'from-teal-500 to-cyan-500', detail: `${(avgResponseTime / 1000).toFixed(2)}s avg` });
+                      const avgResponseTime = safeSessionData.responseTimes.reduce((a: number, b: number) => a + b, 0) / safeSessionData.responseTimes.length;
+                      const score = Math.round(Math.min(10, Math.max(1, 10 - (avgResponseTime / 1000))));
+                      voiceMetrics.push({ name: 'Response Time', score, icon: Clock, color: 'from-teal-500 to-cyan-500', detail: `${(avgResponseTime / 1000).toFixed(2)}s avg` });
                     }
-                    
-                    return voiceMetrics;
-                  })().map((metric, index) => (
-                    <motion.div
-                      key={metric.name}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + index * 0.1 }}
-                      className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
-                    >
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
-                          <metric.icon className="w-4 h-4 text-white" />
+
+                    const selected = voiceExpandedKey ? voiceMetrics.find(v => v.name === voiceExpandedKey) : null;
+
+                    return (
+                      <>
+                        {selected && (() => {
+                          const info = getVoiceMetricDetails(selected.name as any);
+                          return (
+                            <aside className="order-1 self-stretch w-[360px] bg-dark-800/90 border border-dark-700 rounded-xl shadow-xl p-4 mr-auto text-gray-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-white font-semibold text-base">{info.title}</div>
+                                <button
+                                  onClick={() => setVoiceExpandedKey(null)}
+                                  className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
+                                >
+                                  Close
+                                </button>
+                              </div>
+                              <div className="text-sm text-gray-300 mb-2">Score: <span className="font-semibold text-white">{selected.score}/10</span></div>
+                              {selected.detail && <div className="text-xs text-gray-400 mb-2">{selected.detail}</div>}
+                              <div className="space-y-3 text-xs text-gray-200">
+                                <div>
+                                  <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
+                                  <div>{info.whyItMatters}</div>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
+                                  <div>{info.howItIsMeasured}</div>
+                                </div>
+                                {info.idealRange && (
+                                  <div>
+                                    <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
+                                    <div>{info.idealRange}</div>
+                                  </div>
+                                )}
+                                {info.perceptionImpact && (
+                                  <div>
+                                    <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
+                                    <div>{info.perceptionImpact}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </aside>
+                          );
+                        })()}
+
+                        <div className="order-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-1">
+                          {voiceMetrics.map((metric, index) => (
+                            <motion.div
+                              key={metric.name}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.3 + index * 0.1 }}
+                              className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-700/50"
+                              onClick={() => setVoiceExpandedKey(prev => (prev === metric.name ? null : metric.name))}
+                            >
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
+                                  <metric.icon className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-white">{metric.name}</span>
+                                    <span className="text-lg font-semibold text-white">{metric.score}/10</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mb-3">
+                                <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${metric.score * 10}%` }}
+                                    transition={{ duration: 1.5, delay: 0.4 + index * 0.1 }}
+                                    className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                {metric.detail && <p className="text-xs text-gray-400">{metric.detail}</p>}
+                                <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+                              </div>
+                            </motion.div>
+                          ))}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-white">{metric.name}</span>
-                            <span className="text-lg font-semibold text-white">{metric.score}/10</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mb-3">
-                        <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${metric.score * 10}%` }}
-                            transition={{ duration: 1.5, delay: 0.4 + index * 0.1 }}
-                            className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-400">{metric.detail}</p>
-                        <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </>
+                    );
+                  })()}
                 </div>
                 
                 {/* Voice Timeline within Advanced Voice Analysis */}
@@ -659,7 +708,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               </motion.div>
             )}
 
-            {/* Computer Vision */}
+            {/* Computer Vision + external summary aside */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -670,16 +719,24 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 <Eye className="w-5 h-5 text-orange-400" />
                 Computer Vision
               </h3>
-              {hasCameraAnalytics ? (
-                <CameraFeedback
-                  cameraPresence={cameraPresence}
-                  posture={posture}
-                  recordingUrl={recordingUrl}
-                  timeline={timeline}
-                />
-              ) : (
-                <p className="text-sm text-gray-400">No camera data collected.</p>
-              )}
+              <div className="flex gap-4 items-start">
+                <div className="flex-1">
+                  {hasCameraAnalytics ? (
+                    <CameraFeedback
+                      cameraPresence={cameraPresence}
+                      posture={posture}
+                      recordingUrl={recordingUrl}
+                      timeline={timeline}
+                      onMetricSelect={(metricKey, value) => {
+                        setSelectedCvMetric(metricKey);
+                        setSelectedCvMetricValue(value);
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-400">No camera data collected.</p>
+                  )}
+                </div>
+              </div>
             </motion.div>
 
             {/* Question-by-Question Analysis - Compact Style */}
@@ -843,6 +900,55 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* CV Metric Summary Aside (right side of overall layout) */}
+            {selectedCvMetric && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700 sticky top-24"
+              >
+                {(() => {
+                  const info = getMetricDetails(selectedCvMetric as any);
+                  if (!info) return null;
+                  return (
+                    <div className="text-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-white font-semibold text-base">{info.title}</div>
+                        <button
+                          onClick={() => setSelectedCvMetric(null)}
+                          className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-300 mb-2">Score: <span className="font-semibold text-white">{Math.round(selectedCvMetricValue * 100)}%</span></div>
+                      <div className="space-y-3 text-xs text-gray-200">
+                        <div>
+                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
+                          <div>{info.whyItMatters}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
+                          <div>{info.howItIsMeasured}</div>
+                        </div>
+                        {info.idealRange && (
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
+                            <div>{info.idealRange}</div>
+                          </div>
+                        )}
+                        {info.perceptionImpact && (
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
+                            <div>{info.perceptionImpact}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </motion.div>
+            )}
             {/* Next Steps */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}

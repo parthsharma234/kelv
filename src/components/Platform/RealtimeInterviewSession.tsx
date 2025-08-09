@@ -7,6 +7,7 @@ import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
 import AIInterviewer from '../AIInterviewer';
+import { getVoiceMetricDetails } from '../../utils/voiceMetricInfo';
 
 interface RealtimeInterviewSessionProps {
   setup: InterviewSetup;
@@ -166,6 +167,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<unknown>(null); // Store final session data after completion
   const [analysisTimeline, setAnalysisTimeline] = useState<CameraTimelinePoint[]>([]);
+  const [showNudge, setShowNudge] = useState(false);
+  const nudgeTimeoutRef = useRef<number | null>(null);
 
   const metricThresholds = { eyeContact: 0.4, lighting: 0.4 };
   const lowStartTimes = useRef<{ [key: string]: number | null }>({ eyeContact: null, lighting: null });
@@ -178,6 +181,10 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const lastWorkerLightingRef = useRef<number | null>(null);
+  const lastWorkerFaceMetricsRef = useRef<Partial<CameraPresence>>({});
+  const lastFaceBoxRef = useRef<{ x: number; y: number; width: number; height: number; frameW: number; frameH: number } | null>(null);
 
   // Determine if this is a focused interview and what type
   const isFocusedInterview = interviewType && interviewType !== 'standard';
@@ -185,6 +192,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const actualInterviewType = isFocusedInterview ? 'focused' : interviewType;
 
   const summaryVoiceMetrics = useMemo(() => extractVoiceMetrics(sessionData), [sessionData]);
+  const [voiceExpandedKey, setVoiceExpandedKey] = useState<string | null>(null);
   const confidenceTips = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (sessionData as any)?.voice_metrics_summary?.confidenceTips as string[] | undefined;
@@ -247,6 +255,9 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         : null;
       const recordingUrl = recordingBlob ? URL.createObjectURL(recordingBlob) : undefined;
 
+      const baseSophisticated: Record<string, unknown> =
+        ((data as Record<string, unknown>) as any)?.sophisticatedAnalytics || {};
+
       enriched = {
         ...(data as Record<string, unknown>),
         overallScore,
@@ -255,7 +266,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         analysisTimeline,
         recordingUrl,
         sophisticatedAnalytics: {
-          ...(data as Record<string, unknown>)?.sophisticatedAnalytics,
+          ...baseSophisticated,
           overallScore,
           cameraPresence,
           posture,
@@ -343,6 +354,47 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
     };
   }, [isVoiceMode]);
 
+  // Setup camera worker
+  useEffect(() => {
+    const createWorker = () => {
+      try {
+        const worker = new Worker(new URL('../../workers/cameraWorker.ts', import.meta.url), { type: 'module' });
+        worker.onmessage = (e: MessageEvent<any>) => {
+          if (e.data?.type === 'metrics') {
+            lastWorkerLightingRef.current = e.data.lighting ?? null;
+            lastWorkerFaceMetricsRef.current = {
+              eyeContact: e.data.eyeContact,
+              framing: e.data.framing,
+              headPositionStability: e.data.headPositionStability,
+              facialExpressiveness: e.data.facialExpressiveness,
+              blinkRate: e.data.blinkRate,
+              distance: e.data.distance,
+              offFrame: e.data.offFrame,
+            };
+            // Broadcast landmarks/pose to the window for overlays to consume if needed
+            try {
+              (window as any).__kelv_cv_overlay__ = {
+                faceLandmarks: e.data.faceLandmarks,
+                poseLandmarks: e.data.poseLandmarks,
+                debug: e.data.debug
+              };
+            } catch { /* ignore */ }
+          }
+        };
+        workerRef.current = worker;
+      } catch (err) {
+        console.warn('Failed to init camera worker', err);
+      }
+    };
+    createWorker();
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+    };
+  }, []);
+
   // Handle video element assignment separately
   useEffect(() => {
     if (stream) {
@@ -381,6 +433,30 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       const el = videoRef.current;
       if (!el || el.readyState < 2) return;
       try {
+        // Send a downscaled frame to the worker for lighting calc
+        try {
+          if (workerRef.current) {
+            const width = 320;
+            const height = Math.round((el.videoHeight || 240) * (320 / (el.videoWidth || 320)));
+            const bitmap = await createImageBitmap(el, {
+              resizeWidth: width,
+              resizeHeight: height,
+              resizeQuality: 'low'
+            } as any);
+            // If our last camera presence had a debug faceBox, pass it to worker (scaled)
+            let scaledBox: { x: number; y: number; width: number; height: number } | null = null;
+            if (lastFaceBoxRef.current) {
+              const { x, y, width: bw, height: bh, frameW, frameH } = lastFaceBoxRef.current;
+              if (frameW && frameH) {
+                const sx = width / frameW;
+                const sy = height / frameH;
+                scaledBox = { x: Math.round(x * sx), y: Math.round(y * sy), width: Math.round(bw * sx), height: Math.round(bh * sy) };
+              }
+            }
+            workerRef.current.postMessage({ type: 'analyze', frame: bitmap, width, height, faceBox: scaledBox }, [bitmap as unknown as Transferable]);
+          }
+        } catch {}
+
         const cameraPresence = await analyzeCameraPresence(el);
         const posture = await analyzePosture(el);
         const now = Date.now();
@@ -409,18 +485,51 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
         const updatedPresence: CameraPresence = {
           ...cameraPresence,
+          lighting: lastWorkerLightingRef.current ?? cameraPresence.lighting,
           offFrame: Number(offFramePct.toFixed(2)),
           triggers,
         };
+
+        // Merge worker-derived facial metrics if present
+        const wm = lastWorkerFaceMetricsRef.current;
+        if (wm) {
+          if (wm.eyeContact !== undefined) updatedPresence.eyeContact = wm.eyeContact as number;
+          if (wm.framing !== undefined) updatedPresence.framing = wm.framing as number;
+          if (wm.headPositionStability !== undefined) updatedPresence.headPositionStability = wm.headPositionStability as number;
+          if (wm.facialExpressiveness !== undefined) updatedPresence.facialExpressiveness = wm.facialExpressiveness as number;
+          if (wm.blinkRate !== undefined) updatedPresence.blinkRate = wm.blinkRate as number;
+          if (wm.distance !== undefined) updatedPresence.distance = wm.distance as number;
+          if (wm.offFrame !== undefined) updatedPresence.offFrame = wm.offFrame as number;
+        }
 
         setAnalysisTimeline(prev => [
           ...prev,
           { timestamp: now, cameraPresence: updatedPresence, posture, triggers }
         ]);
+        // Real-time encouragement nudge while the user is speaking and posture/metrics dip
+        try {
+          if (state.isUserSpeaking) {
+            const slouch = (posture?.confidence ?? 1) < 0.6;
+            const unstable = (updatedPresence.headPositionStability ?? 1) < 0.45;
+            const leaning = (updatedPresence.distance ?? 1) < 0.45;
+            if (slouch || unstable || leaning) {
+              setShowNudge(true);
+              if (nudgeTimeoutRef.current) window.clearTimeout(nudgeTimeoutRef.current);
+              nudgeTimeoutRef.current = window.setTimeout(() => setShowNudge(false), 1600) as unknown as number;
+            }
+          }
+        } catch { /* ignore */ }
+        // Save faceBox for next worker frame scaling
+        try {
+          const dbg = cameraPresence.debug as any;
+          if (dbg?.faceBox && dbg?.frameSize) {
+            lastFaceBoxRef.current = { x: dbg.faceBox.x, y: dbg.faceBox.y, width: dbg.faceBox.width, height: dbg.faceBox.height, frameW: dbg.frameSize.width, frameH: dbg.frameSize.height };
+          }
+        } catch { /* ignore */ }
       } catch (err) {
         console.warn('Periodic camera analysis failed', err);
       }
-    }, 5000);
+    }, 1500);
     return () => clearInterval(interval);
   }, [analyzeCameraPresence, analyzePosture, stream]);
 
@@ -750,6 +859,11 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
               size="xl"
               showStatus={true}
             />
+            {showNudge && (
+              <div className="pointer-events-none absolute inset-0 rounded-xl">
+                <div className="absolute inset-0 animate-pulse" style={{ boxShadow: '0 0 0 4px rgba(249,115,22,0.35), 0 0 40px 10px rgba(249,115,22,0.2) inset' }} />
+              </div>
+            )}
           </div>
 
           {/* Voice mode recording indicator - bottom center */}
@@ -815,18 +929,50 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           </div>
         </div>
       </div>
-      {sessionData && sessionData.setup && sessionData.setup.interviewMode === 'voice' && !!summaryVoiceMetrics && (
+      {/* Combined Camera + Voice Metrics Summary */}
+      {!!summaryVoiceMetrics && (
         <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 mt-8 max-w-2xl mx-auto">
           <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
             <Mic className="w-5 h-5 text-blue-400" />
             Advanced Voice Analysis
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex gap-4 items-start">
+            {voiceExpandedKey && (() => {
+              const m = summaryVoiceMetrics!.find(v => v.name === voiceExpandedKey);
+              if (!m) return null;
+              return (
+                <aside className="order-2 w-[360px] bg-gray-900/95 border border-gray-800 rounded-xl shadow-xl p-4 sticky top-4 ml-auto">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-white font-semibold text-base">{m.name}</div>
+                    <button
+                      onClick={() => setVoiceExpandedKey(null)}
+                      className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="text-sm text-gray-300 mb-2">Score: <span className="font-semibold text-white">{m.score}/10</span></div>
+                  <div className="text-xs text-gray-200">
+                    <VoiceMetricExplainer name={m.name} />
+                  </div>
+                </aside>
+              );
+            })()}
+
+            <div className="order-1 grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
               {summaryVoiceMetrics!.map((metric) => (
                 <div
                   key={metric.name}
-                className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
-              >
+                  className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-700/50"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setVoiceExpandedKey(prev => (prev === metric.name ? null : metric.name))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setVoiceExpandedKey(prev => (prev === metric.name ? null : metric.name));
+                    }
+                  }}
+                >
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
                     <metric.icon className="w-4 h-4 text-white" />
@@ -845,10 +991,16 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
                     style={{ width: `${metric.score * 10}%`, transition: 'width 1.5s' }}
                   />
                 </div>
-              <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+               <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+               {voiceExpandedKey === metric.name && (
+                 <div className="mt-3 border-t border-dark-600 pt-3 text-xs text-gray-200">
+                   <VoiceMetricExplainer name={metric.name} />
+                 </div>
+               )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
         {confidenceTips && confidenceTips.length > 0 && (
           <ul className="mt-4 text-sm text-blue-200 list-disc list-inside">
             {confidenceTips.map((tip, i) => (
@@ -859,6 +1011,48 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       </div>
     )}
   </div>
+  );
+};
+
+const VoiceMetricExplainer: React.FC<{ name?: string }> = ({ name }) => {
+  if (!name) return null;
+  // map known names to details
+  // Ensure title casing matches keys in getVoiceMetricDetails
+  const keyMap: Record<string, any> = {
+    'speech rate': 'Speech Rate',
+    'fluency': 'Fluency',
+    'voice confidence': 'Voice Confidence',
+    'delivery': 'Delivery',
+    'vocal clarity': 'Clarity',
+    'clarity': 'Clarity',
+    'filler words': 'Filler Words'
+  };
+  const normalized = keyMap[name.toLowerCase()] ?? name;
+  const info = getVoiceMetricDetails(normalized as any);
+  if (!info) return null;
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="text-xs text-gray-400 mb-1">Why this matters</div>
+        <div className="text-sm text-gray-200 leading-relaxed">{info.whyItMatters}</div>
+      </div>
+      <div>
+        <div className="text-xs text-gray-400 mb-1">How we measure it</div>
+        <div className="text-sm text-gray-200 leading-relaxed">{info.howItIsMeasured}</div>
+      </div>
+      {info.idealRange && (
+        <div>
+          <div className="text-xs text-gray-400 mb-1">Ideal range</div>
+          <div className="text-sm text-gray-200 leading-relaxed">{info.idealRange}</div>
+        </div>
+      )}
+      {info.perceptionImpact && (
+        <div>
+          <div className="text-xs text-gray-400 mb-1">Impact on perception</div>
+          <div className="text-sm text-gray-200 leading-relaxed">{info.perceptionImpact}</div>
+        </div>
+      )}
+    </div>
   );
 };
 

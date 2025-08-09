@@ -177,7 +177,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
       ]);
 
       // Set up event handlers
-      this.ws.onopen = (event) => {
+      this.ws.onopen = () => {
         this.handleOpen();
       };
       this.ws.onmessage = (event) => {
@@ -578,12 +578,18 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
     this.isGeneratingResponse = true;
 
-    this.sendEvent('response.create', {
+    // IMPORTANT: Do not override rich session instructions by default.
+    // Only include instructions when a specific override is intentionally provided.
+    const responsePayload: any = {
       response: {
-        modalities: this.sessionConfig.modalities,
-        instructions: instructions || 'Please provide a thoughtful interview question or follow-up based on the conversation so far.'
+        modalities: this.sessionConfig.modalities
       }
-    });
+    };
+    if (instructions && instructions.trim().length > 0) {
+      responsePayload.response.instructions = instructions;
+    }
+
+    this.sendEvent('response.create', responsePayload);
   }
 
   // Send a message to the AI

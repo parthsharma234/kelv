@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Sun, Eye, Smile, Move, Square, Activity, UserCheck, Video, Maximize, XCircle } from 'lucide-react';
 import type { CameraPresence, PostureScore, CameraTimelinePoint } from '../../types/analytics';
 import VideoReview from './VideoReview';
+import { getCameraMetricAdvice, getCameraMetricTips } from '../../utils/metricAdvice';
+import { getMetricDetails } from '../../utils/metricInfo';
 
 interface Props {
   cameraPresence?: CameraPresence;
   posture?: PostureScore;
   recordingUrl?: string;
   timeline?: CameraTimelinePoint[];
+  onMetricSelect?: (metricKey: string | null, value: number) => void;
 }
 
 const metricIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -34,7 +37,9 @@ const metricLabels: Record<string, string> = {
   offFrame: 'Off-Frame Time',
 };
 
-const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl, timeline }) => {
+const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl, timeline, onMetricSelect }) => {
+  const [activeTab, setActiveTab] = useState<'metrics' | 'video'>('metrics');
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   if (!cameraPresence && !posture) {
     return <p className="text-sm text-gray-400">No camera data collected.</p>;
   }
@@ -54,16 +59,57 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
 
   const startTime = timeline?.[0]?.timestamp ?? 0;
 
-  return (
-    <div className="space-y-6">
-      {recordingUrl && <VideoReview src={recordingUrl} />}
+  const getMetricAction = (key: string, value: number) => getCameraMetricAdvice(key as any, value);
 
-      {metrics.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  return (
+    <div className="space-y-6 relative">
+      {/* Tabs */}
+      <div className="flex items-center gap-2">
+        <button
+          className={`px-3 py-1 text-sm rounded border ${activeTab === 'metrics' ? 'bg-dark-600 text-white border-dark-500' : 'bg-dark-800 text-gray-300 border-dark-700'}`}
+          onClick={() => setActiveTab('metrics')}
+        >
+          Metrics
+        </button>
+        <button
+          className={`px-3 py-1 text-sm rounded border ${activeTab === 'video' ? 'bg-dark-600 text-white border-dark-500' : 'bg-dark-800 text-gray-300 border-dark-700'}`}
+          onClick={() => setActiveTab('video')}
+        >
+          Video Review
+        </button>
+      </div>
+
+      {/* Content */}
+      {activeTab === 'video' && recordingUrl && (
+        <div className="rounded-xl overflow-hidden border border-dark-700">
+          <div className="p-3 bg-dark-800 border-b border-dark-700 text-sm text-gray-300">Raw + Annotated (Large View)</div>
+          <div className="p-0">
+            <div className="w-full" style={{ height: '70vh' }}>
+              <div className="flex gap-4 h-full p-4">
+                <div className="flex-1 min-w-0">
+                  <VideoReview src={recordingUrl} timeline={timeline} defaultMode="overlay" defaultShowOverlay />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'metrics' && metrics.length > 0 && (
+        <div className="flex gap-4 items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 order-1">
           {metrics.map((m) => {
             const Icon = metricIcons[m.key];
             return (
-              <div key={m.key} className="bg-dark-700/30 border border-dark-600/30 rounded-lg p-4">
+              <div
+                key={m.key}
+                className="bg-dark-700/30 border border-dark-600/30 rounded-lg p-4 cursor-pointer hover:bg-dark-700/50"
+                onClick={() => {
+                  const next = expandedKey === m.key ? null : m.key;
+                  setExpandedKey(next);
+                  if (onMetricSelect) onMetricSelect(next, m.value);
+                }}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {Icon && <Icon className="w-4 h-4 text-orange-400" />}
@@ -79,13 +125,19 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
                     style={{ width: `${m.value * 100}%` }}
                   />
                 </div>
+                <div className="mt-2 text-xs text-gray-300">
+                  {getMetricAction(m.key, m.value)}
+                </div>
               </div>
             );
           })}
+          </div>
+
+          {/* selection details are rendered by parent via onMetricSelect */}
         </div>
       )}
 
-      {cameraPresence?.suggestions && cameraPresence.suggestions.length > 0 && (
+      {activeTab === 'metrics' && cameraPresence?.suggestions && cameraPresence.suggestions.length > 0 && (
         <div>
           <h5 className="text-sm font-medium text-white mb-2 flex items-center gap-2">
             <Video className="w-4 h-4 text-orange-400" />
@@ -99,7 +151,7 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
         </div>
       )}
 
-      {posture?.suggestions && posture.suggestions.length > 0 && (
+      {activeTab === 'metrics' && posture?.suggestions && posture.suggestions.length > 0 && (
         <div>
           <h5 className="text-sm font-medium text-white mb-2">Posture Tips</h5>
           <ul className="text-xs text-gray-400 list-disc list-inside space-y-1">
@@ -110,7 +162,7 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
         </div>
       )}
 
-      {cameraPresence?.triggers && cameraPresence.triggers.length > 0 && (
+      {activeTab === 'metrics' && cameraPresence?.triggers && cameraPresence.triggers.length > 0 && (
         <div>
           <h5 className="text-sm font-medium text-white mb-2">Alerts</h5>
           <ul className="text-xs text-orange-400 list-disc list-inside space-y-1">
@@ -121,7 +173,7 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
         </div>
       )}
 
-      {timeline && timeline.length > 0 && (
+      {activeTab === 'metrics' && timeline && timeline.length > 0 && (
         <div>
           <h5 className="text-sm font-medium text-white mb-2">Timeline Flags</h5>
           <ul className="text-xs text-gray-300 space-y-2 max-h-48 overflow-y-auto pr-2">

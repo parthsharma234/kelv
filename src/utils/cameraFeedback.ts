@@ -100,15 +100,17 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   lighting = lightingKF.filter(lighting);
 
   // Eye contact and facial analysis using MediaPipe
-  let eyeContact = 0.5;
-  let framing = 0.5;
-  let headPositionStability = 0.5;
+  // Initialize metrics closer to prior readings when possible to avoid sticky 0.5 defaults
+  let eyeContact = prevCenter ? 0.7 : 0.5;
+  let framing = prevCenter ? 0.7 : 0.5;
+  let headPositionStability = 1;
   let facialExpressiveness = 0.5;
-  let blinkRate = 0.5;
-  let distance = 0.5;
+  let blinkRate = 0.4;
+  let distance = 0.6;
   let offFrame = 0;
-  let gestureMagnitude = 0.5;
-  let smileScore = 0.5;
+  let gestureMagnitude = 0.4;
+  let smileScore = 0.4;
+  let lastBoundingBox: { x: number; y: number; width: number; height: number } | null = null;
   try {
     const faceResults = await getFaceResults(canvas);
     if (faceResults && faceResults.detections && faceResults.detections.length > 0) {
@@ -121,6 +123,7 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
           width: box.width * canvas.width,
           height: box.height * canvas.height
         };
+        lastBoundingBox = boundingBox;
         const centerX = boundingBox.x + boundingBox.width / 2;
         const centerY = boundingBox.y + boundingBox.height / 2;
         const distX = Math.abs(centerX - canvas.width / 2) / (canvas.width / 2);
@@ -214,6 +217,35 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
     /* MediaPipe detection failed */
   }
 
+  // Fallback: basic face detection using FaceDetector API if MediaPipe did not yield a face box
+  try {
+    if ((!prevCenter || eyeContact === 0.5 && framing === 0.5) && 'FaceDetector' in window) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detector = new (window as any).FaceDetector();
+      const faces = await detector.detect(canvas);
+      if (faces && faces.length > 0) {
+        const box = faces[0].boundingBox;
+        lastBoundingBox = { x: box.x, y: box.y, width: box.width, height: box.height };
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+        const distX = Math.abs(centerX - canvas.width / 2) / (canvas.width / 2);
+        const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
+        eyeContact = eyeContactKF.filter(Math.max(0, 1 - (distX + distY) / 2));
+        framing = Math.max(0, 1 - Math.max(distX, distY));
+        const faceArea = box.width * box.height;
+        const frameArea = canvas.width * canvas.height;
+        const faceRatio = faceArea / frameArea;
+        const idealRatio = 0.1;
+        distance = distanceKF.filter(Math.max(0, 1 - Math.abs(faceRatio - idealRatio) / idealRatio));
+        const withinX = box.x > canvas.width * 0.15 && box.x + box.width < canvas.width * 0.85;
+        const withinY = box.y > canvas.height * 0.15 && box.y + box.height < canvas.height * 0.85;
+        offFrame = withinX && withinY ? 0 : 1;
+      }
+    }
+  } catch {
+    /* ignore fallback failure */
+  }
+
   // Gesture magnitude using MediaPipe Pose
   try {
     const poseResults = await getPoseResults(canvas);
@@ -270,13 +302,20 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   if (gestureMagnitude < 0.3) confidenceTips.push('Use hand gestures to add energy.');
   if (blinkRate < 0.2) confidenceTips.push('Blink naturally to avoid staring.');
 
+  // Compute attentiveness as a blend of eye contact, head stability, and blink rate
+  const attentivenessScore = Number((
+    (eyeContact * 0.5) +
+    (Math.max(0, headPositionStability) * 0.3) +
+    (Math.min(1, blinkRate * 1.2) * 0.2)
+  ).toFixed(2));
+
   const result: CameraPresence = {
     lighting: Number(lighting.toFixed(2)),
     eyeContact: Number(eyeContact.toFixed(2)),
     smile: Number(smileScore.toFixed(2)),
     smileFrequency: Number(smileFrequency.toFixed(2)),
     gestureMagnitude: Number(gestureMagnitude.toFixed(2)),
-    attentiveness: 0.5,
+    attentiveness: attentivenessScore,
     facialExpressiveness,
     headPositionStability,
     framing,
@@ -285,6 +324,13 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
     offFrame,
     suggestions,
     confidenceTips,
+    debug: lastBoundingBox ? {
+      faceBox: lastBoundingBox,
+      faceCenter: prevCenter || undefined,
+      frameSize: { width: canvas.width, height: canvas.height },
+      faceRatio: lastBoundingBox.width * lastBoundingBox.height / (canvas.width * canvas.height),
+      idealFaceRatio: 0.1
+    } : undefined,
   };
 
   console.debug('Camera analysis result', result);

@@ -8,7 +8,7 @@ import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
-import { getQuestions } from '../utils/questionBank';
+// import { getQuestions } from '../utils/questionBank';
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetrics {
@@ -84,6 +84,9 @@ export function useRealtimeInterview({
   } = useInterviewState();
 
   const clientRef = useRef<OpenAIRealtimeClient | null>(null);
+  const stateRef = useRef(state);
+  // A/B testing flag for prompt strategy (A = current adaptive prompt, B = softer/gentle variant)
+  const promptVariantRef = useRef<'A' | 'B'>('B');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<Date | null>(null);
   const performanceScoresRef = useRef<number[]>([]);
@@ -96,6 +99,9 @@ export function useRealtimeInterview({
   const endInterviewRef = useRef<() => void>();
   const categoryCountsRef = useRef<Record<string, number>>({});
   const categoryStruggleCountsRef = useRef<Record<string, number>>({});
+  // Small-talk control
+  const smallTalkNeededRef = useRef<boolean>(true);
+  const smallTalkTurnsRef = useRef<number>(0);
   // Add a ref to store per-response segments for the voice timeline
   const voiceTimelineSegmentsRef = useRef<Array<{
     transcript: string;
@@ -105,6 +111,11 @@ export function useRealtimeInterview({
   }>>([]);
   // Add a ref to collect transcript chunks for the current user response
   const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
+
+  // Keep a ref to the latest state for event listener closures
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Generate adaptive system prompt
   const generateAdaptiveInstructions = useCallback((
@@ -134,6 +145,14 @@ export function useRealtimeInterview({
     estimatedScore: number = 5,
     questionCategory: string = 'general'
   ) => {
+    // Enforce stricter policy across the interview: require at least two substantive user turns between major topic shifts
+    try {
+      const t = candidateResponse.trim().toLowerCase();
+      const isLow = t.length <= 8 || /^(no|nah|ok|okay|fine|good|yep|yup|sure|idk|i don't know|hmm|lol|not really|i dunno)$/.test(t);
+      if (isLow && clientRef.current) {
+        clientRef.current.sendUserMessage('[POLICY]: Their reply was minimal. Ask for elaboration and avoid advancing difficulty or changing topic.');
+      }
+    } catch { /* ignore */ }
     // Store the response and score for adaptive behavior
     candidateResponsesRef.current.push(candidateResponse);
     performanceScoresRef.current.push(estimatedScore);
@@ -273,15 +292,31 @@ export function useRealtimeInterview({
     }
 
     // Use focused prompt for focused interviews, otherwise use adaptive prompt
-    const instructions = focusedType ? 
+    // Simple A/B toggle read from localStorage for now; default 'A'
+    try {
+      const v = (window.localStorage.getItem('kelv_prompt_variant') as 'A' | 'B' | null);
+      if (v === 'A' || v === 'B') promptVariantRef.current = v;
+    } catch {}
+
+    const baseInstructions = focusedType ? 
       getFocusedInterviewPrompt(focusedType, setup) :
       generateAdaptiveInstructions();
+
+    // Variant B: slightly reduce aggressiveness by hinting gentle transitions
+    const instructions = promptVariantRef.current === 'B'
+      ? `${baseInstructions}
+
+GENTLE TRANSITION POLICY (Variant B):
+- After small talk, ask a high-level opener before deep dives
+- Avoid immediate project walkthroughs; start with background/motivation
+- If last user reply is very short, downshift difficulty`
+      : baseInstructions;
 
     const config: Partial<RealtimeConfig> = {
       voice: 'alloy',
       instructions,
       modalities: setup.interviewMode === 'voice' ? ['text', 'audio'] : ['text'],
-      temperature: focusedType ? 0.6 : 0.7 // Minimum temperature for realtime API is 0.6
+      temperature: focusedType ? 0.6 : 0.65 // Slightly reduced for more natural phrasing
     };
 
     try {
@@ -295,6 +330,8 @@ export function useRealtimeInterview({
       clientRef.current.on('connection.opened', () => {
         setStatus('interviewing');
         startTimeRef.current = new Date();
+        smallTalkNeededRef.current = !focusedType; // Needed for non-focused
+        smallTalkTurnsRef.current = 0;
         // Start the timer after connection is established
         const startTime = Date.now();
         if (timerRef.current) {
@@ -361,12 +398,17 @@ export function useRealtimeInterview({
             
             const followUpPrompt = conversationalPrompts[Math.floor(Math.random() * conversationalPrompts.length)];
 
-            const openingQuestion =
-              getQuestions(setup.jobType, setup.industry, 'behavioral')[0] ||
-              getQuestions(setup.jobType, setup.industry, 'situational')[0] ||
-              'Could you tell me a bit about your background?';
+            // Gentle opening: prefer light, high-level question over project deep-dive
+            const humanOpeners = [
+              `What first pulled you toward ${setup.jobType}?`,
+              `What about ${setup.industry} has kept you curious lately?`,
+              `If you had to pick one theme in your work recently, what would it be?`,
+              `What part of your day-to-day right now energizes you most?`
+            ];
+            const openingQuestion = humanOpeners[Math.floor(Math.random() * humanOpeners.length)];
 
-            const bridgeInstruction = `After this brief chat, acknowledge their response and say something like "Thanks for sharing." Then ask: "${openingQuestion}"`;
+            // Conversational bridge: if user small-talk was minimal, soften the transition
+            const bridgeInstruction = `After this brief chat, acknowledge their response naturally (e.g., "Makes sense"). Then ease into a single, casual opener (avoid stacked questions): "${openingQuestion}".`;
 
             const veryHumanSmallTalkInstruction = `Start with this natural greeting: "${selectedGreeting}"
 
@@ -390,6 +432,11 @@ ${bridgeInstruction}
 Remember: Be genuinely human, not scripted. Listen actively and respond like a real person having a real conversation would.`;
             
             clientRef.current?.createResponse(veryHumanSmallTalkInstruction);
+
+            // If Variant B, send a follow-up internal guide reinforcing gentle first question
+            if (promptVariantRef.current === 'B') {
+              clientRef.current?.sendUserMessage('[INTERNAL CONTEXT]: After small talk, use a gentle opening about background/motivation before technicals.');
+            }
           }
         }, 1000);
         
@@ -415,9 +462,45 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       clientRef.current.on('transcript.update', (chunk: TranscriptChunk) => {
         if (chunk.speaker === 'user') {
           handleUserTranscript(chunk.text, !chunk.isPartial);
+          // Small-talk persistence: if early and reply is minimal, force another small-talk follow-up
+          try {
+            const minutesSinceStart = startTimeRef.current ? (Date.now() - startTimeRef.current.getTime()) / 60000 : 0;
+            if (!chunk.isPartial && minutesSinceStart < 3 && smallTalkNeededRef.current) {
+              const t = (chunk.text || '').trim().toLowerCase();
+              const isLowContent = t.length <= 8 || /^(no|nah|ok|okay|fine|good|yep|yup|sure|idk|i don't know|hmm|lol|not really|i dunno)$/.test(t);
+              if (isLowContent) {
+                smallTalkTurnsRef.current += 1;
+                // Nudge the model explicitly via a user-side control message, then trigger a response
+                clientRef.current?.sendUserMessage('[POLICY]: Their reply was minimal. Stay in small talk. Ask a different, friendly follow-up. Do NOT start interview questions yet.');
+                clientRef.current?.createResponse();
+              } else {
+                // Mark small talk satisfied after at least one substantive reply or 2+ brief turns
+                smallTalkNeededRef.current = smallTalkTurnsRef.current >= 2 ? false : true;
+                if (!smallTalkNeededRef.current) {
+                  clientRef.current?.sendUserMessage('[INTERNAL CONTEXT]: Small talk complete. Transition gently to the first opener.');
+                }
+              }
+            }
+          } catch { /* ignore */ }
         } else if (chunk.speaker === 'assistant') {
           // Use handleAssistantResponse for AI text, which manages buffering
           handleAssistantResponse(chunk.text, !chunk.isPartial);
+
+          // Nudge: if early and last user reply was very short, ask one more small-talk follow-up before opener
+          try {
+            const minutesSinceStart = startTimeRef.current ? (Date.now() - startTimeRef.current.getTime()) / 60000 : 0;
+            if (minutesSinceStart < 3 && !chunk.isPartial) {
+              const transcriptSoFar = stateRef.current?.transcript || [];
+              const lastUser = [...transcriptSoFar].reverse().find(c => c.speaker === 'user' && !c.isPartial);
+              if (lastUser) {
+                const text = lastUser.text.trim().toLowerCase();
+                const wasShort = text.length <= 8 || /^(no|nah|ok|okay|fine|good|yep|yup|sure|oi|hmm|lol|idk|i don't know)$/.test(text);
+                if (wasShort) {
+                  clientRef.current?.sendUserMessage('[INTERNAL CONTEXT]: Their last reply was very short/low-content. Ask one more human follow-up before the opener. No templates, keep it casual.');
+                }
+              }
+            }
+          } catch { /* ignore */ }
         }
 
         // Save complete chunks to the database
@@ -518,7 +601,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       'how have you been'
     ];
 
-    const classifyQuestion = (text: string, index: number, timestamp: number): string => {
+    const classifyQuestion = (text: string, index: number, timestamp: number): 'opening' | 'small_talk' | 'behavioral' | 'technical' | 'situational' | 'follow_up' | 'problem_solving' | 'leadership' | 'cultural_fit' | 'caseStudy' | 'systemDesign' | 'leadershipAssessment' | 'closing' => {
       const q = text.toLowerCase();
       const isEarly = startTimeRef.current ? (timestamp - startTimeRef.current.getTime()) <= 120 * 1000 : true;
       if (index < 2 && isEarly && SMALL_TALK_PHRASES.some(p => q.includes(p))) {
@@ -531,13 +614,13 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         return 'technical';
       }
       if (/goal|future|career|plan|five year/.test(q)) {
-        return 'goals';
+        return 'behavioral';
       }
       if (/team|collaborat|coworker|work with others/.test(q)) {
-        return 'teamwork';
+        return 'behavioral';
       }
       if (/why do you want|company|culture|fit|values/.test(q)) {
-        return 'fit';
+        return 'cultural_fit';
       }
       return 'behavioral';
     };
@@ -556,9 +639,9 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         if (isCollectingResponse && currentResponse.trim() && currentQuestionId) {
           const prevQuestion = questions.find(q => q.id === currentQuestionId);
           const analysis = await analyzeResponseWithAI(
-            { text: currentQuestion, type: prevQuestion?.category || 'behavioral', id: `q${Date.now()}` },
+            { text: currentQuestion, type: (prevQuestion?.category as any) || 'behavioral', id: `q${Date.now()}` },
             currentResponse.trim(),
-            'jobType' in setup ? setup : {
+            (setup as any)?.jobType ? setup : {
               jobType: 'General',
               experienceLevel: 'Mid-level',
               industry: 'Technology',
@@ -600,9 +683,9 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     if (isCollectingResponse && currentResponse.trim() && currentQuestionId) {
       const prevQuestion = questions.find(q => q.id === currentQuestionId);
       const analysis = await analyzeResponseWithAI(
-        { text: currentQuestion, type: prevQuestion?.category || 'behavioral', id: `q${Date.now()}` },
+        { text: currentQuestion, type: (prevQuestion?.category as any) || 'behavioral', id: `q${Date.now()}` },
         currentResponse.trim(),
-        'jobType' in setup ? setup : {
+        (setup as any)?.jobType ? setup : {
           jobType: 'General',
           experienceLevel: 'Mid-level',
           industry: 'Technology',
@@ -735,10 +818,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       const fullTranscription = state.transcript.filter(t => t.speaker === 'user').map(t => t.text).join(' ');
       const duration = state.duration;
 
-      const metrics = await extractSpeechMetrics(fullAudioBlob, fullTranscription, duration, responseTimesRef.current);
+      const metrics = await extractSpeechMetrics(fullAudioBlob, fullTranscription, duration);
       if (metrics) {
-        const feedback = generateActionableFeedback(metrics, fullTranscription, undefined);
-        metrics.confidenceTips = feedback.confidenceTips;
+        const feedback = generateActionableFeedback(metrics as any, fullTranscription, undefined);
+        (metrics as any).confidenceTips = feedback.confidenceTips;
         return [{ questionId: 'summary', metrics }];
       }
       return [];

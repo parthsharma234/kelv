@@ -25,6 +25,13 @@ export interface CameraPresence {
   suggestions: string[]; // Actionable feedback
   triggers?: string[]; // Threshold messages with durations
   confidenceTips?: string[]; // Combined confidence coaching cues
+  debug?: {
+    faceBox?: { x: number; y: number; width: number; height: number };
+    faceCenter?: { x: number; y: number };
+    frameSize?: { width: number; height: number };
+    faceRatio?: number;
+    idealFaceRatio?: number;
+  };
 }
 
 export interface PostureScore {

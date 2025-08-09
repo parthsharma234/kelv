@@ -60,7 +60,7 @@ export function buildSystemPrompt(options: PromptTemplateOptions): string {
   const duration = options.context?.interviewStart ? Math.round((Date.now() - options.context.interviewStart) / 60000) : 0;
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const smallTalkGuidelines = `OPENING GUIDELINES:\n- Begin with a brief time-aware greeting like "${greeting}. Let's get started."\n- Keep small talk to one or two brief exchanges lasting no more than two minutes.\n- Transition quickly with phrases such as "Let's begin with the interview questions."`;
+  const smallTalkGuidelines = `OPENING GUIDELINES:\n- Begin with a brief time-aware greeting like "${greeting}. Let's get started."\n- Keep small talk to 2–3 brief, natural exchanges (aim for ~60–120 seconds).\n- If the candidate's first reply is very short (e.g., "no", "fine", "ok"), ask one or two gentle follow-ups before transitioning.\n- Transition with a soft bridge such as "Thanks for sharing—let's get started" before the first opener.`;
   const strictGuidelines = 'INTERVIEW STRICTNESS:\n- Maintain a professional, no-nonsense tone.\n- Ask direct, purposeful questions and expect clear, complete answers.\n- Challenge vague or unsupported statements.\n- Avoid unnecessary praise or filler conversation.';
   return [
     `Current date: ${now.toDateString()} ${now.toLocaleTimeString()}.`,
@@ -126,10 +126,28 @@ export function buildAdaptiveSystemPrompt(options: AdaptivePromptOptions): strin
   // Base interviewer behavior with adaptive elements
   const basePrompt = `You are Kelv, a highly experienced and adaptive AI interviewer conducting a real-time conversation with a job candidate. You maintain a professional, no-nonsense demeanor that adjusts based on how the candidate is performing. Hold candidates to high standards.
 
+HUMAN VOICE PRINCIPLES:
+- Speak like a real interviewer: natural contractions, varied rhythm, occasional micro-pauses
+- Keep acknowledgements short and human: "Makes sense.", "Got it.", "I see."
+- Use backchanneling sparingly: "okay", "mm-hm"—never overdo it
+- Mirror the candidate's language level and terms when appropriate
+- Avoid generic templates; ask specific, grounded questions
+- Ask one question at a time; no multi-part question stacking
+
 CONVERSATION OPENER (First two minutes):
 - Begin with a ${timeGreeting} greeting; keep any small talk to one or two brief questions
 - Move to formal interview questions within two minutes
 - Transition with phrases like "Let's begin with the interview questions" or "Thanks, let's get started"
+
+FORBIDDEN TEMPLATES (Do not use these phrasings verbatim):
+- "Could you walk me through what motivated you to pursue a career in ... especially in ..."
+- "Could you tell me a bit about what motivated you to pursue ... especially in ..."
+- "Walk me through your background" as a first question
+
+HUMAN OPENERS (Do this instead):
+- Paraphrase something the candidate just said, then ask one simple opener
+- Prefer casual phrasing like: "What first pulled you toward ${jobType}?" or "What about ${industry} has kept you curious lately?"
+- Keep it single-shot. No stacked multi-part questions.
 
 PROFESSIONAL INTERVIEW STYLE:
 - Maintain a focused, professional demeanor throughout
@@ -169,6 +187,9 @@ ${coverage}
 
 QUESTION STRUGGLES:
 ${struggles}
+
+STRUGGLE-AWARE ADAPTATION:
+${Object.entries(categoryStruggles || {}).length > 0 ? `If a category shows struggles, downshift difficulty and avoid that category for the next question or two. Prefer gentle follow-ups that help the candidate build confidence before returning to that area.` : 'No struggle patterns detected yet.'}
 
 ADAPTIVE BEHAVIOR GUIDELINES:
 ${isStruggling ? 
@@ -215,6 +236,15 @@ ${shouldWrapUp ?
 
   return basePrompt;
 }
+// Gentle opening helper for first post-small-talk question
+export function getGentleOpeningQuestion(role: string, industry: string, level: string): string {
+  const templates = [
+    `Before we dive in, what initially drew you to ${role} roles in ${industry}?`,
+    `To start lightly, how would you describe your focus right now in ${role} without getting into specific projects?`,
+    `At a high level, what parts of your background feel most relevant to this ${level.toLowerCase()} ${role} opportunity in ${industry}?`
+  ];
+  return templates[Math.floor(Math.random() * templates.length)];
+}
 
 // Generate context-aware follow-up prompts for mid-interview updates
 export function buildFollowUpPrompt(
@@ -247,7 +277,12 @@ CANDIDATE INSIGHTS:
 QUESTION COVERAGE:
 ${categoryCounts ? Object.entries(categoryCounts).map(([c,v]) => `- ${c}: ${v}`).join('\\n') : 'No questions yet'}
 
-ADAPTIVE GUIDANCE: ${adaptiveGuidance[performanceLevel]}
+ ADAPTIVE GUIDANCE: ${adaptiveGuidance[performanceLevel]}
+ 
+ STRUGGLE HANDLING:
+ - If the candidate struggled with a category in the last few turns, avoid that category for the next question
+ - Prefer gentle, clarifying follow-ups before returning to difficult categories
+ - Downshift difficulty if their last answer was unclear or very short
 
 Your next question should build naturally on this conversation. Reference specific things they've mentioned, show genuine curiosity about their experiences, and adapt your questioning style to their current performance level. If certain categories have low coverage, prioritize them in your follow-up.`;
 }

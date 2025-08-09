@@ -37,6 +37,10 @@ export function useInterviewState() {
     questionCount: 0,
   });
 
+  // Track early small-talk dynamics to inform smoother transitions
+  const smallTalkExchangeCountRef = useRef<number>(0);
+  const lastUserShortReplyRef = useRef<boolean>(false);
+
   const assistantTextBuffer = useRef<string>('');
   const userTextBuffer = useRef<string>('');
   const assistantChunkIdRef = useRef<string | null>(null);
@@ -81,6 +85,20 @@ export function useInterviewState() {
       }
 
       // Update current question if it's a final assistant chunk
+      // Increment small-talk exchanges if early-stage small talk-like messages appear
+      if (!chunk.isPartial && chunk.speaker === 'user') {
+        const text = chunk.text.trim().toLowerCase();
+        const isShort = text.length <= 3 || /^(no|nah|ok|okay|fine|good|yep|yup|sure)$/i.test(text);
+        lastUserShortReplyRef.current = isShort;
+      }
+      if (!chunk.isPartial && chunk.speaker === 'assistant') {
+        const text = chunk.text.toLowerCase();
+        const looksLikeSmallTalk = /how are you|how's your day|how has your day|how's everything|how are you feeling|week going|where are you joining|what's.*highlight/.test(text);
+        if (looksLikeSmallTalk && smallTalkExchangeCountRef.current < 3) {
+          smallTalkExchangeCountRef.current += 1;
+        }
+      }
+
       const newCurrentQuestion = (chunk.speaker === 'assistant' && !chunk.isPartial)
         ? chunk.text
         : prev.currentQuestion;

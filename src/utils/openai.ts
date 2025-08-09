@@ -644,21 +644,18 @@ const getTechnicalQuestions = (jobType: string, industry: string, _experienceLev
   ];
 };
 
-// Resume-based question templates that keep the opening light and conversational
+// Resume-based question templates that keep the opening light and conversational (gentle)
 const getResumeBasedQuestions = (
   _jobType: string,
   _industry: string,
   _experienceLevel: string
 ): string[] => {
   const templates = [
-    'What sparked your interest in [industry], and how did you get started?',
-    'Looking back, what\'s a highlight from your time in [role] so far?',
-    'How did you first become interested in [specific skill/technology]?',
-    "What's one project or accomplishment you're especially proud of?",
-    'Which part of your background feels most relevant to this position?',
-    'What inspired you to move toward [current focus] in your career?',
-    'Is there a particular experience that shaped how you approach your work today?',
-    'When did you realize [industry/role] was the right path for you?'
+    'Before we dive in, what initially drew you to [role] in [industry]?',
+    'At a high level, what aspects of your background feel most relevant to this [role]?',
+    'What motivated you to pursue [role], and what keeps you excited about it?',
+    'How would you describe your focus right now in [role] without getting into specific projects yet?',
+    'What kind of work energizes you most day-to-day in [industry]?'
   ];
 
   return templates;
@@ -701,7 +698,7 @@ ${getRoleContext(setup.jobType, setup.industry)}
 EXPERIENCE LEVEL EXPECTATIONS:
 ${getExperienceLevelContext(setup.experienceLevel)}
 
-TASK: Start the interview with a warm, authentic opening question that invites the candidate to share their background, experience, or skills.
+TASK: Start the interview with a warm, gentle opening question that invites the candidate to share a high-level background or motivation. Avoid deep project walkthroughs. Keep it light and introductory. Speak with a natural, human voice (brief acknowledgements, contractions).
 
 REQUIREMENTS:
 1. RESUME-FOCUSED: Ask about their background, experience, or a specific skill
@@ -711,8 +708,9 @@ REQUIREMENTS:
 5. ROLE-SPECIFIC: Tailored to ${setup.jobType} and ${setup.industry}
 6. EXPERIENCE-APPROPRIATE: Matches ${setup.experienceLevel} expectations
 7. ENCOURAGING: Designed to help the candidate open up and feel comfortable
+8. LIGHTWEIGHT: Do not ask for specific project deep-dives in the opening
 
-RESUME-BASED QUESTION EXAMPLES:
+RESUME-BASED QUESTION EXAMPLES (gentle):
 ${getResumeBasedQuestions(setup.jobType, setup.industry, setup.experienceLevel).slice(0, 3).map(q => `- "${q}"`).join('\n')}
 
 TECHNICAL QUESTION EXAMPLES (for later in interview):
@@ -931,11 +929,12 @@ DIFFICULTY ADAPTATION:
 - If performing well (score > 7): Ask complex, strategic questions
 
 NATURAL CONVERSATION TECHNIQUES:
+- Use a human voice: contractions, varied rhythm, brief acknowledgements ("makes sense", "got it")
 - Reference specific details from their previous answers
-- Use phrases like "That's interesting," "I'm curious about," "Walk me through"
 - Ask for specific examples when they mention general concepts
 - Probe deeper when they mention achievements or challenges
 - Connect their experiences to the role requirements
+- Ask one clear question at a time (avoid multi-part)
 
 ADVANCED INTERVIEWING TECHNIQUES:
 
