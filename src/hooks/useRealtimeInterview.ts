@@ -298,9 +298,24 @@ export function useRealtimeInterview({
       if (v === 'A' || v === 'B') promptVariantRef.current = v;
     } catch {}
 
-    const baseInstructions = focusedType ? 
-      getFocusedInterviewPrompt(focusedType, setup) :
-      generateAdaptiveInstructions();
+    // Prefer individual strict prompts when available
+    const individual = ((): string | undefined => {
+      try {
+        // Dynamically import to avoid bundling issues if folder is missing
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { resolveIndividualPrompt } = require('../individualprompts/resolver');
+        return resolveIndividualPrompt(setup);
+      } catch { return undefined; }
+    })();
+
+    const baseInstructions = (() => {
+      const core = focusedType ? getFocusedInterviewPrompt(focusedType, setup) : generateAdaptiveInstructions();
+      if (individual && individual.trim()) {
+        // Use the single role+industry system prompt as the source of truth (includes small talk/behavioral/technical)
+        return individual;
+      }
+      return core;
+    })();
 
     // Variant B: slightly reduce aggressiveness by hinting gentle transitions
     const instructions = promptVariantRef.current === 'B'
@@ -338,7 +353,12 @@ GENTLE TRANSITION POLICY (Variant B):
           clearInterval(timerRef.current);
         }
         timerRef.current = setInterval(() => {
-          setDuration(Math.floor((Date.now() - startTime) / 1000));
+          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+          setDuration(elapsedSeconds);
+          const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+          if (elapsedSeconds % 60 === 0 && clientRef.current) { // Send update every minute
+            clientRef.current.sendUserMessage(`[TIME UPDATE]: Elapsed time: ${elapsedMinutes} minutes. Time remaining: ${maxDuration - elapsedMinutes} minutes. Adjust question depth and pace accordingly. If near end, prepare to wrap up.`);
+          }
         }, 1000);
         
         // Send initial greeting message to start the interview with small talk (skip for focused interviews)

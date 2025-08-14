@@ -186,6 +186,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                   const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined;
 
 
+                  // Try to decode fusion if present in stored interview meta
+                  let fusion: { confidence?: number; clarity?: number; warmth?: number; engagement?: number } | null = null;
+                  try {
+                    // @ts-ignore stored JSON payloads may vary
+                    fusion = (interview as any).sophisticatedAnalytics?.fusion || null;
+                  } catch {}
                   return (
                     <div
                       key={interview.id}
@@ -214,6 +220,21 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
                           <p className="text-sm text-gray-400">
                             {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
                           </p>
+                          {fusion && (
+                            <div className="mt-1 grid grid-cols-4 gap-2">
+                              {[{k:'confidence',l:'Conf.'},{k:'clarity',l:'Clar.'},{k:'warmth',l:'Warm.'},{k:'engagement',l:'Eng.'}].map(({k,l}) => (
+                                <div key={k} className="text-[10px] text-gray-300">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 mr-1">{l}</span>
+                                    <span className="text-white font-semibold">{Math.round((fusion as any)[k] || 0)}</span>
+                                  </div>
+                                  <div className="h-1 bg-dark-700 rounded">
+                                    <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded" style={{ width: `${Math.round((fusion as any)[k] || 0)}%` }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">

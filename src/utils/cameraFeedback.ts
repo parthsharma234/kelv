@@ -30,8 +30,29 @@ class KalmanFilter {
 }
 
 // MediaPipe detectors (initialized lazily)
-let mpFace: FaceDetection | null = null;
-let mpPose: Pose | null = null;
+// Worker integration for advanced CV analysis
+let cameraWorker: Worker | null = null;
+
+function initWorker() {
+  if (!cameraWorker) {
+    cameraWorker = new Worker(new URL('../workers/cameraWorker.ts', import.meta.url));
+    cameraWorker.postMessage({ type: 'init' });
+  }
+}
+
+async function analyzeWithWorker(frame: ImageBitmap, width: number, height: number, faceBox?: { x: number; y: number; width: number; height: number } | null): Promise<any> {
+  initWorker();
+  return new Promise(resolve => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data.type === 'metrics') {
+        cameraWorker?.removeEventListener('message', handleMessage);
+        resolve(e.data);
+      }
+    };
+    cameraWorker?.addEventListener('message', handleMessage);
+    cameraWorker?.postMessage({ type: 'analyze', frame, width, height, faceBox });
+  });
+}
 
 // Persist basic state between frames for temporal metrics
 let prevCenter: { x: number; y: number } | null = null;
@@ -48,32 +69,6 @@ const eyeContactKF = new KalmanFilter();
 const lightingKF = new KalmanFilter();
 const distanceKF = new KalmanFilter();
 const gestureKF = new KalmanFilter();
-
-async function getFaceResults(canvas: HTMLCanvasElement) {
-  if (!mpFace) {
-    mpFace = new FaceDetection({
-      locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-    });
-    mpFace.setOptions({ model: 'short', selfieMode: true });
-  }
-  return await new Promise<any>(resolve => {
-    mpFace!.onResults((results: any) => resolve(results));
-    mpFace!.send({ image: canvas });
-  });
-}
-
-async function getPoseResults(canvas: HTMLCanvasElement) {
-  if (!mpPose) {
-    mpPose = new Pose({
-      locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    });
-    mpPose.setOptions({ modelComplexity: 0, selfieMode: true, smoothLandmarks: true });
-  }
-  return await new Promise<any>(resolve => {
-    mpPose!.onResults((results: any) => resolve(results));
-    mpPose!.send({ image: canvas });
-  });
-}
 
 /**
  * Basic camera presence analysis using Canvas API.
@@ -99,10 +94,9 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   }
   lighting = lightingKF.filter(lighting);
 
-  // Eye contact and facial analysis using MediaPipe
-  // Initialize metrics closer to prior readings when possible to avoid sticky 0.5 defaults
-  let eyeContact = prevCenter ? 0.7 : 0.5;
-  let framing = prevCenter ? 0.7 : 0.5;
+  // Initialize metrics to defaults
+  let eyeContact = 0.5;
+  let framing = 0.5;
   let headPositionStability = 1;
   let facialExpressiveness = 0.5;
   let blinkRate = 0.4;
@@ -110,173 +104,76 @@ export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<Ca
   let offFrame = 0;
   let gestureMagnitude = 0.4;
   let smileScore = 0.4;
+  let smileFrequency = 0;
   let lastBoundingBox: { x: number; y: number; width: number; height: number } | null = null;
+
+  // First, detect face box for worker input
   try {
-    const faceResults = await getFaceResults(canvas);
-    if (faceResults && faceResults.detections && faceResults.detections.length > 0) {
-      const det = faceResults.detections[0];
-      const box = det.locationData?.relativeBoundingBox;
-      if (box) {
-        const boundingBox = {
-          x: box.xmin * canvas.width,
-          y: box.ymin * canvas.height,
-          width: box.width * canvas.width,
-          height: box.height * canvas.height
-        };
-        lastBoundingBox = boundingBox;
-        const centerX = boundingBox.x + boundingBox.width / 2;
-        const centerY = boundingBox.y + boundingBox.height / 2;
-        const distX = Math.abs(centerX - canvas.width / 2) / (canvas.width / 2);
-        const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
-        eyeContact = eyeContactKF.filter(Math.max(0, 1 - (distX + distY) / 2));
-        framing = Math.max(0, 1 - Math.max(distX, distY));
-        const faceArea = boundingBox.width * boundingBox.height;
-        const frameArea = canvas.width * canvas.height;
-        const faceRatio = faceArea / frameArea;
-        const idealRatio = 0.1;
-        distance = distanceKF.filter(Math.max(0, 1 - Math.abs(faceRatio - idealRatio) / idealRatio));
-        const withinX =
-          boundingBox.x > canvas.width * 0.15 &&
-          boundingBox.x + boundingBox.width < canvas.width * 0.85;
-        const withinY =
-          boundingBox.y > canvas.height * 0.15 &&
-          boundingBox.y + boundingBox.height < canvas.height * 0.85;
-        offFrame = withinX && withinY ? 0 : 1;
-
-        // Head movement compared to previous frame
-        if (prevCenter) {
-          const moveX = Math.abs(centerX - prevCenter.x) / canvas.width;
-          const moveY = Math.abs(centerY - prevCenter.y) / canvas.height;
-          const movement = Math.sqrt(moveX * moveX + moveY * moveY);
-          headPositionStability = Math.max(0, 1 - movement * 5);
-        } else {
-          headPositionStability = 1;
-        }
-        prevCenter = { x: centerX, y: centerY };
-
-        // Facial expressiveness via frame difference inside face box
-        const faceData = ctx?.getImageData(
-          boundingBox.x,
-          boundingBox.y,
-          boundingBox.width,
-          boundingBox.height
-        ).data;
-        if (faceData && prevFaceData && faceData.length === prevFaceData.length) {
-          let diff = 0;
-          for (let i = 0; i < faceData.length; i += 4) {
-            diff +=
-              Math.abs(faceData[i] - prevFaceData[i]) +
-              Math.abs(faceData[i + 1] - prevFaceData[i + 1]) +
-              Math.abs(faceData[i + 2] - prevFaceData[i + 2]);
-          }
-          diff /= (faceData.length / 4) * 255 * 3;
-          facialExpressiveness = Math.min(1, diff * 3);
-        }
-        prevFaceData = faceData || null;
-
-        // Simple smile detection based on lower-face brightness
-        if (faceData) {
-          const mouthStart = Math.floor(boundingBox.height * 0.6);
-          let lowerBrightness = 0;
-          let upperBrightness = 0;
-          for (let y = 0; y < boundingBox.height; y++) {
-            for (let x = 0; x < boundingBox.width; x++) {
-              const idx = (y * boundingBox.width + x) * 4;
-              const pixel = faceData[idx] + faceData[idx + 1] + faceData[idx + 2];
-              if (y > mouthStart) lowerBrightness += pixel;
-              else upperBrightness += pixel;
-            }
-          }
-          lowerBrightness /= (boundingBox.width * (boundingBox.height - mouthStart));
-          upperBrightness /= (boundingBox.width * mouthStart);
-          smileScore = Math.min(1, Math.max(0, (lowerBrightness - upperBrightness) / 100));
-          totalFrames++;
-          if (smileScore > 0.6) smileFrames++;
-        }
-
-        // Blink detection from eye-region brightness
-        if (faceData) {
-          const eyeHeight = Math.floor(boundingBox.height * 0.2);
-          let brightness = 0;
-          for (let y = 0; y < eyeHeight; y++) {
-            for (let x = 0; x < boundingBox.width; x++) {
-              const idx = (y * boundingBox.width + x) * 4;
-              brightness += faceData[idx] + faceData[idx + 1] + faceData[idx + 2];
-            }
-          }
-          brightness = brightness / (eyeHeight * boundingBox.width) / (255 * 3);
-          if (prevEyeBrightness - brightness > 0.25) blinkCount++;
-          prevEyeBrightness = brightness;
-          const elapsedMinutes = (Date.now() - blinkStart) / 60000;
-          const rate = blinkCount / (elapsedMinutes || 1);
-          blinkRate = Math.min(1, rate / 20);
-        }
-      }
-    }
-  } catch {
-    /* MediaPipe detection failed */
-  }
-
-  // Fallback: basic face detection using FaceDetector API if MediaPipe did not yield a face box
-  try {
-    if ((!prevCenter || eyeContact === 0.5 && framing === 0.5) && 'FaceDetector' in window) {
+    if ('FaceDetector' in window) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const detector = new (window as any).FaceDetector();
       const faces = await detector.detect(canvas);
       if (faces && faces.length > 0) {
         const box = faces[0].boundingBox;
         lastBoundingBox = { x: box.x, y: box.y, width: box.width, height: box.height };
-        const centerX = box.x + box.width / 2;
-        const centerY = box.y + box.height / 2;
-        const distX = Math.abs(centerX - canvas.width / 2) / (canvas.width / 2);
-        const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
-        eyeContact = eyeContactKF.filter(Math.max(0, 1 - (distX + distY) / 2));
-        framing = Math.max(0, 1 - Math.max(distX, distY));
-        const faceArea = box.width * box.height;
-        const frameArea = canvas.width * canvas.height;
-        const faceRatio = faceArea / frameArea;
-        const idealRatio = 0.1;
-        distance = distanceKF.filter(Math.max(0, 1 - Math.abs(faceRatio - idealRatio) / idealRatio));
-        const withinX = box.x > canvas.width * 0.15 && box.x + box.width < canvas.width * 0.85;
-        const withinY = box.y > canvas.height * 0.15 && box.y + box.height < canvas.height * 0.85;
-        offFrame = withinX && withinY ? 0 : 1;
       }
     }
   } catch {
-    /* ignore fallback failure */
+    /* ignore */
   }
 
-  // Gesture magnitude using MediaPipe Pose
+  // Use worker for advanced analysis with faceBox
   try {
-    const poseResults = await getPoseResults(canvas);
-    const landmarks = poseResults?.poseLandmarks;
-    if (landmarks) {
-      const leftWrist = landmarks[15];
-      const rightWrist = landmarks[16];
-      if (leftWrist && rightWrist) {
-        if (prevPose.leftWrist && prevPose.rightWrist) {
-          const lwMove = Math.sqrt(
-            Math.pow(leftWrist.x - prevPose.leftWrist.x, 2) +
-            Math.pow(leftWrist.y - prevPose.leftWrist.y, 2)
-          );
-          const rwMove = Math.sqrt(
-            Math.pow(rightWrist.x - prevPose.rightWrist.x, 2) +
-            Math.pow(rightWrist.y - prevPose.rightWrist.y, 2)
-          );
-          const movement = (lwMove + rwMove) / 2;
-          gestureMagnitude = gestureKF.filter(Math.min(1, movement * 5));
-        }
-        prevPose = {
-          leftWrist: { x: leftWrist.x, y: leftWrist.y },
-          rightWrist: { x: rightWrist.x, y: rightWrist.y }
-        };
-      }
+    const bitmap = await createImageBitmap(ctx!.getImageData(0, 0, canvas.width, canvas.height));
+    const workerResult = await analyzeWithWorker(bitmap, canvas.width, canvas.height, lastBoundingBox);
+    bitmap.close();
+
+    // Update metrics from worker, overriding defaults
+    if (workerResult.eyeContact !== undefined) eyeContact = workerResult.eyeContact;
+    if (workerResult.framing !== undefined) framing = workerResult.framing;
+    if (workerResult.headPositionStability !== undefined) headPositionStability = workerResult.headPositionStability;
+    if (workerResult.facialExpressiveness !== undefined) facialExpressiveness = workerResult.facialExpressiveness;
+    if (workerResult.blinkRate !== undefined) blinkRate = workerResult.blinkRate;
+    if (workerResult.distance !== undefined) distance = workerResult.distance;
+    if (workerResult.offFrame !== undefined) offFrame = workerResult.offFrame;
+
+    // Compute smile from actionUnits if available
+    if (workerResult.actionUnits) {
+      smileScore = workerResult.actionUnits.AU12 ?? smileScore;
     }
-  } catch {
-    /* Pose detection failed */
+
+    // Compute gesture magnitude from temporalSummary if available
+    if (workerResult.temporalSummary && workerResult.temporalSummary.gestureFrequency) {
+      gestureMagnitude = Math.min(1, workerResult.temporalSummary.gestureFrequency / 10);
+    }
+
+    // Update smileFrequency from temporal data if available
+    if (workerResult.temporalSummary && workerResult.temporalSummary.avgSmileRatio) {
+      smileFrequency = workerResult.temporalSummary.avgSmileRatio;
+    }
+  } catch (error) {
+    console.error('Worker analysis failed:', error);
   }
 
-  const smileFrequency = totalFrames ? smileFrames / totalFrames : 0;
+  // Fallback basic calculations if worker didn't provide values
+  if (lastBoundingBox) {
+    const centerX = lastBoundingBox.x + lastBoundingBox.width / 2;
+    const centerY = lastBoundingBox.y + lastBoundingBox.height / 2;
+    const distX = Math.abs(centerX - canvas.width / 2) / (canvas.width / 2);
+    const distY = Math.abs(centerY - canvas.height / 2) / (canvas.height / 2);
+    eyeContact = eyeContactKF.filter(Math.max(0, 1 - (distX + distY) / 2));
+    framing = Math.max(0, 1 - Math.max(distX, distY));
+    const faceArea = lastBoundingBox.width * lastBoundingBox.height;
+    const frameArea = canvas.width * canvas.height;
+    const faceRatio = faceArea / frameArea;
+    const idealRatio = 0.1;
+    distance = distanceKF.filter(Math.max(0, 1 - Math.abs(faceRatio - idealRatio) / idealRatio));
+    const withinX = lastBoundingBox.x > canvas.width * 0.15 && lastBoundingBox.x + lastBoundingBox.width < canvas.width * 0.85;
+    const withinY = lastBoundingBox.y > canvas.height * 0.15 && lastBoundingBox.y + lastBoundingBox.height < canvas.height * 0.85;
+    offFrame = (withinX && withinY) ? 0 : 1;
+  }
+
+  smileFrequency = totalFrames ? smileFrames / totalFrames : 0;
 
   const suggestions: string[] = [];
   if (lighting < 0.4)

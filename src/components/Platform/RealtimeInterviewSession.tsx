@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, MessageCircle, AlertCircle, TrendingUp, CheckCircle, Brain } from 'lucide-react';
 import { analyzeCameraPresence, analyzePosture } from '../../utils/cameraFeedback';
 import { calculateOverallScore } from '../../utils/overallScore';
+import { calculatePresenceIndex, getPresenceIndexSummary, type PresenceIndexResult } from '../../utils/presenceIndex';
 import type { CameraPresence, PostureScore, CameraTimelinePoint, VoiceMetricsSummary } from '../../types/analytics';
 import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
@@ -170,6 +171,15 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [showNudge, setShowNudge] = useState(false);
   const nudgeTimeoutRef = useRef<number | null>(null);
 
+  const [realTimeNudgesEnabled, setRealTimeNudgesEnabled] = useState(false);
+  const [currentPresenceIndex, setCurrentPresenceIndex] = useState<PresenceIndexResult | null>(null);
+  const presenceIndexHistoryRef = useRef<PresenceIndexResult[]>([]);
+
+  // Initialize nudges preference from setup
+  useEffect(() => {
+    setRealTimeNudgesEnabled(!!setup.showCues);
+  }, [setup.showCues]);
+
   const metricThresholds = { eyeContact: 0.4, lighting: 0.4 };
   const lowStartTimes = useRef<{ [key: string]: number | null }>({ eyeContact: null, lighting: null });
   const lowDurations = useRef<{ [key: string]: number }>({ eyeContact: 0, lighting: 0 });
@@ -185,6 +195,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const lastWorkerLightingRef = useRef<number | null>(null);
   const lastWorkerFaceMetricsRef = useRef<Partial<CameraPresence>>({});
   const lastFaceBoxRef = useRef<{ x: number; y: number; width: number; height: number; frameW: number; frameH: number } | null>(null);
+  const lastTemporalSummaryRef = useRef<any>(null);
+  const lastExtendedVisionRef = useRef<{ posture?: { slouchScore?: number; leanForwardScore?: number } | null; gesturesMagnitude?: number } | null>(null);
 
   // Determine if this is a focused interview and what type
   const isFocusedInterview = interviewType && interviewType !== 'standard';
@@ -258,6 +270,26 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       const baseSophisticated: Record<string, unknown> =
         ((data as Record<string, unknown>) as any)?.sophisticatedAnalytics || {};
 
+      // Optional: compute fused scores for interview-specific metrics
+      let fusion: any = undefined;
+      try {
+        const { fuseVoiceAndVision } = await import('../../utils/multimodal');
+        const vm = (data as any)?.voice_metrics_summary || (data as any)?.speechMetrics?.[0]?.metrics || null;
+        const vis = {
+          eyeContact: cameraPresence?.eyeContact,
+          distance: cameraPresence?.distance,
+          blinkRate: cameraPresence?.blinkRate,
+          facialExpressiveness: cameraPresence?.facialExpressiveness,
+          gesturesMagnitude: lastExtendedVisionRef.current?.gesturesMagnitude,
+          posture: lastExtendedVisionRef.current?.posture || null,
+          temporal: { gazeOnCameraPercent: lastTemporalSummaryRef.current?.gazeOnCameraPercent }
+        };
+        fusion = fuseVoiceAndVision(vm, vis);
+      } catch {}
+
+      const presenceIndexSummary = currentPresenceIndex ? getPresenceIndexSummary(currentPresenceIndex) : undefined;
+      const presenceIndexHistory = presenceIndexHistoryRef.current.length ? presenceIndexHistoryRef.current : undefined;
+
       enriched = {
         ...(data as Record<string, unknown>),
         overallScore,
@@ -271,7 +303,11 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           cameraPresence,
           posture,
           analysisTimeline,
-          recordingUrl
+          recordingUrl,
+          fusion,
+          presenceIndex: currentPresenceIndex || null,
+          presenceIndexSummary,
+          presenceIndexHistory,
         }
       };
     } catch (err) {
@@ -359,6 +395,10 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
     const createWorker = () => {
       try {
         const worker = new Worker(new URL('../../workers/cameraWorker.ts', import.meta.url), { type: 'module' });
+        // Flag to let main thread utils know worker is active
+        try { (window as any).__kelv_worker_cv_active__ = true; } catch { /* ignore */ }
+        // Proactively init worker MediaPipe to avoid race during first analyze
+        try { worker.postMessage({ type: 'init' }); } catch { /* ignore */ }
         worker.onmessage = (e: MessageEvent<any>) => {
           if (e.data?.type === 'metrics') {
             lastWorkerLightingRef.current = e.data.lighting ?? null;
@@ -370,6 +410,11 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
               blinkRate: e.data.blinkRate,
               distance: e.data.distance,
               offFrame: e.data.offFrame,
+            };
+            lastTemporalSummaryRef.current = e.data.temporalSummary || null;
+            lastExtendedVisionRef.current = {
+              posture: e.data.posture || null,
+              gesturesMagnitude: e.data.gestures?.magnitude
             };
             // Broadcast landmarks/pose to the window for overlays to consume if needed
             try {
@@ -392,6 +437,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         workerRef.current.terminate();
         workerRef.current = null;
       }
+      // Clear the active flag on cleanup
+      try { (window as any).__kelv_worker_cv_active__ = false; } catch { /* ignore */ }
     };
   }, []);
 
@@ -504,23 +551,48 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
         setAnalysisTimeline(prev => [
           ...prev,
-          { timestamp: now, cameraPresence: updatedPresence, posture, triggers }
+          {
+            timestamp: now,
+            cameraPresence: updatedPresence,
+            posture,
+            triggers,
+            vision: lastExtendedVisionRef.current ? {
+              posture: lastExtendedVisionRef.current.posture || undefined,
+              gestures: lastExtendedVisionRef.current.gesturesMagnitude !== undefined ? { magnitude: lastExtendedVisionRef.current.gesturesMagnitude } as any : undefined
+            } as any : undefined,
+            temporal: lastTemporalSummaryRef.current || undefined
+          }
         ]);
+
+        // Calculate Presence Index (35/35/30) and update curves/history
+        try {
+          const pi = calculatePresenceIndex(
+            updatedPresence,
+            posture,
+            undefined,
+            (lastExtendedVisionRef.current as any) || undefined,
+            (lastTemporalSummaryRef.current as any) || undefined,
+            currentPresenceIndex?.confidenceCurves
+          );
+          setCurrentPresenceIndex(pi);
+          presenceIndexHistoryRef.current = [...presenceIndexHistoryRef.current.slice(-49), pi];
+        } catch { /* ignore */ }
+
         // Real-time encouragement nudge while the user is speaking and posture/metrics dip
         try {
-          if (setup.showCues && state.isUserSpeaking) {
-            const slouch = (posture?.confidence ?? 1) < 0.6;
-            const unstable = (updatedPresence.headPositionStability ?? 1) < 0.45;
-            const leaning = (updatedPresence.distance ?? 1) < 0.45;
-            const cueDelayMs = (setup.nudgeThreshold ?? 60) * 1000;
-            const now = Date.now();
-            const metricsLowLongEnough = Object.entries(lowStartTimes.current).some(([_, start]) => start && now - start >= cueDelayMs);
-            if (slouch || unstable || leaning || metricsLowLongEnough) {
-              setShowNudge(true);
-              if (nudgeTimeoutRef.current) window.clearTimeout(nudgeTimeoutRef.current);
-              nudgeTimeoutRef.current = window.setTimeout(() => setShowNudge(false), 1600) as unknown as number;
+            if (realTimeNudgesEnabled && state.isUserSpeaking) {
+                const slouch = (posture?.confidence ?? 1) < 0.6;
+                const unstable = (updatedPresence.headPositionStability ?? 1) < 0.45;
+                const leaning = (updatedPresence.distance ?? 1) < 0.45;
+                const cueDelayMs = (setup.nudgeThreshold ?? 60) * 1000;
+                const now = Date.now();
+                const metricsLowLongEnough = Object.entries(lowStartTimes.current).some(([_, start]) => start && now - start >= cueDelayMs);
+                if (slouch || unstable || leaning || metricsLowLongEnough) {
+                    setShowNudge(true);
+                    if (nudgeTimeoutRef.current) window.clearTimeout(nudgeTimeoutRef.current);
+                    nudgeTimeoutRef.current = window.setTimeout(() => setShowNudge(false), 1600) as unknown as number;
+                }
             }
-          }
         } catch { /* ignore */ }
         // Save faceBox for next worker frame scaling
         try {
@@ -534,7 +606,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       }
     }, 1500);
     return () => clearInterval(interval);
-  }, [analyzeCameraPresence, analyzePosture, stream, setup.showCues, setup.nudgeThreshold]);
+  }, [analyzeCameraPresence, analyzePosture, stream, realTimeNudgesEnabled, setup.nudgeThreshold]);
 
   // Handle microphone toggle
   const toggleMute = () => {
@@ -683,65 +755,99 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           {/* Full-screen start overlay */}
           <div className="absolute inset-0 bg-dark-900/85 backdrop-blur-lg flex items-center justify-center z-10">
             <div className="bg-gray-900/95 rounded-2xl p-8 max-w-md w-full mx-6 border border-gray-800 shadow-2xl backdrop-blur-sm">
-              {/* Icon and Title */}
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#FF5722] to-[#D84315] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Brain className="w-8 h-8 text-white" />
+              {/* Left: Main intro and actions */}
+              <div className="md:col-span-2 flex flex-col">
+                {/* Icon and Title */}
+                <div className="text-center md:text-left mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#FF5722] to-[#D84315] rounded-2xl flex items-center justify-center mx-auto md:mx-0 mb-4 shadow-lg">
+                    <Brain className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Ready to Start</h2>
+                  <p className="text-gray-400 leading-relaxed">
+                    Your personalized realtime interview with adaptive conversation flow is ready to begin.
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Ready to Start</h2>
-                <p className="text-gray-400 leading-relaxed">
-                  Your personalized realtime interview with adaptive conversation flow is ready to begin.
-                </p>
-              </div>
 
-              {/* Features list - more compact */}
-              <div className="mb-6">
-                <h3 className="text-white font-medium mb-3 text-sm">What to expect:</h3>
-                <ul className="space-y-1.5 text-sm text-gray-300">
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>Live conversation with AI interviewer</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>Real-time transcript and question flow</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>{isVoiceMode ? 'Natural voice interaction' : 'Dynamic text conversation'}</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>Adaptive questions based on responses</span>
-                  </li>
-                </ul>
-              </div>
+                {/* Features list - more compact */}
+                <div className="mb-6">
+                  <h3 className="text-white font-medium mb-3 text-sm">What to expect:</h3>
+                  <ul className="space-y-1.5 text-sm text-gray-300">
+                    <li className="flex items-center space-x-2">
+                      <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
+                      <span>Live conversation with AI interviewer</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
+                      <span>Real-time transcript and question flow</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
+                      <span>{isVoiceMode ? 'Natural voice interaction' : 'Dynamic text conversation'}</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
+                      <span>Adaptive questions based on responses</span>
+                    </li>
+                  </ul>
+                </div>
 
-              {/* Start button */}
-              <button
-                onClick={handleStartInterview}
-                disabled={state.status === 'connecting' || !!cameraError}
-                className="w-full px-6 py-4 bg-gradient-to-r from-[#FF5722] to-[#D84315] text-white rounded-xl hover:from-[#D84315] hover:to-[#BF360C] disabled:opacity-50 disabled:cursor-not-allowed transition-all text-lg font-semibold flex items-center justify-center space-x-3 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {state.status === 'connecting' ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Brain className="w-6 h-6" />
-                    <span>Start Interview</span>
-                  </>
+                {/* AI Coaching Nudges - Compact Toggle */}
+                <div className="mt-6">
+                  <div className="bg-dark-800/50 rounded-xl p-4 border border-dark-700">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-md">
+                          <Brain className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-white font-semibold">AI Coaching Nudges</h3>
+                          <p className="text-gray-400 text-sm">Real-time guidance on presence.</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={realTimeNudgesEnabled}
+                          onChange={(e) => {
+                            setRealTimeNudgesEnabled(e.target.checked);
+                            setup.showCues = e.target.checked;
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-500/30 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Start button */}
+                <button
+                  onClick={handleStartInterview}
+                  disabled={state.status === 'connecting' || !!cameraError}
+                  className="w-full px-6 py-4 bg-gradient-to-r from-[#FF5722] to-[#D84315] text-white rounded-xl hover:from-[#D84315] hover:to-[#BF360C] disabled:opacity-50 disabled:cursor-not-allowed transition-all text-lg font-semibold flex items-center justify-center space-x-3 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {state.status === 'connecting' ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Connecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-6 h-6" />
+                      <span>Start Interview</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Error message if any */}
+                {cameraError && (
+                  <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+                    <p className="text-red-400 text-sm">{cameraError}</p>
+                  </div>
                 )}
-              </button>
+              </div>
 
-              {/* Error message if any */}
-              {cameraError && (
-                <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
-                  <p className="text-red-400 text-sm">{cameraError}</p>
-                </div>
-              )}
+
             </div>
           </div>
         </div>
@@ -862,9 +968,58 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
               size="xl"
               showStatus={true}
             />
+            {currentPresenceIndex && (
+              <div className="absolute top-6 left-6 bg-gray-900/80 backdrop-blur-sm border border-gray-800 rounded-xl px-4 py-2 text-sm text-gray-200 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#FF5722]" />
+                  <span className="font-semibold">Presence:</span>
+                  <span className="text-white font-bold">{currentPresenceIndex.presenceIndex}</span>
+                  <span className="text-gray-400">/ 100</span>
+                </div>
+              </div>
+            )}
             {showNudge && (
               <div className="pointer-events-none absolute inset-0 rounded-xl">
-                <div className="absolute inset-0 animate-pulse" style={{ boxShadow: '0 0 0 4px rgba(249,115,22,0.35), 0 0 40px 10px rgba(249,115,22,0.2) inset' }} />
+                {/* High-tech nudge overlay with multiple visual layers */}
+                <div className="absolute inset-0 rounded-xl overflow-hidden">
+                  {/* Outer glow ring */}
+                  <div className="absolute inset-0 rounded-xl animate-pulse" 
+                       style={{ 
+                         boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.6), 0 0 0 6px rgba(34, 197, 94, 0.4), 0 0 30px 8px rgba(59, 130, 246, 0.3)' 
+                       }} />
+                  
+                  {/* Scanning line effect */}
+                  <div className="absolute inset-0 rounded-xl overflow-hidden">
+                    <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80 animate-pulse"
+                         style={{
+                           top: '20%',
+                           animation: 'scan 2s ease-in-out infinite'
+                         }} />
+                  </div>
+                  
+                  {/* Corner indicators */}
+                  <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-blue-400 animate-pulse" />
+                  <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-blue-400 animate-pulse" />
+                  <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-green-400 animate-pulse" />
+                  <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-green-400 animate-pulse" />
+                  
+                  {/* Central coaching indicator */}
+                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg animate-bounce">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                      <span>AI COACHING</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Add custom CSS for scanning animation */}
+                <style>{`
+                  @keyframes scan {
+                    0% { top: 10%; opacity: 0; }
+                    50% { opacity: 1; }
+                    100% { top: 90%; opacity: 0; }
+                  }
+                `}</style>
               </div>
             )}
           </div>
@@ -1013,7 +1168,9 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
         )}
       </div>
     )}
-  </div>
+
+
+    </div>
   );
 };
 

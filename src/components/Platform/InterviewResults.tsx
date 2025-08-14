@@ -6,26 +6,23 @@ import {
   Trophy,
   Brain,
   MessageCircle,
-  TrendingUp,
-  Lightbulb,
-  Star,
   CheckCircle,
   FileText,
   BarChart3,
   Volume2,
   Mic,
-  BookOpen,
   Play,
   MessageSquare,
   AlertCircle,
   Clock,
-  Eye
+  Eye,
+  TrendingUp
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
-import RedPandaLogo from '../RedPandaLogo';
 import CameraFeedback from './CameraFeedback';
-import { getMetricDetails } from '../../utils/metricInfo';
+import MultimodalPresenceAnalysis from './MultimodalPresenceAnalysis';
 import { getVoiceMetricDetails } from '../../utils/voiceMetricInfo';
+import { getMetricDetails } from '../../utils/metricInfo';
 
 // Utility function to format category labels for standard interviews
 const formatCategoryLabel = (category: string): string => {
@@ -112,17 +109,22 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
 
   // Add state for selected metric
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const [selectedCvMetric, setSelectedCvMetric] = useState<string | null>(null);
-  const [selectedCvMetricValue, setSelectedCvMetricValue] = useState<number>(0);
   const [selectedVoiceMetric, setSelectedVoiceMetric] = useState<
     { name: string; score: number; detail?: string } | null
   >(null);
+  
+  // Add CV metric detail state (used for CameraFeedback learn more)
+  const [selectedMetricDetails, setSelectedMetricDetails] = useState<{ key: string; value: number } | null>(null);
+
+  // NEW: High-level tab between "Questions", "Computer Vision + Voice", and "Multimodal Presence"
+  const [resultsTab, setResultsTab] = useState<'questions' | 'analytics' | 'multimodal'>('multimodal');
 
   const analyticsReport = sessionData.sophisticatedAnalytics;
   const cameraPresence = analyticsReport?.cameraPresence || sessionData.cameraPresence;
   const posture = analyticsReport?.posture || sessionData.posture;
   const recordingUrl = analyticsReport?.recordingUrl || sessionData.recordingUrl;
   const timeline = analyticsReport?.analysisTimeline || sessionData.analysisTimeline;
+  const fusion = analyticsReport?.fusion;
   const hasCameraAnalytics = cameraPresence || posture;
   const hasFullAnalytics =
     analyticsReport && (analyticsReport.summary || analyticsReport.timeline);
@@ -243,100 +245,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     return insight || "Keep practicing to improve this area.";
   };
 
-  const getInterviewTypeAdvice = (interviewType: string) => {
-    const advice = {
-      behavioral: {
-        title: 'Behavioral Interview Tips',
-        tips: [
-          'Use The STAR Method For Structured Responses',
-          'Prepare Specific Examples From Your Experience',
-          'Show Growth Mindset In Challenge Situations',
-          'Demonstrate Leadership And Collaboration Skills'
-        ]
-      },
-      technical: {
-        title: 'Technical Interview Tips',
-        tips: [
-          'Practice Coding Problems Daily And Think Out Loud',
-          'Master Data Structures And Algorithm Fundamentals',
-          'Explain Your Approach Before Writing Code',
-          'Test Your Solutions With Edge Cases'
-        ]
-      },
-    };
-    return advice[interviewType as keyof typeof advice] || {
-      title: 'General Interview Tips',
-      tips: [
-        'Research The Company And Role Thoroughly',
-        'Prepare Specific Examples From Your Experience',
-        'Practice Common Interview Questions',
-        'Show Genuine Interest And Enthusiasm'
-      ]
-    };
-  };
-
-  const getSkillAdvice = (interviewType: string) => {
-    const advice = {
-      behavioral: [
-        'Reflect On Past Experiences And Lessons Learned',
-        'Practice Storytelling With Clear Structure',
-        'Develop Self-Awareness And Emotional Intelligence',
-        'Work On Communication And Presentation Skills'
-      ],
-      technical: [
-        'Practice LeetCode Problems Regularly',
-        'Study System Design Concepts',
-        'Review Computer Science Fundamentals',
-        'Build Projects To Demonstrate Skills'
-      ],
-    };
-    return advice[interviewType as keyof typeof advice] || [
-      'Continue Learning And Improving Relevant Skills',
-      'Seek Feedback From Mentors And Peers',
-      'Practice Interview Skills Regularly',
-      'Stay Updated With Industry Trends'
-    ];
-  };
-
-  const getNextSteps = (overallScore: number) => {
-    const percentage = overallScore;
-    if (percentage >= 85) {
-      return {
-        title: "You're Interview Ready! 🎉",
-        steps: [
-          "Apply to target roles with confidence",
-          "Research specific company cultures and values",
-          "Prepare thoughtful questions for your interviewers",
-          "Practice with senior professionals or mentors"
-        ]
-      };
-    } else if (percentage >= 75) {
-      return {
-        title: "Almost There - Polish Your Skills ✨",
-        steps: [
-          `Practice more behavioral and situational questions`,
-          "Refine your examples using the STAR method",
-          "Record yourself and review your performance",
-          "Get feedback from peers or experienced professionals"
-        ]
-      };
-    } else {
-      return {
-        title: "Build Your Foundation 💪",
-        steps: [
-          `Focus on interview fundamentals and core concepts`,
-          "Develop your professional story and key achievements",
-          "Practice basic interview etiquette and communication",
-          "Work with a mentor or interview coach for guidance"
-        ]
-      };
-    }
-  };
-
   const overallGrade = getOverallGrade(safeSessionData.overallScore);
-  const interviewAdvice = getInterviewTypeAdvice(safeSessionData.interviewType);
-  const skillAdvice = getSkillAdvice(safeSessionData.interviewType);
-  const nextSteps = getNextSteps(safeSessionData.overallScore);
 
   // If a metric is selected, show the detail page
   if (selectedMetric) {
@@ -376,6 +285,60 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             </div>
           </motion.div>
 
+          {/* Unified Performance (Fusion) */}
+          {fusion && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
+            >
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-400" /> Unified Performance
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {[{k:'confidence',l:'Confidence'},{k:'clarity',l:'Clarity'},{k:'warmth',l:'Warmth'},{k:'engagement',l:'Engagement'}].map(({k,l}) => (
+                    <div key={k} className="bg-dark-900/40 rounded-lg p-3 border border-dark-700">
+                      <div className="text-xs text-gray-400 mb-1">{l}</div>
+                      <div className="text-2xl font-bold text-white">{Math.round(fusion[k] || 0)}</div>
+                      <div className="h-2 bg-dark-700 rounded mt-2">
+                        <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded" style={{ width: `${Math.round(fusion[k] || 0)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {fusion.compound && (
+                  <div className="mt-4 text-sm">
+                    {fusion.compound.lowConfidence && (
+                      <div className="text-orange-400">Low energy + poor gaze suggests lower confidence.</div>
+                    )}
+                    {fusion.compound.highEngagement && (
+                      <div className="text-green-400">Good posture, gestures, and gaze indicate high engagement.</div>
+                    )}
+                    {fusion.compound.notes && fusion.compound.notes.length > 0 && (
+                      <ul className="text-gray-300 list-disc list-inside mt-2 text-xs">
+                        {fusion.compound.notes.map((n:string,i:number)=>(<li key={i}>{n}</li>))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+              {/* Benchmark ribbons (placeholder) */}
+              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-400" /> Benchmarks (Beta)
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="text-blue-300">Eye contact: Top 30% (placeholder)</li>
+                  <li className="text-green-300">Delivery consistency: Top 40% (placeholder)</li>
+                  <li className="text-amber-300">Gesture energy: Median (placeholder)</li>
+                </ul>
+                <p className="text-xs text-gray-400 mt-3">We’ll replace these with anonymized population stats once available.</p>
+              </div>
+            </motion.div>
+          )}
+
           {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -409,82 +372,154 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
     );
   }
   return (
-    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
-      <div className="container max-w-6xl mx-auto px-4">
-        {/* Header */}
+    <div className="min-h-screen bg-dark-900 pt-16 pb-8">
+      <div className="container max-w-7xl mx-auto px-4">
+        {/* Trading Terminal Style Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          className="mb-8"
         >
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => {
-                onBackToDashboard();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-400" />
-            </button>
-            <div>
-              <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center mb-4">
-                <Trophy className="w-10 h-10 text-white" />
+          <div className="bg-dark-800/30 rounded-2xl p-6 border border-dark-700/50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    onBackToDashboard();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-2 rounded-lg bg-dark-700 hover:bg-dark-600 transition-colors border border-dark-600"
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-400" />
+                </button>
+                <div>
+                  <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                    <BarChart3 className="w-8 h-8 text-orange-400" />
+                    Performance Analytics
+                  </h1>
+                  <div className="flex items-center gap-6 mt-2 text-sm text-gray-400">
+                    <span className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      {new Date(safeSessionData.startTime).toLocaleDateString()}
+                    </span>
+                    <span>{formatTime(safeSessionData.duration)}</span>
+                    <span>{safeSessionData.questionsAnswered} Questions</span>
+                    <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded-full text-xs font-medium">
+                      {safeSessionData.setup.industry} • {safeSessionData.setup.difficulty}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <h1 className="text-4xl font-bold gradient-text-orange mb-4">Interview Complete!</h1>
-              <p className="text-gray-400 text-lg">
-                Your standard interview practice session has been analyzed with detailed AI feedback.
-              </p>
+              
+              {/* Performance Score Display */}
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <div className="text-4xl font-bold gradient-text-orange">{safeSessionData.overallScore}%</div>
+                  <div className={`text-lg font-semibold ${overallGrade.color}`}>{overallGrade.grade} Grade</div>
+                  <div className="text-xs text-gray-400 mt-1">{overallGrade.description}</div>
+                </div>
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center">
+                  <Trophy className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+            
+            {/* Quick Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  onStartNewInterview();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-amber-400 transition-all flex items-center gap-2 shadow-lg"
+              >
+                <Play className="w-4 h-4" />
+                Practice Again
+              </button>
+              <button
+                onClick={() => {
+                  onBackToDashboard();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-6 py-3 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-xl font-semibold transition-colors border border-dark-600"
+              >
+                Dashboard
+              </button>
             </div>
           </div>
         </motion.div>
 
-        {/* Overall Performance Card */}
+        {/* Main Tab Controls */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-orange-500/10 to-amber-400/5 rounded-2xl p-8 border border-orange-500/20 mb-8"
+          transition={{ delay: 0.2 }}
+          className="mb-8"
         >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-5xl font-bold gradient-text-orange mb-2">{safeSessionData.overallScore}%</div>
-              <div className={`text-2xl font-bold ${overallGrade.color} mb-1`}>{overallGrade.grade}</div>
-              <p className="text-gray-400 text-sm">{overallGrade.description}</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">{formatTime(safeSessionData.duration)}</div>
-              <p className="text-gray-400 text-sm">Interview Duration</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">{safeSessionData.questionsAnswered}</div>
-              <p className="text-gray-400 text-sm">Questions Answered</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <Trophy className={`w-8 h-8 ${safeSessionData.overallScore >= 80 ? 'text-yellow-400' : 'text-gray-500'}`} />
-                {safeSessionData.overallScore >= 80 ? 'Role Ready' : 'Needs Practice'}
-              </div>
-              <p className="text-gray-400 text-sm">Standard Interview</p>
+          <div className="bg-dark-800/30 rounded-2xl p-2 border border-dark-700/50">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setResultsTab('multimodal')}
+                className={`flex-1 px-4 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm ${
+                  resultsTab === 'multimodal'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                    : 'bg-dark-700/50 text-gray-300 hover:bg-dark-700'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                Multimodal Presence
+              </button>
+              <button
+                onClick={() => setResultsTab('analytics')}
+                className={`flex-1 px-4 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm ${
+                  resultsTab === 'analytics'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                    : 'bg-dark-700/50 text-gray-300 hover:bg-dark-700'
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                Computer Vision + Voice
+              </button>
+              <button
+                onClick={() => setResultsTab('questions')}
+                className={`flex-1 px-4 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm ${
+                  resultsTab === 'questions'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                    : 'bg-dark-700/50 text-gray-300 hover:bg-dark-700'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Questions
+              </button>
             </div>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Interview Performance Metrics */}
+        {/* Tab Content */}
+        {resultsTab === 'multimodal' && (
+          <MultimodalPresenceAnalysis sessionData={safeSessionData} />
+        )}
+
+        {resultsTab === 'analytics' && (
+          <div className="space-y-8">
+            {/* Core Performance Metrics - Trading Terminal Style */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+              className="bg-dark-800/30 rounded-2xl p-6 border border-dark-700/50"
             >
-              <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
-                <BarChart3 className="w-5 h-5 text-orange-400" />
-                Interview Performance
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white flex items-center gap-3">
+                  <Brain className="w-6 h-6 text-orange-400" />
+                  Core Performance Metrics
+                </h3>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span>Live Analysis</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {(() => {
                   const metrics = safeSessionData.metrics || {};
                   const responses = safeSessionData.responses || [];
@@ -509,21 +544,28 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 + index * 0.1 }}
-                    className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 select-none"
+                    className="bg-dark-700/20 rounded-xl p-5 border border-dark-600/20 hover:border-orange-500/30 transition-all group"
                   >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
-                        <metric.icon className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-white">{metric.name}</span>
-                          <span className="text-lg font-semibold text-white">{metric.score}/10</span>
+                    {/* Header with Icon and Score */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-lg bg-gradient-to-br ${metric.color} shadow-lg`}>
+                          <metric.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold text-white">{metric.name}</span>
+                          <div className="text-xs text-gray-400">Performance Index</div>
                         </div>
                       </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-white">{metric.score}</div>
+                        <div className="text-xs text-gray-400">/10</div>
+                      </div>
                     </div>
+                    
+                    {/* Progress Bar */}
                     <div className="mb-3">
-                      <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-dark-600 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${metric.score * 10}%` }}
@@ -532,11 +574,26 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                         />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
+                    
+                    {/* Performance Indicator */}
+                    <div className="flex items-center justify-between">
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        metric.score >= 8 ? 'bg-green-500/20 text-green-400' :
+                        metric.score >= 6 ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {metric.score >= 8 ? 'Excellent' : metric.score >= 6 ? 'Good' : 'Needs Work'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {Math.round(metric.score * 10)}%
+                      </div>
+                    </div>
                   </motion.div>
                 ))}
               </div>
             </motion.div>
+
+
 
             {/* Voice Analysis Section */}
             {safeSessionData.setup.interviewMode === 'voice' && (
@@ -544,13 +601,13 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 }}
-                className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+                className="bg-dark-800/30 rounded-2xl p-6 border border-dark-700/50 mb-6"
               >
                 <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
                   <Mic className="w-5 h-5 text-orange-400" />
                   Advanced Voice Analysis
                 </h3>
-                <div className="flex gap-4 items-stretch">
+                <div className="flex gap-6 items-start">
                   {(() => {
                     const metricsObj =
                       safeSessionData.voice_metrics_summary ||
@@ -621,20 +678,83 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                     }
 
                     return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-1">
-                        {voiceMetrics.map((metric, index) => (
-                          <motion.div
-                            key={metric.name}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 + index * 0.1 }}
-                            className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-700/50"
-                            onClick={() =>
-                              setSelectedVoiceMetric(prev =>
-                                prev?.name === metric.name ? null : metric
-                              )
-                            }
-                          >
+                      <>
+                        {/* Voice Metrics Sidebar - Left Side */}
+                        {selectedVoiceMetric && (
+                          <div className="w-80 flex-shrink-0">
+                            <motion.div
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700 sticky top-6"
+                            >
+                              {(() => {
+                                const info = getVoiceMetricDetails(selectedVoiceMetric.name as any);
+                                return (
+                                  <div className="text-gray-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="text-white font-semibold text-base">{info.title}</div>
+                                      <button
+                                        onClick={() => setSelectedVoiceMetric(null)}
+                                        className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
+                                      >
+                                        Close
+                                      </button>
+                                    </div>
+                                    <div className="text-sm text-gray-300 mb-2">
+                                      Score: <span className="font-semibold text-white">{selectedVoiceMetric.score}/10</span>
+                                    </div>
+                                    {selectedVoiceMetric.detail && (
+                                      <div className="text-xs text-gray-400 mb-2">{selectedVoiceMetric.detail}</div>
+                                    )}
+                                    <div className="space-y-3 text-xs text-gray-200">
+                                      <div>
+                                        <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
+                                        <div>{info.whyItMatters}</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
+                                        <div>{info.howItIsMeasured}</div>
+                                      </div>
+                                      {info.idealRange && (
+                                        <div>
+                                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
+                                          <div>{info.idealRange}</div>
+                                        </div>
+                                      )}
+                                      {info.perceptionImpact && (
+                                        <div>
+                                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
+                                          <div>{info.perceptionImpact}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()} 
+                            </motion.div>
+                          </div>
+                        )}
+                        
+                        {/* Voice Metrics Grid */}
+                        <div className="flex-1">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {voiceMetrics.map((metric, index) => (
+                              <motion.div
+                                key={metric.name}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 + index * 0.1 }}
+                                className={`bg-dark-700/30 rounded-xl p-4 border cursor-pointer hover:bg-dark-700/50 transition-all ${
+                                  selectedVoiceMetric?.name === metric.name 
+                                    ? 'border-orange-500/50 bg-dark-700/50' 
+                                    : 'border-dark-600/30'
+                                }`}
+                                onClick={() =>
+                                  setSelectedVoiceMetric(prev =>
+                                    prev?.name === metric.name ? null : metric
+                                  )
+                                }
+                              >
                             <div className="flex items-center gap-3 mb-3">
                               <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
                                 <metric.icon className="w-4 h-4 text-white" />
@@ -656,18 +776,24 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
                                 />
                               </div>
                             </div>
-                            <div className="space-y-1">
-                              {metric.detail && <p className="text-xs text-gray-400">{metric.detail}</p>}
-                              <p className="text-xs text-gray-400">
-                                {getMetricInsight(
-                                  metric.name.toLowerCase(),
-                                  metric.score
-                                )}
-                              </p>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
+                                <div className="space-y-1">
+                                  {metric.detail && <p className="text-xs text-gray-400">{metric.detail}</p>}
+                                  <p className="text-xs text-gray-400">
+                                    {getMetricInsight(
+                                      metric.name.toLowerCase(),
+                                      metric.score
+                                    )}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <span className="text-xs text-orange-400 font-medium">Click to learn more</span>
+                                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
                     );
                   })()}
                 </div>
@@ -683,54 +809,119 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               </motion.div>
             )}
 
-            {/* Computer Vision + external summary aside */}
+            {/* Computer Vision Analysis - Trading Terminal Style */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.28 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Eye className="w-5 h-5 text-orange-400" />
-                Computer Vision
-              </h3>
-              <div className="flex gap-4 items-start">
-                <div className="flex-1">
-                  {hasCameraAnalytics ? (
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-orange-400" />
+                  Computer Vision Analysis
+                </h3>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-gray-400">Visual Analytics</span>
+                </div>
+              </div>
+              
+              {hasCameraAnalytics ? (
+                <div className="flex gap-6 items-start">
+                  <div className={selectedMetricDetails ? 'flex-1' : 'w-full'}>
                     <CameraFeedback
                       cameraPresence={cameraPresence}
                       posture={posture}
                       recordingUrl={recordingUrl}
                       timeline={timeline}
-                      onMetricSelect={(metricKey, value) => {
-                        setSelectedCvMetric(metricKey);
-                        setSelectedCvMetricValue(value);
-                      }}
+                      onMetricSelect={(metricKey, value) =>
+                        setSelectedMetricDetails(metricKey ? { key: metricKey, value } : null)
+                      }
                     />
-                  ) : (
-                    <p className="text-sm text-gray-400">No camera data collected.</p>
+                  </div>
+                  {selectedMetricDetails && (
+                    <div className="w-80 flex-shrink-0">
+                      <div className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700 sticky top-6 text-gray-200">
+                        {(() => {
+                          const info = getMetricDetails(selectedMetricDetails.key as any);
+                          return (
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-white font-semibold text-base">{info.title}</div>
+                                <button
+                                  onClick={() => setSelectedMetricDetails(null)}
+                                  className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
+                                >
+                                  Close
+                                </button>
+                              </div>
+                              <div className="text-sm text-gray-300 mb-2">
+                                Score: <span className="font-semibold text-white">{Math.round(selectedMetricDetails.value * 100)}%</span>
+                              </div>
+                              <div className="space-y-3 text-xs text-gray-200">
+                                <div>
+                                  <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
+                                  <div>{info.whyItMatters}</div>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
+                                  <div>{info.howItIsMeasured}</div>
+                                </div>
+                                {info.idealRange && (
+                                  <div>
+                                    <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
+                                    <div>{info.idealRange}</div>
+                                  </div>
+                                )}
+                                {info.perceptionImpact && (
+                                  <div>
+                                    <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
+                                    <div>{info.perceptionImpact}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Eye className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No camera data collected for this session</p>
+                  <p className="text-xs text-gray-500 mt-1">Enable camera for visual feedback analysis</p>
+                </div>
+              )}
             </motion.div>
+          </div>
+        )}
 
-            {/* Question-by-Question Analysis - Compact Style */}
+        {/* Questions Tab Content */}
+        {resultsTab === 'questions' && (
+          <div className="space-y-8">
+            {/* Question-by-Question Analysis - Trading Terminal Style */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.32 }}
+              transition={{ delay: 0.15 }}
               className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-                  <RedPandaLogo size="sm" animate={false} className="w-6 h-6" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-white">Question Analysis</h3>
+                    <p className="text-gray-400 text-sm">Performance breakdown by question</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-orange-400" />
-                    Question-by-Question Analysis
-                  </h3>
-                  <p className="text-gray-400 text-sm">Detailed feedback from your AI interview coach</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-gray-400">AI Analysis</span>
                 </div>
               </div>
 
@@ -872,231 +1063,8 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
               </div>
             </motion.div>
           </div>
+        )}
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Voice Metric Summary Aside */}
-            {selectedVoiceMetric && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700"
-              >
-                {(() => {
-                  const info = getVoiceMetricDetails(selectedVoiceMetric.name as any);
-                  return (
-                    <div className="text-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-white font-semibold text-base">{info.title}</div>
-                        <button
-                          onClick={() => setSelectedVoiceMetric(null)}
-                          className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
-                        >
-                          Close
-                        </button>
-                      </div>
-                      <div className="text-sm text-gray-300 mb-2">
-                        Score: <span className="font-semibold text-white">{selectedVoiceMetric.score}/10</span>
-                      </div>
-                      {selectedVoiceMetric.detail && (
-                        <div className="text-xs text-gray-400 mb-2">{selectedVoiceMetric.detail}</div>
-                      )}
-                      <div className="space-y-3 text-xs text-gray-200">
-                        <div>
-                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
-                          <div>{info.whyItMatters}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
-                          <div>{info.howItIsMeasured}</div>
-                        </div>
-                        {info.idealRange && (
-                          <div>
-                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
-                            <div>{info.idealRange}</div>
-                          </div>
-                        )}
-                        {info.perceptionImpact && (
-                          <div>
-                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
-                            <div>{info.perceptionImpact}</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </motion.div>
-            )}
-            {/* CV Metric Summary Aside (right side of overall layout) */}
-            {selectedCvMetric && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-dark-800/90 rounded-2xl p-6 border border-dark-700"
-              >
-                {(() => {
-                  const info = getMetricDetails(selectedCvMetric as any);
-                  if (!info) return null;
-                  return (
-                    <div className="text-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-white font-semibold text-base">{info.title}</div>
-                        <button
-                          onClick={() => setSelectedCvMetric(null)}
-                          className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-gray-200 border border-dark-600"
-                        >
-                          Close
-                        </button>
-                      </div>
-                      <div className="text-sm text-gray-300 mb-2">
-                        Score: <span className="font-semibold text-white">{Math.round(selectedCvMetricValue * 100)}%</span>
-                      </div>
-                      <div className="space-y-3 text-xs text-gray-200">
-                        <div>
-                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">Why this matters</div>
-                          <div>{info.whyItMatters}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] text-gray-400 uppercase tracking-wider">How we measure it</div>
-                          <div>{info.howItIsMeasured}</div>
-                        </div>
-                        {info.idealRange && (
-                          <div>
-                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Ideal range</div>
-                            <div>{info.idealRange}</div>
-                          </div>
-                        )}
-                        {info.perceptionImpact && (
-                          <div>
-                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Impact on perception</div>
-                            <div>{info.perceptionImpact}</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </motion.div>
-            )}
-            {/* Next Steps */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-orange-400" />
-                {nextSteps.title}
-              </h3>
-              <div className="space-y-3">
-                {nextSteps.steps.map((step, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <span className="text-white text-xs font-bold">{index + 1}</span>
-                    </div>
-                    <p className="text-gray-300 text-sm">{step}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 space-y-3">
-                <button
-                  onClick={() => {
-                    onStartNewInterview();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg hover:from-orange-400 hover:to-amber-400 transition-all font-medium flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Practice Again
-                </button>
-              </div>
-            </motion.div>
-
-            {/* Interview Type Advice */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Brain className="w-5 h-5 text-orange-400" />
-                {interviewAdvice.title}
-              </h3>
-              <div className="space-y-3">
-                {interviewAdvice.tips.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Lightbulb className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-1" />
-                    <p className="text-gray-300 text-sm">{tip}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Skill Development */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-orange-400" />
-                Skill Development Tips
-              </h3>
-              <div className="space-y-3">
-                {skillAdvice.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Star className="w-4 h-4 text-orange-400 flex-shrink-0 mt-1" />
-                    <p className="text-gray-300 text-sm">{tip}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Session Details */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4">Session Details</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Interview Type:</span>
-                  <span className="text-white capitalize">
-                    {safeSessionData.interviewType.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()).trim()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Difficulty:</span>
-                  <span className="text-white capitalize">{safeSessionData.setup.difficulty}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Industry:</span>
-                  <span className="text-white capitalize">{safeSessionData.setup.industry}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Interview Mode:</span>
-                  <span className="text-white capitalize">{safeSessionData.setup.interviewMode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Date:</span>
-                  <span className="text-white">
-                    {new Date(safeSessionData.startTime).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Interview Focus:</span>
-                  <span className="text-orange-400">Standard Practice</span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
       </div>
     </div>
   );

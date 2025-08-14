@@ -44,6 +44,9 @@ export interface CameraTimelinePoint {
   cameraPresence: CameraPresence;
   posture: PostureScore;
   triggers?: string[];
+  // Extended optional CV signals for overlays and chips
+  vision?: VisionFrameFeatures;
+  temporal?: VisionTemporalSummary;
 }
 
 export interface VoiceMetricsSummary {
@@ -62,4 +65,84 @@ export interface VerbalFeedback {
   fillerCount: number;
   sentiment: number; // 0..1 where 0.5 is neutral
   suggestions: string[]; // Improvement suggestions
+}
+
+// ====== CV: Extended, temporal-aware feature schemas ======
+
+export interface HeadPose {
+  // degrees
+  yaw: number;
+  pitch: number;
+  roll: number;
+}
+
+export interface EyeGaze {
+  // normalized offsets of iris center relative to each eye box center, [-1, 1]
+  leftOffsetX: number;
+  leftOffsetY: number;
+  rightOffsetX: number;
+  rightOffsetY: number;
+  // instantaneous probability of looking at camera [0..1]
+  onCameraProb: number;
+}
+
+export interface ActionUnits {
+  // 0..1 heuristic intensities for a subset of AUs
+  AU01: number; // inner brow raiser
+  AU04: number; // brow lowerer
+  AU06: number; // cheek raiser
+  AU07: number; // lid tightener
+  AU12: number; // lip corner puller (smile)
+  AU14?: number; // dimpler (optional)
+}
+
+export interface PosePostureMetrics {
+  shoulderTiltDeg?: number; // lateral tilt from shoulders
+  slouchScore?: number; // 0..1, higher worse
+  leanForwardScore?: number; // 0..1, forward leaning
+}
+
+export interface GestureMetrics {
+  magnitude: number; // 0..1 average movement magnitude
+  classification?: 'low' | 'medium' | 'high' | 'emphatic';
+}
+
+export interface TemporalStats {
+  headPoseStabilityStd: {
+    yaw: number; pitch: number; roll: number;
+  };
+  gazeDispersionEntropy: number; // 0..1 normalized entropy of gaze direction
+  microExpressionsPerMin: number;
+  changePoints: Array<{ t: number; signal: 'head' | 'gaze' | 'au'; magnitude: number }>;
+  gazeOnCameraPercent?: number; // percent over rolling window
+}
+
+export interface VisionFrameFeatures {
+  landmarks2D?: Array<{ x: number; y: number }>; // Face Mesh 2D
+  poseLandmarks?: Array<{ x: number; y: number; z?: number; visibility?: number }>;
+  headPose?: HeadPose;
+  eyeGaze?: EyeGaze;
+  actionUnits?: ActionUnits;
+  posture?: PosePostureMetrics;
+  gestures?: GestureMetrics;
+}
+
+export interface VisionTemporalSummary extends TemporalStats {
+  // rolling aggregates
+  avgEyeContact?: number;
+  avgBlinkRate?: number;
+}
+
+export interface CompoundSignals {
+  lowConfidence?: boolean;
+  highEngagement?: boolean;
+  notes?: string[];
+}
+
+export interface FusionScores {
+  confidence: number; // 0..100
+  clarity: number; // 0..100
+  warmth: number; // 0..100
+  engagement: number; // 0..100
+  compound?: CompoundSignals;
 }

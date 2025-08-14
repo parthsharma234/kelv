@@ -1,14 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import {
   Volume2,
-  TrendingUp,
-  TrendingDown,
-  Clock,
-  Star,
-  AlertCircle,
-  CheckCircle,
-  Info,
   Zap,
   BarChart3
 } from 'lucide-react';
@@ -28,7 +21,6 @@ const METRICS = [
 ];
 
 const VoiceTimeline: React.FC<VoiceTimelineProps> = ({ voiceTimeline }) => {
-  const [selectedPoint, setSelectedPoint] = useState<VoiceTimelinePoint | null>(null);
 
   if (!voiceTimeline || voiceTimeline.length === 0) {
     return (
@@ -42,11 +34,7 @@ const VoiceTimeline: React.FC<VoiceTimelineProps> = ({ voiceTimeline }) => {
     );
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+
 
   // Prepare data for the line graph
   const times = voiceTimeline.map(pt => (pt.timestamp - voiceTimeline[0].timestamp) / 1000);
@@ -67,14 +55,14 @@ const VoiceTimeline: React.FC<VoiceTimelineProps> = ({ voiceTimeline }) => {
     return height - padding - ((val - min) / (max - min)) * (height - 2 * padding);
   };
 
-  // Find Y-axis ranges for each metric
+  // Find Y-axis ranges for each metric with proper limits
   const yRanges = {
-    speechRate: { min: 60, max: 200 },
-    fluencyScore: { min: 0, max: 100 },
-    voiceConfidence: { min: 0, max: 100 },
-    deliveryScore: { min: 0, max: 100 },
-    clarityScore: { min: 0, max: 100 },
-    fillerWordCount: { min: 0, max: Math.max(5, ...voiceTimeline.map(pt => pt.metrics.fillerWordCount)) },
+    speechRate: { min: 80, max: 220 },
+    fluencyScore: { min: 20, max: 100 },
+    voiceConfidence: { min: 20, max: 100 },
+    deliveryScore: { min: 20, max: 100 },
+    clarityScore: { min: 20, max: 100 },
+    fillerWordCount: { min: 0, max: Math.max(8, ...voiceTimeline.map(pt => pt.metrics.fillerWordCount)) },
   };
 
   // Build line paths for each metric
@@ -86,249 +74,342 @@ const VoiceTimeline: React.FC<VoiceTimelineProps> = ({ voiceTimeline }) => {
     }).join(' ');
   };
 
-  // Legend
-  const legend = (
-    <div className="flex flex-wrap gap-4 mb-4">
-      {METRICS.map(m => (
-        <div key={m.key} className="flex items-center gap-2">
-          <span style={{ background: m.color }} className="inline-block w-4 h-1.5 rounded-full" />
-          <span className="text-xs text-gray-300">{m.label}</span>
-        </div>
-      ))}
-    </div>
-  );
+
 
   return (
     <div className="space-y-6">
-      <div className="bg-dark-700/30 rounded-xl p-6 border border-dark-600/30">
-        <div className="flex items-center gap-3 mb-6">
-          <Volume2 className="w-5 h-5 text-orange-400" />
-          <h4 className="text-lg font-semibold text-white">Voice Metrics Timeline</h4>
+      {/* High-Tech Neural Network Style */}
+      <div className="bg-gradient-to-br from-dark-800/90 to-dark-900/95 rounded-2xl p-6 border border-orange-500/20 shadow-2xl backdrop-blur-sm relative overflow-hidden">
+        {/* Animated background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 via-transparent to-orange-500/10 animate-pulse"></div>
+          <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent"></div>
+          <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent"></div>
         </div>
-        {legend}
-        <div className="overflow-x-auto">
-          <svg width={width} height={height} className="block">
-            {/* Axes */}
-            <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#888" strokeWidth={1} />
-            <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#888" strokeWidth={1} />
-            {/* Y-axis ticks and labels for each metric (left side) */}
-            {METRICS.map((m, idx) => {
-              const { min, max } = yRanges[m.key as keyof typeof yRanges];
-              const steps = 4;
-              return Array.from({ length: steps + 1 }).map((_, i) => {
-                const val = min + ((max - min) * (steps - i)) / steps;
+        
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-400/20 to-transparent rounded-xl animate-pulse"></div>
+                <BarChart3 className="w-6 h-6 text-white relative z-10" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  Voice Metrics Timeline
+                  <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                </h3>
+                <p className="text-sm text-gray-400 flex items-center gap-2">
+                  <span>Neural voice analysis</span>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full"></div>
+                  <span>Real-time processing</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-xs text-gray-400 bg-dark-700/50 px-3 py-1.5 rounded-lg border border-dark-600/30">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
+                <span className="font-medium">Live Analysis</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-400 bg-dark-700/50 px-3 py-1.5 rounded-lg border border-dark-600/30">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse shadow-lg shadow-blue-400/50"></div>
+                <span className="font-medium">AI Processing</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="relative bg-gradient-to-br from-dark-900/80 to-black/90 rounded-xl p-6 border border-orange-500/10 shadow-inner">
+            {/* High-tech corner decorations */}
+            <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-orange-500/40 rounded-tl"></div>
+            <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-orange-500/40 rounded-tr"></div>
+            <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-orange-500/40 rounded-bl"></div>
+            <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-orange-500/40 rounded-br"></div>
+            
+            <svg width={width} height={height} className="rounded-lg relative z-10">
+              {/* Enhanced grid and gradients */}
+              <defs>
+                <pattern id="neuralGrid" width="40" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 20" fill="none" stroke="#374151" strokeWidth="0.2" opacity="0.3" />
+                  <circle cx="20" cy="10" r="0.5" fill="#6b7280" opacity="0.2" />
+                </pattern>
+                <linearGradient id="highTechGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#0f0f0f" stopOpacity="0.95"/>
+                  <stop offset="50%" stopColor="#1a1a1a" stopOpacity="0.9"/>
+                  <stop offset="100%" stopColor="#000000" stopOpacity="0.95"/>
+                </linearGradient>
+                <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                  <feMerge> 
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/> 
+                  </feMerge>
+                </filter>
+                <filter id="dataGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge> 
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/> 
+                  </feMerge>
+                </filter>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#highTechGradient)" />
+              <rect width="100%" height="100%" fill="url(#neuralGrid)" />
+            
+            {/* Enhanced metric lines with high-tech effects */}
+            {METRICS.map((metric) => {
+              const path = buildLine(metric.key as keyof typeof yRanges);
+              const gradientId = `gradient-${metric.key}`;
+              const glowGradientId = `glow-gradient-${metric.key}`;
+              
+              return (
+                <g key={metric.key}>
+                  <defs>
+                    <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor={metric.color} stopOpacity="0.6"/>
+                      <stop offset="50%" stopColor={metric.color} stopOpacity="0.3"/>
+                      <stop offset="100%" stopColor={metric.color} stopOpacity="0.05"/>
+                    </linearGradient>
+                    <linearGradient id={glowGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor={metric.color} stopOpacity="0.9"/>
+                      <stop offset="100%" stopColor={metric.color} stopOpacity="0.4"/>
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Glow effect background */}
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke={`url(#${glowGradientId})`}
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.3"
+                    filter="url(#neonGlow)"
+                  />
+                  
+                  {/* Main data line */}
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke={metric.color}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#dataGlow)"
+                    className="drop-shadow-lg"
+                  />
+                  
+                  {/* Enhanced data points with pulse effect */}
+                  {voiceTimeline.map((pt, i) => {
+                    const t = times[i];
+                    const val = pt.metrics[metric.key as keyof typeof yRanges];
+                    const x = scaleX(t);
+                    const y = scaleY(val, metric.key as keyof typeof yRanges);
+                    return (
+                      <g key={i}>
+                        {/* Outer glow ring */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="8"
+                          fill="none"
+                          stroke={metric.color}
+                          strokeWidth="1"
+                          opacity="0.3"
+                          filter="url(#neonGlow)"
+                        />
+                        {/* Main data point */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="4"
+                          fill={metric.color}
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                          filter="url(#dataGlow)"
+                          className="drop-shadow-lg"
+                        />
+                        {/* Inner core */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="1.5"
+                          fill="#ffffff"
+                          opacity="0.9"
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })}
+            
+            {/* Enhanced Y-axis with high-tech styling */}
+            {METRICS.map((metric) => {
+              const { min, max } = yRanges[metric.key as keyof typeof yRanges];
+              const steps = 5;
+              return Array.from({ length: steps + 1 }, (_, i) => {
+                const value = min + (max - min) * (i / steps);
+                const y = scaleY(value, metric.key as keyof typeof yRanges);
+                const isMiddle = i === Math.floor(steps / 2);
                 return (
-                  <g key={m.key + '-' + i}>
+                  <g key={`${metric.key}-label-${i}`}>
+                    <line
+                      x1={padding}
+                      y1={y}
+                      x2={width - padding}
+                      y2={y}
+                      stroke="#374151"
+                      strokeWidth="0.3"
+                      opacity="0.4"
+                      strokeDasharray={isMiddle ? "none" : "2,4"}
+                    />
+                    {/* Axis indicator */}
+                    <circle
+                      cx={padding}
+                      cy={y}
+                      r="2"
+                      fill={isMiddle ? "#f97316" : "#6b7280"}
+                      opacity={isMiddle ? "0.8" : "0.4"}
+                    />
                     <text
-                      x={padding - 8 - idx * 40}
-                      y={scaleY(val, m.key as keyof typeof yRanges) + 4}
-                      fontSize={10}
-                      fill={m.color}
+                      x={padding - 15}
+                      y={y + 4}
                       textAnchor="end"
+                      className="text-xs fill-gray-300 font-semibold"
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
                     >
-                      {m.key === 'fillerWordCount' ? Math.round(val) : Math.round(val)}
+                      {Math.round(value)}
                     </text>
                   </g>
                 );
               });
             })}
-            {/* X-axis ticks and labels */}
-            {voiceTimeline.map((pt, i) => (
-              <g key={i + '-tick'}>
-                <line
-                  x1={scaleX(times[i])}
-                  y1={height - padding}
-                  x2={scaleX(times[i])}
-                  y2={height - padding + 6}
-                  stroke="#aaa"
-                  strokeWidth={1}
-                />
-                <text
-                  x={scaleX(times[i])}
-                  y={height - padding + 18}
-                  fontSize={10}
-                  fill="#aaa"
-                  textAnchor="middle"
-                >
-                  {formatTime(times[i])}
-                </text>
-              </g>
-            ))}
-            {/* Metric lines */}
-            {METRICS.map(m => (
-              <path
-                key={m.key}
-                d={buildLine(m.key as keyof typeof yRanges)}
-                fill="none"
-                stroke={m.color}
-                strokeWidth={2}
-                style={{ opacity: 0.9 }}
-              />
-            ))}
-            {/* Points for selection */}
-            {METRICS.map(m => (
-              voiceTimeline.map((pt, i) => {
-                const t = times[i];
-                const val = pt.metrics[m.key as keyof typeof yRanges];
+            
+            {/* Enhanced X-axis with neural network styling */}
+            {times.map((t, i) => {
+              if (i % Math.ceil(times.length / 8) === 0) {
+                const x = scaleX(t);
                 return (
-                  <circle
-                    key={m.key + '-' + i}
-                    cx={scaleX(t)}
-                    cy={scaleY(val, m.key as keyof typeof yRanges)}
-                    r={selectedPoint === pt ? 6 : 3}
-                    fill={m.color}
-                    stroke="#fff"
-                    strokeWidth={selectedPoint === pt ? 2 : 0}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedPoint(pt)}
-                  />
+                  <g key={`time-${i}`}>
+                    <line
+                      x1={x}
+                      y1={padding}
+                      x2={x}
+                      y2={height - padding}
+                      stroke="#374151"
+                      strokeWidth="0.3"
+                      opacity="0.3"
+                      strokeDasharray="1,3"
+                    />
+                    {/* Time marker */}
+                    <circle
+                      cx={x}
+                      cy={height - padding}
+                      r="2"
+                      fill="#6b7280"
+                      opacity="0.6"
+                    />
+                    <text
+                      x={x}
+                      y={height - padding + 20}
+                      textAnchor="middle"
+                      className="text-xs fill-gray-300 font-semibold"
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
+                    >
+                      {Math.round(t)}s
+                    </text>
+                  </g>
                 );
-              })
-            ))}
+              }
+              return null;
+            })}
+            
+            {/* Chart border */}
+            <rect
+              x={padding}
+              y={padding}
+              width={width - 2 * padding}
+              height={height - 2 * padding}
+              fill="none"
+              stroke="#4b5563"
+              strokeWidth="1"
+              opacity="0.5"
+            />
           </svg>
         </div>
-      </div>
-
-      {/* Detailed Analysis for Selected Point */}
-      {selectedPoint && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-dark-800 rounded-2xl p-6"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <Zap className="w-5 h-5 text-orange-400" />
-            <h4 className="text-lg font-semibold text-white">
-              Detailed Analysis - {formatTime(selectedPoint.timestamp / 1000)}
-            </h4>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedPoint.feedback.score >= 85 ? 'text-green-400' : selectedPoint.feedback.score >= 70 ? 'text-blue-400' : selectedPoint.feedback.score >= 55 ? 'text-yellow-400' : 'text-red-400'}`}>
-              Score: {selectedPoint.feedback.score}/100
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Voice Metrics */}
-            <div className="space-y-4">
-              <h5 className="text-md font-semibold text-white mb-3">Voice Metrics</h5>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Speech Rate</span>
-                  <span className="text-white">{Math.round(selectedPoint.metrics.speechRate)} WPM</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Fluency Score</span>
-                  <span className={selectedPoint.metrics.fluencyScore >= 85 ? 'text-green-400' : selectedPoint.metrics.fluencyScore >= 70 ? 'text-blue-400' : selectedPoint.metrics.fluencyScore >= 55 ? 'text-yellow-400' : 'text-red-400'}>
-                    {Math.round(selectedPoint.metrics.fluencyScore)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Voice Confidence</span>
-                  <span className={selectedPoint.metrics.voiceConfidence >= 85 ? 'text-green-400' : selectedPoint.metrics.voiceConfidence >= 70 ? 'text-blue-400' : selectedPoint.metrics.voiceConfidence >= 55 ? 'text-yellow-400' : 'text-red-400'}>
-                    {Math.round(selectedPoint.metrics.voiceConfidence)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Delivery Score</span>
-                  <span className={selectedPoint.metrics.deliveryScore >= 85 ? 'text-green-400' : selectedPoint.metrics.deliveryScore >= 70 ? 'text-blue-400' : selectedPoint.metrics.deliveryScore >= 55 ? 'text-yellow-400' : 'text-red-400'}>
-                    {Math.round(selectedPoint.metrics.deliveryScore)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Clarity Score</span>
-                  <span className={selectedPoint.metrics.clarityScore >= 85 ? 'text-green-400' : selectedPoint.metrics.clarityScore >= 70 ? 'text-blue-400' : selectedPoint.metrics.clarityScore >= 55 ? 'text-yellow-400' : 'text-red-400'}>
-                    {Math.round(selectedPoint.metrics.clarityScore)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Filler Words</span>
-                  <span className={selectedPoint.metrics.fillerWordCount > 3 ? 'text-red-400' : 'text-green-400'}>
-                    {selectedPoint.metrics.fillerWordCount}
-                  </span>
-                </div>
-              </div>
-            </div>
-            {/* Feedback */}
-            <div className="space-y-4">
-              <h5 className="text-md font-semibold text-white mb-3">Feedback</h5>
-              <div className="bg-dark-700 rounded-lg p-4">
-                <p className="text-gray-300 mb-3">{selectedPoint.feedback.overall}</p>
-                {selectedPoint.feedback.strengths.length > 0 && (
-                  <div className="mb-3">
-                    <h6 className="text-green-400 font-medium mb-2">Strengths:</h6>
-                    <ul className="space-y-1">
-                      {selectedPoint.feedback.strengths.map((strength, index) => (
-                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                          <CheckCircle className="w-3 h-3 text-green-400 mt-0.5 flex-shrink-0" />
-                          {strength}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {selectedPoint.feedback.improvements.length > 0 && (
-                  <div className="mb-3">
-                    <h6 className="text-yellow-400 font-medium mb-2">Areas for Improvement:</h6>
-                    <ul className="space-y-1">
-                      {selectedPoint.feedback.improvements.map((improvement, index) => (
-                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                          <AlertCircle className="w-3 h-3 text-yellow-400 mt-0.5 flex-shrink-0" />
-                          {improvement}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {selectedPoint.feedback.specificTips.length > 0 && (
-                  <div>
-                    <h6 className="text-blue-400 font-medium mb-2">Specific Tips:</h6>
-                    <ul className="space-y-1">
-                      {selectedPoint.feedback.specificTips.map((tip, index) => (
-                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                          <Info className="w-3 h-3 text-blue-400 mt-0.5 flex-shrink-0" />
-                          {tip}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Overall Recommendations */}
-      <div className="bg-dark-800 rounded-2xl p-6">
-        <h4 className="text-lg font-semibold text-white mb-4">Overall Voice Recommendations</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h5 className="text-green-400 font-medium mb-3">Key Strengths to Maintain:</h5>
-            <div className="space-y-2">
-              {Array.from(new Set(voiceTimeline.flatMap(point => point.feedback.strengths))).slice(0, 5).map((strength, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-gray-300">{strength}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* High-Tech Neural Legend */}
+        <div className="mt-8 bg-gradient-to-br from-dark-800/40 to-dark-900/60 rounded-xl p-6 border border-orange-500/10 backdrop-blur-sm relative overflow-hidden">
+          {/* Animated background effects */}
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 via-transparent to-orange-500/5 animate-pulse"></div>
+          <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent"></div>
+          <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent"></div>
           
-          <div>
-            <h5 className="text-blue-400 font-medium mb-3">Priority Improvements:</h5>
-            <div className="space-y-2">
-              {Array.from(new Set(voiceTimeline.flatMap(point => point.feedback.specificTips))).slice(0, 5).map((tip, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-gray-300">{tip}</span>
-                </div>
+          {/* Corner decorations */}
+          <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-orange-500/30 rounded-tl"></div>
+          <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-orange-500/30 rounded-tr"></div>
+          <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-orange-500/30 rounded-bl"></div>
+          <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-orange-500/30 rounded-br"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex items-center justify-center">
+                <Zap className="w-4 h-4 text-white" />
+              </div>
+              <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                Neural Metrics Legend
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              </h4>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {METRICS.map((metric, index) => (
+                <motion.div 
+                  key={metric.key} 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.1, type: "spring", stiffness: 120 }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-dark-700/40 to-dark-800/60 border border-dark-600/20 hover:border-orange-500/30 transition-all duration-300 group relative overflow-hidden"
+                >
+                  {/* Hover effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
+                  <div className="relative z-10 flex items-center gap-2">
+                    <div className="relative">
+                      <div 
+                        className="w-4 h-4 rounded-full shadow-lg relative z-10" 
+                        style={{ 
+                          backgroundColor: metric.color, 
+                          boxShadow: `0 0 12px ${metric.color}60`,
+                          filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.5))'
+                        }}
+                      />
+                      <div 
+                        className="absolute inset-0 w-4 h-4 rounded-full animate-ping opacity-20"
+                        style={{ backgroundColor: metric.color }}
+                      />
+                    </div>
+                    <div 
+                      className="w-10 h-1 rounded-full relative overflow-hidden" 
+                      style={{ backgroundColor: `${metric.color}40` }}
+                    >
+                      <div 
+                        className="absolute inset-0 w-full h-full rounded-full animate-pulse"
+                        style={{ backgroundColor: metric.color }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-200 font-semibold tracking-wide relative z-10">{metric.label}</span>
+                </motion.div>
               ))}
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default VoiceTimeline;

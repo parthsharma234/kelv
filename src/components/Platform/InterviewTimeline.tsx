@@ -75,6 +75,20 @@ export const InterviewTimeline: React.FC<InterviewTimelineProps> = ({ duration, 
       return { x, y, ...e };
     });  }, [displayEvents, displayDuration, showSample]);
 
+  // Render change-point chips and gaze/head pose annotations when available
+  const chips = useMemo(() => {
+    return events
+      .filter(e => (e as any).temporal || (e as any).vision)
+      .map((e, idx) => {
+        const t = e.time;
+        const x = (t / (duration || 1)) * 1000;
+        const temporal = (e as any).temporal as { changePoints?: Array<{ t: number; signal: string; magnitude: number }>; gazeOnCameraPercent?: number } | undefined;
+        const cp = temporal?.changePoints && temporal.changePoints.length ? temporal.changePoints[0] : null;
+        const label = cp ? `${cp.signal} shift` : temporal?.gazeOnCameraPercent !== undefined ? `Gaze ${(temporal.gazeOnCameraPercent * 100).toFixed(0)}%` : 'Event';
+        return { x, label, key: idx };
+      });
+  }, [events, duration]);
+
   // If no events and not showing sample, show a placeholder with sample option
   if (!events.length && !showSample) {
     return (
@@ -138,6 +152,25 @@ export const InterviewTimeline: React.FC<InterviewTimelineProps> = ({ duration, 
     d += ` L ${points[points.length - 1].x},${HEIGHT} L ${points[0].x},${HEIGHT} Z`;
     return d;
   }, [points]);
+
+  // Compute inline chips from temporal CV summary when events carry it (optional integration path)
+  const chips = useMemo(() => {
+    return displayEvents
+      .map((e, idx) => {
+        const anyE = e as any;
+        const temporal = anyE.temporal as { changePoints?: Array<{ t: number; signal: string; magnitude: number }>; gazeOnCameraPercent?: number } | undefined;
+        if (!temporal) return null;
+        const label = temporal.changePoints && temporal.changePoints.length
+          ? `${temporal.changePoints[0].signal} shift`
+          : temporal.gazeOnCameraPercent !== undefined
+            ? `Gaze ${(temporal.gazeOnCameraPercent * 100).toFixed(0)}%`
+            : null;
+        if (!label) return null;
+        const x = (e.time / displayDuration) * 1000;
+        return { x, label, key: `t${idx}` };
+      })
+      .filter(Boolean) as Array<{ x: number; label: string; key: string }>;
+  }, [displayEvents, displayDuration]);
   return (
     <div className="w-full flex flex-col items-center">
       <div className="w-full bg-gradient-to-br from-dark-800/90 to-dark-900/70 rounded-3xl p-8 border border-orange-500/30 shadow-2xl backdrop-blur-sm">
@@ -253,6 +286,13 @@ export const InterviewTimeline: React.FC<InterviewTimelineProps> = ({ duration, 
                   {pt.value}/10
                 </text>
               )}
+            </g>
+          ))}
+          {/* Chips for temporal signals */}
+          {chips.map(chip => (
+            <g key={chip.key} transform={`translate(${chip.x}, ${HEIGHT - 30})`}>
+              <rect x={-34} y={-16} rx={8} ry={8} width={68} height={18} fill="rgba(66,165,245,0.15)" stroke="#42A5F5" strokeWidth={1} />
+              <text x={0} y={-3} textAnchor="middle" fontSize={10} fill="#9cc9ff">{chip.label}</text>
             </g>
           ))}
         </svg>

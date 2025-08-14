@@ -44,6 +44,7 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [hasStartedInterview, setHasStartedInterview] = useState(false);  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showCoachingPanel, setShowCoachingPanel] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
@@ -798,6 +799,42 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
             {/* Start interview button */}
             {!hasStartedInterview && (
               <div className="mt-8 pt-6 border-t border-[#FF5722]/20">
+                {/* AI Coaching Nudges - Side Panel Trigger */}
+                <div className="mb-6 relative">
+                  <button
+                    onClick={() => setShowCoachingPanel(!showCoachingPanel)}
+                    className="w-full p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/5 rounded-xl border border-blue-500/20 backdrop-blur-sm hover:from-blue-500/15 hover:to-cyan-500/10 transition-all duration-300 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="relative">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                            <Brain className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <div className="text-left">
+                          <h4 className="text-white font-medium text-sm">AI Coaching Nudges</h4>
+                          <div className="flex items-center space-x-2 mt-0.5">
+                            <div className="w-1 h-1 bg-blue-400 rounded-full"></div>
+                            <span className="text-xs text-blue-300 font-medium">BETA FEATURE</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-400">
+                          {setup.showCues ? 'ENABLED' : 'CONFIGURE'}
+                        </span>
+                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
+                          <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                            showCoachingPanel ? 'bg-cyan-400 rotate-180' : 'bg-gray-400'
+                          }`}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+                
                 <button
                   onClick={startInterview}
                   disabled={!!cameraError}
@@ -921,6 +958,159 @@ export const FocusedInterview: React.FC<FocusedInterviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* AI Coaching Nudges Side Panel */}
+      <div className={`fixed top-0 right-0 h-full w-96 bg-gradient-to-b from-dark-800/95 to-dark-900/98 backdrop-blur-xl border-l border-blue-500/20 shadow-2xl transform transition-transform duration-500 ease-in-out z-50 ${
+        showCoachingPanel ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        {/* Panel Header */}
+        <div className="p-6 border-b border-blue-500/20">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
+              </div>
+              <div>
+                <h3 className="text-white font-semibold text-lg">AI Coaching Nudges</h3>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <div className="w-1 h-1 bg-blue-400 rounded-full"></div>
+                  <span className="text-xs text-blue-300 font-medium">BETA FEATURE</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCoachingPanel(false)}
+              className="w-8 h-8 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 flex items-center justify-center transition-colors"
+            >
+              <div className="w-4 h-0.5 bg-gray-400 rotate-45 absolute"></div>
+              <div className="w-4 h-0.5 bg-gray-400 -rotate-45 absolute"></div>
+            </button>
+          </div>
+          <p className="text-gray-300 text-sm leading-relaxed">
+            Intelligent real-time guidance for posture, eye contact, and speaking dynamics
+          </p>
+        </div>
+
+        {/* Panel Content */}
+        <div className="p-6 space-y-6 overflow-y-auto h-full pb-32">
+          {/* Enable/Disable Toggle */}
+          <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/5 rounded-xl p-4 border border-blue-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-white font-medium">Enable Coaching</span>
+              <label className="relative inline-flex items-center cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={setup.showCues || false}
+                  onChange={(e) => {
+                    setup.showCues = e.target.checked;
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="relative w-14 h-7 bg-gray-700/50 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-blue-500 peer-checked:to-cyan-500 shadow-inner">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 peer-checked:opacity-100 transition-opacity duration-300"></div>
+                </div>
+              </label>
+            </div>
+            <p className="text-gray-400 text-xs">
+              Get real-time feedback during your interview to improve your performance
+            </p>
+          </div>
+
+          {/* Coaching Features */}
+          <div className="space-y-4">
+            <h4 className="text-white font-medium text-sm flex items-center space-x-2">
+              <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+              <span>What You'll Get</span>
+            </h4>
+            
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3 p-3 bg-dark-700/30 rounded-lg border border-dark-600/30">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                </div>
+                <div>
+                  <h5 className="text-white text-sm font-medium">Posture Guidance</h5>
+                  <p className="text-gray-400 text-xs mt-1">Real-time alerts for slouching, leaning, or poor positioning</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3 p-3 bg-dark-700/30 rounded-lg border border-dark-600/30">
+                <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                </div>
+                <div>
+                  <h5 className="text-white text-sm font-medium">Eye Contact Coaching</h5>
+                  <p className="text-gray-400 text-xs mt-1">Gentle reminders to maintain natural eye contact with the camera</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3 p-3 bg-dark-700/30 rounded-lg border border-dark-600/30">
+                <div className="w-6 h-6 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                </div>
+                <div>
+                  <h5 className="text-white text-sm font-medium">Speaking Dynamics</h5>
+                  <p className="text-gray-400 text-xs mt-1">Feedback on pace, volume, and vocal confidence</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sensitivity Settings */}
+          <div className="space-y-4">
+            <h4 className="text-white font-medium text-sm flex items-center space-x-2">
+              <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+              <span>Nudge Sensitivity</span>
+            </h4>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300 text-sm">Frequency</span>
+                <select className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300 text-sm">Delay (seconds)</span>
+                <input 
+                  type="range" 
+                  min="30" 
+                  max="120" 
+                  defaultValue="60" 
+                  className="w-20 h-2 bg-dark-600 rounded-lg appearance-none cursor-pointer slider"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Privacy Notice */}
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+            <div className="flex items-start space-x-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h5 className="text-amber-300 text-sm font-medium">Privacy Notice</h5>
+                <p className="text-amber-200/80 text-xs mt-1">
+                  All coaching analysis happens locally in your browser. No video data is transmitted to our servers.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Overlay */}
+      {showCoachingPanel && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300"
+          onClick={() => setShowCoachingPanel(false)}
+        />
+      )}
     </div>
   );
 };

@@ -55,6 +55,10 @@ export interface AudioAnalysisResult {
   mfcc: number[][];
   zcr: number[];
   rms: number[];
+  // New for steadiness and prosody details
+  jitter?: number;   // pitch period variability
+  shimmer?: number;  // amplitude variability
+  silenceSegments?: Array<{ start: number; end: number; duration: number }>;
 }
 
 export class AdvancedSpeechAnalyzer {
@@ -212,6 +216,52 @@ export class AdvancedSpeechAnalyzer {
       }
     }
     
+    // Compute jitter and shimmer over voiced frames
+    const voicedPitches = features.pitch.filter(p => p > 50);
+    let jitter = 0;
+    if (voicedPitches.length > 2) {
+      const periods = [] as number[];
+      for (let i = 1; i < voicedPitches.length; i++) {
+        periods.push(1 / voicedPitches[i]);
+      }
+      let num = 0; let den = 0;
+      for (let i = 1; i < periods.length; i++) {
+        num += Math.abs(periods[i] - periods[i - 1]);
+        den += periods[i];
+      }
+      jitter = den > 0 ? (num / (periods.length - 1)) / (den / periods.length) : 0;
+    }
+    // Shimmer via RMS variability
+    let shimmer = 0;
+    if (features.rms.length > 2) {
+      let num = 0; let den = 0;
+      for (let i = 1; i < features.rms.length; i++) {
+        num += Math.abs(features.rms[i] - features.rms[i - 1]);
+        den += features.rms[i];
+      }
+      shimmer = den > 0 ? (num / (features.rms.length - 1)) / (den / features.rms.length) : 0;
+    }
+    // Silence segmentation based on energy threshold
+    const silences: Array<{ start: number; end: number; duration: number }> = [];
+    const frameDur = (1024 /* frameSize */) / sampleRate;
+    const thresh = Math.max(0.02, this.calculateAverage(features.rms) * 0.3);
+    let inSilence = false; let start = 0;
+    for (let i = 0; i < features.rms.length; i++) {
+      const isSilent = features.rms[i] < thresh;
+      if (!inSilence && isSilent) { inSilence = true; start = i * frameDur; }
+      else if (inSilence && !isSilent) {
+        const end = i * frameDur; const dur = end - start; if (dur > 0.15) silences.push({ start, end, duration: dur });
+        inSilence = false;
+      }
+    }
+    if (inSilence) {
+      const end = features.rms.length * frameDur; const dur = end - start; if (dur > 0.15) silences.push({ start, end, duration: dur });
+    }
+
+    (features as any).jitter = jitter;
+    (features as any).shimmer = shimmer;
+    (features as any).silenceSegments = silences;
+
     return features;
   }
 
@@ -814,6 +864,7 @@ export class AdvancedSpeechAnalyzer {
   private analyzeSpeechPatterns(transcription: string, duration: number) {
     const words = transcription.toLowerCase().split(/\s+/).filter(word => word.length > 0);
     const wordCount = words.length;
+    let speechRate: number;
     
     // Debug logging for speech rate calculation
     console.log('Speech rate calculation debug:', {
@@ -840,20 +891,12 @@ export class AdvancedSpeechAnalyzer {
     safeDuration = Math.max(safeDuration, 1);
     
     // Calculate WPM: (words / minutes) = (words / (seconds / 60)) = (words * 60) / seconds
-    let speechRate = (wordCount * 60) / safeDuration;
-    speechRate = Math.round(speechRate * 10) / 10; // Round to 1 decimal place
-    
-    // Clamp output to 60–250 WPM for realistic range
-    speechRate = Math.max(60, Math.min(250, speechRate));
-    
-    console.log('Final speech rate calculation:', {
-      wordCount,
-      safeDuration,
-      calculatedWPM: (wordCount * 60) / safeDuration,
-      clampedWPM: speechRate
-    });
-    
-    // Advanced filler word detection
+    speechRate = Math.round((wordCount * 60 / safeDuration) * 10) / 10;
+speechRate = Math.max(80, Math.min(220, speechRate));
+
+console.log('Initial speech rate:', speechRate);
+
+// Advanced filler word detection
     const fillerWords = [
       'um', 'uh', 'like', 'you know', 'so', 'well', 'actually', 'basically', 
       'literally', 'right', 'kind of', 'sort of', 'i mean', 'you see', 
@@ -874,7 +917,14 @@ export class AdvancedSpeechAnalyzer {
     // Analyze pauses (estimated from punctuation and context)
     const pauseAnalysis = this.analyzePauses(transcription, duration);
     
-    return {
+    const totalPauseDuration = pauseAnalysis.averagePauseLength * pauseAnalysis.pauseFrequency;
+const effectiveDuration = Math.max(safeDuration - totalPauseDuration, wordCount / 4);
+speechRate = (wordCount * 60) / effectiveDuration;
+speechRate = Math.round(speechRate * 10) / 10;
+speechRate = Math.max(80, Math.min(220, speechRate));
+console.log('Adjusted speech rate with pauses:', speechRate);
+
+return {
       wordCount,
       speechRate,
       fillerWordCount,

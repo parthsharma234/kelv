@@ -233,13 +233,6 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
       icon: GraduationCap,
       options: experienceLevels,
       key: 'experienceLevel' as keyof InterviewSetup
-    },
-    {
-      title: 'In-Session Cues',
-      icon: AlertTriangle,
-      options: [],
-      key: 'showCues' as keyof InterviewSetup,
-      isCues: true
     }
   ];
 
@@ -660,52 +653,10 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
             </div>
           )}
 
-          {/* In-session cues configuration */}
-          {!showOtherInput && currentStepData?.isCues && (
-            <div className="relative z-10 space-y-6">
-              <label className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  checked={setup.showCues ?? false}
-                  onChange={(e) => setSetup({ ...setup, showCues: e.target.checked })}
-                  className="form-checkbox h-5 w-5 text-[#FF5722] bg-gray-900 border-gray-700 rounded"
-                />
-                <span className="text-gray-200">Show in-session cues</span>
-              </label>
-              {setup.showCues && (
-                <div className="flex items-center space-x-3">
-                  <span className="text-gray-400">Silence threshold (seconds)</span>
-                  <input
-                    type="number"
-                    min={10}
-                    max={300}
-                    value={setup.nudgeThreshold}
-                    onChange={(e) => setSetup({ ...setup, nudgeThreshold: parseInt(e.target.value, 10) })}
-                    className="w-24 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
-                  />
-                </div>
-              )}
-              <button
-                onClick={() => {
-                  setIsAnimating(true);
-                  setTimeout(() => {
-                    if (currentStep < steps.length - 1) {
-                      setCurrentStep(currentStep + 1);
-                    } else {
-                      setShowSaveDialog(true);
-                    }
-                    setIsAnimating(false);
-                  }, 300);
-                }}
-                className="mt-4 px-6 py-3 bg-[#FF5722] text-white rounded-xl hover:bg-[#D84315] transition-colors"
-              >
-                Continue
-              </button>
-            </div>
-          )}
+
 
           {/* Regular options grid for other steps */}
-          {!showOtherInput && currentStepData && currentStep > 0 && !currentStepData.isCues && (
+          {!showOtherInput && currentStepData && currentStep > 0 && (
             <div className="relative z-10">
               {currentStepData.options.length <= 4 ? (
                 // 2x2 grid for 4 or fewer items

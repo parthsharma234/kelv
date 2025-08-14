@@ -47,8 +47,8 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
   const metrics: { key: string; value: number; suggestions?: string[] }[] = [];
   if (cameraPresence) {
     Object.keys(metricLabels).forEach((key) => {
-      const value = (cameraPresence as Record<string, number | undefined>)[key];
-      if (value !== undefined) {
+      const value = cameraPresence[key as keyof CameraPresence];
+      if (typeof value === 'number') {
         metrics.push({ key, value, suggestions: cameraPresence.suggestions });
       }
     });
@@ -85,9 +85,45 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
           <div className="p-3 bg-dark-800 border-b border-dark-700 text-sm text-gray-300">Raw + Annotated (Large View)</div>
           <div className="p-0">
             <div className="w-full" style={{ height: '70vh' }}>
-              <div className="flex gap-4 h-full p-4">
-                <div className="flex-1 min-w-0">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full p-4">
+                <div className="lg:col-span-3 min-w-0">
                   <VideoReview src={recordingUrl} timeline={timeline} defaultMode="overlay" defaultShowOverlay />
+                </div>
+                {/* Change-point side panel */}
+                <div className="lg:col-span-1 bg-dark-800/60 border border-dark-700 rounded-lg p-3 overflow-y-auto">
+                  <div className="text-sm font-medium text-white mb-2">Change Points</div>
+                  <div className="space-y-2 text-xs">
+                    {timeline && timeline.length > 0 ? (
+                      timeline
+                        .filter(p => (p as any).temporal?.changePoints?.length)
+                        .map((p) => {
+                          const cp = (p as any).temporal.changePoints[0];
+                          const t0 = timeline[0].timestamp;
+                          const sec = (p.timestamp - t0) / 1000;
+                          const timeLabel = new Date((p.timestamp - t0)).toISOString().substr(14, 5);
+                          const label = `${cp.signal} Δ${cp.magnitude.toFixed(1)}`;
+                          return (
+                            <button
+                              key={`${p.timestamp}-${cp.signal}`}
+                              className="w-full text-left px-2 py-2 rounded bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-200"
+                              onClick={() => {
+                                const el = document.querySelector('video');
+                                if (!el) return;
+                                try { (el as HTMLVideoElement).currentTime = sec; } catch {}
+                              }}
+                              title={`Jump to ${timeLabel}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span>{label}</span>
+                                <span className="text-[10px] text-gray-400">{timeLabel}</span>
+                              </div>
+                            </button>
+                          );
+                        })
+                    ) : (
+                      <div className="text-gray-400">No detected change-points.</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -127,6 +163,10 @@ const CameraFeedback: React.FC<Props> = ({ cameraPresence, posture, recordingUrl
                 </div>
                 <div className="mt-2 text-xs text-gray-300">
                   {getMetricAction(m.key, m.value)}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-orange-400 font-medium">Click to learn more</span>
+                  <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
                 </div>
               </div>
             );
