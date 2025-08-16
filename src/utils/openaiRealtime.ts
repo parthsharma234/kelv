@@ -488,24 +488,74 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
       this.audioContext = new AudioContext({ sampleRate: 24000 });
       const source = this.audioContext.createMediaStreamSource(this.stream);
-      
-      // Create a script processor to capture audio data
-      const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-      
-      processor.onaudioprocess = (event) => {
-        if (this.isConnected && this.isRecording) {
-          const inputBuffer = event.inputBuffer.getChannelData(0);
-          const pcm16 = this.floatTo16BitPCM(inputBuffer);
-          this.sendAudioData(pcm16);
-          
-          // Store audio chunks locally for speech analysis
-          this.audioChunks.push(pcm16.slice(0)); // Create a copy
-          this.currentResponseAudioChunks.push(pcm16.slice(0));
-        }
-      };
 
-      source.connect(processor);
-      processor.connect(this.audioContext.destination);
+      // Preferred: AudioWorkletNode (modern, low-latency)
+      let workletSucceeded = false;
+      try {
+        if (this.audioContext.audioWorklet) {
+          const workletCode = `
+            class RecorderProcessor extends AudioWorkletProcessor {
+              process(inputs) {
+                const input = inputs[0];
+                if (input && input[0] && input[0].length) {
+                  // Send first channel to main thread
+                  const channel = input[0];
+                  // Copy to prevent transferring shared buffers unexpectedly
+                  const copy = new Float32Array(channel.length);
+                  copy.set(channel);
+                  this.port.postMessage(copy);
+                }
+                return true;
+              }
+            }
+            registerProcessor('recorder-processor', RecorderProcessor);
+          `;
+          const blob = new Blob([workletCode], { type: 'application/javascript' });
+          const moduleUrl = URL.createObjectURL(blob);
+          await this.audioContext.audioWorklet.addModule(moduleUrl);
+          const recorderNode = new AudioWorkletNode(this.audioContext, 'recorder-processor');
+          recorderNode.port.onmessage = (event: MessageEvent) => {
+            if (this.isConnected && this.isRecording) {
+              const inputBuffer = event.data as Float32Array;
+              const pcm16 = this.floatTo16BitPCM(inputBuffer);
+              this.sendAudioData(pcm16);
+
+              // Store audio chunks locally for speech analysis
+              this.audioChunks.push(pcm16.slice(0));
+              this.currentResponseAudioChunks.push(pcm16.slice(0));
+            }
+          };
+          // Connect source to recorder worklet
+          source.connect(recorderNode);
+          // Optional: ensure node stays active without audible output
+          const zeroGain = this.audioContext.createGain();
+          zeroGain.gain.value = 0;
+          recorderNode.connect(zeroGain);
+          zeroGain.connect(this.audioContext.destination);
+          workletSucceeded = true;
+        }
+      } catch (err) {
+        // Fallback will be used below
+        workletSucceeded = false;
+      }
+
+      if (!workletSucceeded) {
+        // Fallback: ScriptProcessorNode (deprecated)
+        const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+        processor.onaudioprocess = (event) => {
+          if (this.isConnected && this.isRecording) {
+            const inputBuffer = event.inputBuffer.getChannelData(0);
+            const pcm16 = this.floatTo16BitPCM(inputBuffer);
+            this.sendAudioData(pcm16);
+
+            // Store audio chunks locally for speech analysis
+            this.audioChunks.push(pcm16.slice(0)); // Create a copy
+            this.currentResponseAudioChunks.push(pcm16.slice(0));
+          }
+        };
+        source.connect(processor);
+        processor.connect(this.audioContext.destination);
+      }
 
       this.isRecording = true;
       return true;

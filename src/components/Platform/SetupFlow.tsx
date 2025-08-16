@@ -109,9 +109,7 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
 export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [setup, setSetup] = useState<Partial<InterviewSetup>>({
-    interviewMode: 'voice', // Default to voice mode
-    showCues: false,
-    nudgeThreshold: 60
+    interviewMode: 'voice' // Default to voice mode
   });
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);

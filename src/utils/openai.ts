@@ -2,6 +2,7 @@ import { InterviewSetup, Question, InterviewResponse, AIInterviewerState } from 
 import { synthesizeSpeechWithElevenLabs } from './elevenLabsTTS';
 import { analyzeVerbalResponse } from './verbalFeedback';
 import { getQuestions } from './questionBank';
+import Sentiment from 'sentiment';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -154,7 +155,12 @@ export async function extractSpeechMetrics(
           0,
           1 - Math.abs(analyzeVerbalResponse(transcription).sentiment - 0.5) * 2 - Math.abs(legacy.speechRate - 160) / 160
         ) * 100
-      )
+      ),
+      sentimentScore: (() => {
+        const sentimentAnalyzer = new Sentiment();
+        const sentimentResult = sentimentAnalyzer.analyze(transcription);
+        return Math.max(-1, Math.min(1, sentimentResult.comparative));
+      })()
     };
   } catch (error) {
     console.error('Error extracting speech metrics:', error);
@@ -184,7 +190,8 @@ export async function extractSpeechMetrics(
       fluency: 0,
       delivery: 0,
       clarity: 0,
-      duration
+      duration,
+      sentimentScore: 0
     };
   }
 }

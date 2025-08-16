@@ -136,13 +136,6 @@ export interface VisionTemporalSummary extends TemporalStats {
 export interface CompoundSignals {
   lowConfidence?: boolean;
   highEngagement?: boolean;
+  negativeSentiment?: boolean;
   notes?: string[];
-}
-
-export interface FusionScores {
-  confidence: number; // 0..100
-  clarity: number; // 0..100
-  warmth: number; // 0..100
-  engagement: number; // 0..100
-  compound?: CompoundSignals;
 }

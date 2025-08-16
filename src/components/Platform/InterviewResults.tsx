@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Target,
   ArrowLeft,
-  Trophy,
   Brain,
+  Trophy,
   MessageCircle,
+  Target,
   CheckCircle,
   FileText,
   BarChart3,
@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import VoiceTimeline from './VoiceTimeline';
 import CameraFeedback from './CameraFeedback';
-import MultimodalPresenceAnalysis from './MultimodalPresenceAnalysis';
+
 import { getVoiceMetricDetails } from '../../utils/voiceMetricInfo';
 import { getMetricDetails } from '../../utils/metricInfo';
 
@@ -116,15 +116,14 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   // Add CV metric detail state (used for CameraFeedback learn more)
   const [selectedMetricDetails, setSelectedMetricDetails] = useState<{ key: string; value: number } | null>(null);
 
-  // NEW: High-level tab between "Questions", "Computer Vision + Voice", and "Multimodal Presence"
-  const [resultsTab, setResultsTab] = useState<'questions' | 'analytics' | 'multimodal'>('multimodal');
+  // NEW: High-level tab between "Questions" and "Computer Vision + Voice"
+  const [resultsTab, setResultsTab] = useState<'questions' | 'analytics'>('analytics');
 
   const analyticsReport = sessionData.sophisticatedAnalytics;
   const cameraPresence = analyticsReport?.cameraPresence || sessionData.cameraPresence;
   const posture = analyticsReport?.posture || sessionData.posture;
   const recordingUrl = analyticsReport?.recordingUrl || sessionData.recordingUrl;
   const timeline = analyticsReport?.analysisTimeline || sessionData.analysisTimeline;
-  const fusion = analyticsReport?.fusion;
   const hasCameraAnalytics = cameraPresence || posture;
   const hasFullAnalytics =
     analyticsReport && (analyticsReport.summary || analyticsReport.timeline);
@@ -285,59 +284,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
             </div>
           </motion.div>
 
-          {/* Unified Performance (Fusion) */}
-          {fusion && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
-            >
-              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-amber-400" /> Unified Performance
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {[{k:'confidence',l:'Confidence'},{k:'clarity',l:'Clarity'},{k:'warmth',l:'Warmth'},{k:'engagement',l:'Engagement'}].map(({k,l}) => (
-                    <div key={k} className="bg-dark-900/40 rounded-lg p-3 border border-dark-700">
-                      <div className="text-xs text-gray-400 mb-1">{l}</div>
-                      <div className="text-2xl font-bold text-white">{Math.round(fusion[k] || 0)}</div>
-                      <div className="h-2 bg-dark-700 rounded mt-2">
-                        <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded" style={{ width: `${Math.round(fusion[k] || 0)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {fusion.compound && (
-                  <div className="mt-4 text-sm">
-                    {fusion.compound.lowConfidence && (
-                      <div className="text-orange-400">Low energy + poor gaze suggests lower confidence.</div>
-                    )}
-                    {fusion.compound.highEngagement && (
-                      <div className="text-green-400">Good posture, gestures, and gaze indicate high engagement.</div>
-                    )}
-                    {fusion.compound.notes && fusion.compound.notes.length > 0 && (
-                      <ul className="text-gray-300 list-disc list-inside mt-2 text-xs">
-                        {fusion.compound.notes.map((n:string,i:number)=>(<li key={i}>{n}</li>))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-              {/* Benchmark ribbons (placeholder) */}
-              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-400" /> Benchmarks (Beta)
-                </h3>
-                <ul className="space-y-2 text-sm">
-                  <li className="text-blue-300">Eye contact: Top 30% (placeholder)</li>
-                  <li className="text-green-300">Delivery consistency: Top 40% (placeholder)</li>
-                  <li className="text-amber-300">Gesture energy: Median (placeholder)</li>
-                </ul>
-                <p className="text-xs text-gray-400 mt-3">We’ll replace these with anonymized population stats once available.</p>
-              </div>
-            </motion.div>
-          )}
+
+
+
+
+                
+
 
           {/* Action Buttons */}
           <motion.div
@@ -458,17 +410,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
         >
           <div className="bg-dark-800/30 rounded-2xl p-2 border border-dark-700/50">
             <div className="flex gap-2">
-              <button
-                onClick={() => setResultsTab('multimodal')}
-                className={`flex-1 px-4 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm ${
-                  resultsTab === 'multimodal'
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
-                    : 'bg-dark-700/50 text-gray-300 hover:bg-dark-700'
-                }`}
-              >
-                <Brain className="w-4 h-4" />
-                Multimodal Presence
-              </button>
+
               <button
                 onClick={() => setResultsTab('analytics')}
                 className={`flex-1 px-4 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm ${
@@ -496,9 +438,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
         </motion.div>
 
         {/* Tab Content */}
-        {resultsTab === 'multimodal' && (
-          <MultimodalPresenceAnalysis sessionData={safeSessionData} />
-        )}
+
 
         {resultsTab === 'analytics' && (
           <div className="space-y-8">

@@ -2,6 +2,7 @@
 // Focused on high-quality voice metrics for college interview feedback
 
 import { analyzeVerbalResponse } from './verbalFeedback';
+import Sentiment from 'sentiment';
 export interface VoiceMetrics {
   speechRate: number;        // Words per minute
   fluencyScore: number;      // 0-100 score based on flow and smoothness
@@ -28,6 +29,7 @@ export interface VoiceMetrics {
   sentimentPaceBalance?: number; // 0-100 balance of sentiment and pace
   timestamp: number;         // When this analysis was taken
   duration: number;          // Duration of the analyzed segment
+  sentimentScore: number; // Normalized sentiment score from -1 (negative) to 1 (positive)
 }
 
 export interface VoiceTimelinePoint {
@@ -153,20 +155,24 @@ export class AdvancedSpeechAnalyzer {
     
     // Advanced energy analysis
     const energyAnalysis = this.analyzeAdvancedEnergy(audioFeatures.energy);
-    
-    return {
-      speechRate,
-      fluencyScore,
-      voiceConfidence,
-      deliveryScore,
-      clarityScore,
-      fillerWordCount,
-      pauseAnalysis: speechPatterns.pauseAnalysis,
-      pitchAnalysis,
-      energyAnalysis,
-      timestamp,
-      duration
-    };
+const sentimentAnalyzer = new Sentiment();
+const sentimentResult = sentimentAnalyzer.analyze(transcription);
+const sentimentScore = Math.max(-1, Math.min(1, sentimentResult.comparative));
+
+return {
+  speechRate,
+  fluencyScore,
+  voiceConfidence,
+  deliveryScore,
+  clarityScore,
+  fillerWordCount,
+  pauseAnalysis: speechPatterns.pauseAnalysis,
+  pitchAnalysis,
+  energyAnalysis,
+  timestamp,
+  duration,
+  sentimentScore
+};
   }
 
   // Extract advanced audio features from real audio data
@@ -688,6 +694,9 @@ export class AdvancedSpeechAnalyzer {
       
       // Advanced energy analysis
       const energyAnalysis = this.analyzeEnergy(audioAnalysis.energy);
+const sentimentAnalyzer = new Sentiment();
+const sentimentResult = sentimentAnalyzer.analyze(transcription);
+const sentimentScore = Math.max(-1, Math.min(1, sentimentResult.comparative));
       
       return {
         speechRate,
@@ -700,7 +709,8 @@ export class AdvancedSpeechAnalyzer {
         pitchAnalysis,
         energyAnalysis,
         timestamp,
-        duration
+        duration,
+        sentimentScore
       };
     } catch (error) {
       console.error('Error analyzing voice metrics:', error);
@@ -760,7 +770,10 @@ export class AdvancedSpeechAnalyzer {
       80 + (avgSentenceLength > 5 && avgSentenceLength < 20 ? 15 : -10) - (fillerRatio * 30)
     ));
     
-    return {
+    const sentimentAnalyzer = new Sentiment();
+const sentimentResult = sentimentAnalyzer.analyze(transcription);
+const sentimentScore = Math.max(-1, Math.min(1, sentimentResult.comparative));
+return {
       speechRate,
       fluencyScore,
       voiceConfidence,
@@ -783,7 +796,8 @@ export class AdvancedSpeechAnalyzer {
         dynamicRange: 0.4
       },
       timestamp,
-      duration
+      duration,
+      sentimentScore
     };
   }
 
@@ -1174,7 +1188,8 @@ return {
         dynamicRange: 0
       },
       timestamp: Date.now(),
-      duration: 0
+      duration: 0,
+      sentimentScore: 0
     };
   }
 

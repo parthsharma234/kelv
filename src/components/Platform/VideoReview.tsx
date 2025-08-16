@@ -12,7 +12,7 @@ interface VideoReviewProps {
 
 // Enhanced overlay types
 type OverlayMode = 'split' | 'overlay';
-type Layer = 'faceBox' | 'idealZone' | 'center' | 'motion' | 'labels' | 'pose' | 'emotions' | 'landmarks';
+type Layer = 'faceBox' | 'idealZone' | 'center' | 'motion' | 'pose' | 'emotions' | 'landmarks';
 
 const VideoReview: React.FC<VideoReviewProps> = ({ src, timeline, defaultMode = 'split', defaultShowOverlay = false, externalSeekSec }) => {
   const rawRef = useRef<HTMLVideoElement>(null);
@@ -26,7 +26,6 @@ const VideoReview: React.FC<VideoReviewProps> = ({ src, timeline, defaultMode = 
     idealZone: false,
     center: false,
     motion: true,
-    labels: false,
     pose: true,
     emotions: true,
     landmarks: true,
@@ -85,7 +84,7 @@ const VideoReview: React.FC<VideoReviewProps> = ({ src, timeline, defaultMode = 
     const video = mode === 'split' ? annotatedRef.current : rawRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     let raf: number;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let detector: any = null;
@@ -257,62 +256,7 @@ const VideoReview: React.FC<VideoReviewProps> = ({ src, timeline, defaultMode = 
           }
           prevCenterRef.current = center;
         }
-        if (layers.labels) {
-          const faceRatio = faceBox ? (faceBox.width * faceBox.height) / (canvas.width * canvas.height) : 0;
-          const idealRatio = 0.10;
-          const distX = center ? Math.abs(center.x - canvas.width / 2) / (canvas.width / 2) : 0;
-          const distY = center ? Math.abs(center.y - canvas.height / 2) / (canvas.height / 2) : 0;
-          const eyeContact = Math.max(0, 1 - (distX + distY) / 2);
-          const distanceScore = Math.max(0, 1 - Math.abs(faceRatio - idealRatio) / idealRatio);
-          ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(10, 10, 380, 120);
-          ctx.fillStyle = '#fff';
-          ctx.font = '12px monospace';
-          ctx.fillText(`Eye Contact≈ ${(eyeContact * 100).toFixed(0)}%`, 18, 28);
-          ctx.fillText(`Framing≈ ${(Math.max(0, 1 - Math.max(distX, distY)) * 100).toFixed(0)}%`, 18, 44);
-          ctx.fillText(`Distance≈ ${(distanceScore * 100).toFixed(0)}%`, 18, 60);
-          if (layers.emotions && latestEmotionRef.current) {
-            ctx.fillText(`Emotion: ${latestEmotionRef.current.label} (${Math.round(latestEmotionRef.current.confidence * 100)}%)`, 18, 76);
-          }
-          // timeline-driven debug overlay
-          if (timeline && timelineStart !== null) {
-            const absTime = timelineStart + video.currentTime * 1000;
-            let nearest: CameraTimelinePoint | null = null;
-            let best = Infinity;
-            for (const p of timeline) {
-              const d = Math.abs(p.timestamp - absTime);
-              if (d < best) { best = d; nearest = p; }
-            }
-            if (nearest && best <= 3000) {
-              ctx.fillText(`Off-Frame ${(Math.round((nearest.cameraPresence.offFrame || 0) * 100))}%`, 18, 76);
-              if (nearest.triggers && nearest.triggers.length) {
-                ctx.fillText(`Flags: ${nearest.triggers.slice(0,2).join(' | ')}`, 18, 92);
-              }
-              const dbg = nearest.cameraPresence.debug;
-              if (dbg?.faceBox) {
-                ctx.strokeStyle = 'rgba(250,204,21,0.9)';
-                ctx.lineWidth = 1.5;
-                ctx.strokeRect(dbg.faceBox.x, dbg.faceBox.y, dbg.faceBox.width, dbg.faceBox.height);
-              }
-              // New head pose and gaze labels from temporal summary if available
-              const temporal = (nearest as any).temporal as any;
-              if (temporal) {
-                const yawStd = temporal.headPoseStabilityStd?.yaw;
-                const gazePct = temporal.gazeOnCameraPercent;
-                if (typeof yawStd === 'number') {
-                  ctx.fillText(`Head Pose Std (yaw): ${yawStd.toFixed(1)}°`, 18, 108);
-                }
-                if (typeof gazePct === 'number') {
-                  ctx.fillText(`Gaze On-Cam: ${(gazePct * 100).toFixed(0)}%`, 18, 124);
-                }
-                if (temporal.changePoints && temporal.changePoints.length) {
-                  const cp = temporal.changePoints[0];
-                  ctx.fillText(`Change: ${cp.signal} Δ${cp.magnitude.toFixed(1)}`, 18, 140);
-                }
-              }
-            }
-          }
-        }
+        // Labels layer removed as requested - no text overlays on video
         };
 
         // Enhanced face mesh landmarks with detailed feature mapping and animations
@@ -585,9 +529,7 @@ const VideoReview: React.FC<VideoReviewProps> = ({ src, timeline, defaultMode = 
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={layers.motion} onChange={e => setLayers(v => ({ ...v, motion: e.target.checked }))} /> Motion
           </label>
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={layers.labels} onChange={e => setLayers(v => ({ ...v, labels: e.target.checked }))} /> Labels
-          </label>
+
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={layers.landmarks} onChange={e => setLayers(v => ({ ...v, landmarks: e.target.checked }))} /> Landmarks
           </label>

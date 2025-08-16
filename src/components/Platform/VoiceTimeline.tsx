@@ -99,11 +99,11 @@ const VoiceTimeline: React.FC<VoiceTimelineProps> = ({ voiceTimeline }) => {
                   Voice Metrics Timeline
                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
                 </h3>
-                <p className="text-sm text-gray-400 flex items-center gap-2">
+                <div className="text-sm text-gray-400 flex items-center gap-2">
                   <span>Neural voice analysis</span>
                   <div className="w-1 h-1 bg-gray-500 rounded-full"></div>
                   <span>Real-time processing</span>
-                </p>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">

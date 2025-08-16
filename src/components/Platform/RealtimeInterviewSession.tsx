@@ -168,17 +168,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<unknown>(null); // Store final session data after completion
   const [analysisTimeline, setAnalysisTimeline] = useState<CameraTimelinePoint[]>([]);
-  const [showNudge, setShowNudge] = useState(false);
-  const nudgeTimeoutRef = useRef<number | null>(null);
-
-  const [realTimeNudgesEnabled, setRealTimeNudgesEnabled] = useState(false);
   const [currentPresenceIndex, setCurrentPresenceIndex] = useState<PresenceIndexResult | null>(null);
   const presenceIndexHistoryRef = useRef<PresenceIndexResult[]>([]);
-
-  // Initialize nudges preference from setup
-  useEffect(() => {
-    setRealTimeNudgesEnabled(!!setup.showCues);
-  }, [setup.showCues]);
 
   const metricThresholds = { eyeContact: 0.4, lighting: 0.4 };
   const lowStartTimes = useRef<{ [key: string]: number | null }>({ eyeContact: null, lighting: null });
@@ -270,22 +261,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       const baseSophisticated: Record<string, unknown> =
         ((data as Record<string, unknown>) as any)?.sophisticatedAnalytics || {};
 
-      // Optional: compute fused scores for interview-specific metrics
-      let fusion: any = undefined;
-      try {
-        const { fuseVoiceAndVision } = await import('../../utils/multimodal');
-        const vm = (data as any)?.voice_metrics_summary || (data as any)?.speechMetrics?.[0]?.metrics || null;
-        const vis = {
-          eyeContact: cameraPresence?.eyeContact,
-          distance: cameraPresence?.distance,
-          blinkRate: cameraPresence?.blinkRate,
-          facialExpressiveness: cameraPresence?.facialExpressiveness,
-          gesturesMagnitude: lastExtendedVisionRef.current?.gesturesMagnitude,
-          posture: lastExtendedVisionRef.current?.posture || null,
-          temporal: { gazeOnCameraPercent: lastTemporalSummaryRef.current?.gazeOnCameraPercent }
-        };
-        fusion = fuseVoiceAndVision(vm, vis);
-      } catch {}
+
 
       const presenceIndexSummary = currentPresenceIndex ? getPresenceIndexSummary(currentPresenceIndex) : undefined;
       const presenceIndexHistory = presenceIndexHistoryRef.current.length ? presenceIndexHistoryRef.current : undefined;
@@ -304,7 +280,6 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           posture,
           analysisTimeline,
           recordingUrl,
-          fusion,
           presenceIndex: currentPresenceIndex || null,
           presenceIndexSummary,
           presenceIndexHistory,
@@ -394,7 +369,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   useEffect(() => {
     const createWorker = () => {
       try {
-        const worker = new Worker(new URL('../../workers/cameraWorker.ts', import.meta.url), { type: 'module' });
+        const worker = new Worker(new URL('../../workers/cameraWorker.ts', import.meta.url));
         // Flag to let main thread utils know worker is active
         try { (window as any).__kelv_worker_cv_active__ = true; } catch { /* ignore */ }
         // Proactively init worker MediaPipe to avoid race during first analyze
@@ -578,22 +553,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           presenceIndexHistoryRef.current = [...presenceIndexHistoryRef.current.slice(-49), pi];
         } catch { /* ignore */ }
 
-        // Real-time encouragement nudge while the user is speaking and posture/metrics dip
-        try {
-            if (realTimeNudgesEnabled && state.isUserSpeaking) {
-                const slouch = (posture?.confidence ?? 1) < 0.6;
-                const unstable = (updatedPresence.headPositionStability ?? 1) < 0.45;
-                const leaning = (updatedPresence.distance ?? 1) < 0.45;
-                const cueDelayMs = (setup.nudgeThreshold ?? 60) * 1000;
-                const now = Date.now();
-                const metricsLowLongEnough = Object.entries(lowStartTimes.current).some(([_, start]) => start && now - start >= cueDelayMs);
-                if (slouch || unstable || leaning || metricsLowLongEnough) {
-                    setShowNudge(true);
-                    if (nudgeTimeoutRef.current) window.clearTimeout(nudgeTimeoutRef.current);
-                    nudgeTimeoutRef.current = window.setTimeout(() => setShowNudge(false), 1600) as unknown as number;
-                }
-            }
-        } catch { /* ignore */ }
+
         // Save faceBox for next worker frame scaling
         try {
           const dbg = cameraPresence.debug as any;
@@ -606,7 +566,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
       }
     }, 1500);
     return () => clearInterval(interval);
-  }, [analyzeCameraPresence, analyzePosture, stream, realTimeNudgesEnabled, setup.nudgeThreshold]);
+  }, [analyzeCameraPresence, analyzePosture, stream]);
 
   // Handle microphone toggle
   const toggleMute = () => {
@@ -791,34 +751,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
                   </ul>
                 </div>
 
-                {/* AI Coaching Nudges - Compact Toggle */}
-                <div className="mt-6">
-                  <div className="bg-dark-800/50 rounded-xl p-4 border border-dark-700">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-md">
-                          <Brain className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-white font-semibold">AI Coaching Nudges</h3>
-                          <p className="text-gray-400 text-sm">Real-time guidance on presence.</p>
-                        </div>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={realTimeNudgesEnabled}
-                          onChange={(e) => {
-                            setRealTimeNudgesEnabled(e.target.checked);
-                            setup.showCues = e.target.checked;
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-500/30 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
+
 
                 {/* Start button */}
                 <button
@@ -978,50 +911,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
                 </div>
               </div>
             )}
-            {showNudge && (
-              <div className="pointer-events-none absolute inset-0 rounded-xl">
-                {/* High-tech nudge overlay with multiple visual layers */}
-                <div className="absolute inset-0 rounded-xl overflow-hidden">
-                  {/* Outer glow ring */}
-                  <div className="absolute inset-0 rounded-xl animate-pulse" 
-                       style={{ 
-                         boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.6), 0 0 0 6px rgba(34, 197, 94, 0.4), 0 0 30px 8px rgba(59, 130, 246, 0.3)' 
-                       }} />
-                  
-                  {/* Scanning line effect */}
-                  <div className="absolute inset-0 rounded-xl overflow-hidden">
-                    <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80 animate-pulse"
-                         style={{
-                           top: '20%',
-                           animation: 'scan 2s ease-in-out infinite'
-                         }} />
-                  </div>
-                  
-                  {/* Corner indicators */}
-                  <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-blue-400 animate-pulse" />
-                  <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-blue-400 animate-pulse" />
-                  <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-green-400 animate-pulse" />
-                  <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-green-400 animate-pulse" />
-                  
-                  {/* Central coaching indicator */}
-                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg animate-bounce">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                      <span>AI COACHING</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Add custom CSS for scanning animation */}
-                <style>{`
-                  @keyframes scan {
-                    0% { top: 10%; opacity: 0; }
-                    50% { opacity: 1; }
-                    100% { top: 90%; opacity: 0; }
-                  }
-                `}</style>
-              </div>
-            )}
+
           </div>
 
           {/* Voice mode recording indicator - bottom center */}

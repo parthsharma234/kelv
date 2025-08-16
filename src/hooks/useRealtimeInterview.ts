@@ -117,6 +117,37 @@ export function useRealtimeInterview({
     stateRef.current = state;
   }, [state]);
 
+  // Add timing-based session updates
+  const sendTimingUpdate = useCallback((phase: string, duration: number, context?: string) => {
+    if (clientRef.current) {
+      const timingInstruction = `[TIMING UPDATE]: You are now in the ${phase.toUpperCase()} phase (${duration.toFixed(1)} minutes elapsed). ${context || ''}`;
+      clientRef.current.sendUserMessage(timingInstruction);
+    }
+  }, []);
+
+  // Phase management based on timing
+  const manageInterviewPhases = useCallback((duration: number) => {
+    const minutes = duration / 60;
+    
+    if (minutes >= 2.5 && minutes < 3 && smallTalkNeededRef.current) {
+      // Transition from small talk to interview
+      smallTalkNeededRef.current = false;
+      sendTimingUpdate('INTERVIEW_START', minutes, 'Time to transition from small talk to the main interview. Begin with a natural opener about their background or motivation.');
+    } else if (minutes >= 6 && minutes < 6.5) {
+      // Suggest moving to situational questions
+      sendTimingUpdate('SITUATIONAL_PHASE', minutes, 'Consider transitioning to situational or scenario-based questions if you haven\'t already.');
+    } else if (minutes >= 12 && minutes < 12.5) {
+      // Suggest technical/analytical questions
+      sendTimingUpdate('TECHNICAL_PHASE', minutes, 'Time to focus on technical and analytical capabilities if not covered yet.');
+    } else if (minutes >= 17 && minutes < 17.5) {
+      // Start wrapping up
+      sendTimingUpdate('WRAP_UP_PHASE', minutes, 'Begin thinking about wrapping up the interview. Ask any final important questions and prepare for closure.');
+    } else if (minutes >= 20) {
+      // Force wrap up
+      sendTimingUpdate('CLOSING_PHASE', minutes, 'Interview should be concluding now. Thank the candidate and provide closure.');
+    }
+  }, [sendTimingUpdate]);
+
   // Generate adaptive system prompt
   const generateAdaptiveInstructions = useCallback((
     questionCount: number = 1,
@@ -124,6 +155,12 @@ export function useRealtimeInterview({
     recentScores: number[] = [],
     overallPerformance: number = 5
   ) => {
+    const minutes = duration / 60;
+    const currentPhase = minutes < 3 ? 'SMALL_TALK' : 
+                       minutes < 8 ? 'BACKGROUND_BEHAVIORAL' :
+                       minutes < 15 ? 'SITUATIONAL_TECHNICAL' :
+                       minutes < 18 ? 'ROLE_FIT' : 'WRAP_UP';
+    
     const options: AdaptivePromptOptions = {
       setup,
       recentScores,
@@ -136,8 +173,33 @@ export function useRealtimeInterview({
       categoryCounts: categoryCountsRef.current,
       categoryStruggles: categoryStruggleCountsRef.current
     };
-    return buildAdaptiveSystemPrompt(options);
+    
+    const basePrompt = buildAdaptiveSystemPrompt(options);
+    
+    // Add phase-specific context
+    const phaseContext = `\n\n[CURRENT PHASE]: ${currentPhase} (${minutes.toFixed(1)} minutes elapsed)\n` +
+      `[PHASE GUIDANCE]: ${getPhaseGuidance(currentPhase, minutes, overallPerformance)}`;
+    
+    return basePrompt + phaseContext;
   }, [setup, maxDuration]);
+  
+  // Helper function for phase-specific guidance
+  const getPhaseGuidance = useCallback((phase: string, minutes: number, performance: number) => {
+    switch (phase) {
+      case 'SMALL_TALK':
+        return 'Focus on building rapport and natural conversation. Ask genuine follow-up questions based on their responses.';
+      case 'BACKGROUND_BEHAVIORAL':
+        return 'Transition to understanding their background and behavioral examples. Ask about their journey and specific experiences.';
+      case 'SITUATIONAL_TECHNICAL':
+        return 'Present realistic scenarios and probe for technical/analytical thinking. Focus on methodology and problem-solving approach.';
+      case 'ROLE_FIT':
+        return 'Explore how they would approach this specific role and deliver value. Focus on their vision and practical application.';
+      case 'WRAP_UP':
+        return 'Begin concluding the interview. Ask any final important questions and prepare for closure.';
+      default:
+        return 'Continue with natural interview flow.';
+    }
+  }, []);
 
   // Update the AI's behavior based on candidate performance
   const updateInterviewerBehavior = useCallback((
@@ -449,7 +511,9 @@ Take 2-3 minutes for this natural conversation. Let it flow organically. When it
 
 ${bridgeInstruction}
 
-Remember: Be genuinely human, not scripted. Listen actively and respond like a real person having a real conversation would.`;
+Remember: Be genuinely human, not scripted. Listen actively and respond like a real person having a real conversation would.
+
+[TIMING CONTEXT]: You are in the SMALL TALK phase (0-3 minutes). Focus on building rapport and natural conversation. The system will automatically guide you to transition to interview questions after 2-3 minutes of genuine conversation.`;
             
             clientRef.current?.createResponse(veryHumanSmallTalkInstruction);
 
@@ -596,9 +660,13 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     
     const startTime = Date.now();
     timerRef.current = setInterval(() => {
-      setDuration(Math.floor((Date.now() - startTime) / 1000));
+      const currentDuration = Math.floor((Date.now() - startTime) / 1000);
+      setDuration(currentDuration);
+      
+      // Manage interview phases based on timing
+      manageInterviewPhases(currentDuration);
     }, 1000);
-  }, [setDuration]);
+  }, [setDuration, manageInterviewPhases]);
 
   // Stop timer
   const stopTimer = useCallback(() => {

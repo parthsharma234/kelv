@@ -1,6 +1,8 @@
 import type { CameraPresence, PostureScore } from '../types/analytics';
 import { FaceDetection } from '@mediapipe/face_detection';
 import { Pose } from '@mediapipe/pose';
+import * as faceapi from 'face-api.js';
+import * as poseDetection from '@tensorflow-models/pose-detection';
 
 // Lightweight Kalman filter for smoothing noisy metrics
 class KalmanFilter {
@@ -35,7 +37,7 @@ let cameraWorker: Worker | null = null;
 
 function initWorker() {
   if (!cameraWorker) {
-    cameraWorker = new Worker(new URL('../workers/cameraWorker.ts', import.meta.url));
+    cameraWorker = new Worker(new URL('../workers/cameraWorker.ts', import.meta.url), { type: 'module' });
     cameraWorker.postMessage({ type: 'init' });
   }
 }
@@ -78,7 +80,7 @@ const gestureKF = new KalmanFilter();
  */
 export async function analyzeCameraPresence(video: HTMLVideoElement): Promise<CameraPresence> {
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   canvas.width = video.videoWidth || 640;
   canvas.height = video.videoHeight || 480;
   ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -244,7 +246,7 @@ export async function analyzePosture(video: HTMLVideoElement): Promise<PostureSc
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth || 640;
         canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const detector = new (window as any).FaceDetector();
@@ -272,4 +274,7 @@ export async function analyzePosture(video: HTMLVideoElement): Promise<PostureSc
     suggestions: ['Ensure your face is visible and centered in the frame.']
   };
 }
+
+
+// Remove duplicated import * as faceapi from 'face-api.js';
 

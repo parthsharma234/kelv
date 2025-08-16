@@ -33,8 +33,6 @@ export interface InterviewSetup {
   jobType: string;
   experienceLevel: string;
   interviewMode: 'voice' | 'text';
-  showCues?: boolean;
-  nudgeThreshold?: number; // seconds before showing cues
 }
 
 // Deprecated: kept for backward compatibility
