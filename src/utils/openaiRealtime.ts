@@ -1,4 +1,4 @@
-import { buildSystemPrompt, PromptTemplateOptions } from './promptTemplates';
+// Prompts are provided as static strings; no builder functions are used.
 // @ts-nocheck
 // Custom EventEmitter for browser compatibility
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -101,22 +101,13 @@ export class OpenAIRealtimeClient extends EventEmitter {
       this.stream = mediaStream;
     }
     
-    // If instructions is not set, use a default system prompt
-    let instructions = config.instructions;
-    if (!instructions) {
-      const startTime = Date.now();
-      const options: PromptTemplateOptions = {
-        tone: 'warm',
-        pacing: 'normal',
-        depth: 'moderate',
-        type: 'default',
-        responseStyle: 'elaborate',
-        context: { interviewStart: startTime }
-      };
-      instructions = buildSystemPrompt(options);
-    }
+    // If instructions are not provided, fall back to a fully structured static prompt
+    const instructions = config.instructions || (() => {
+      console.warn('OpenAIRealtimeClient: using fallback prompt');
+      return `# Role & Objective\nYou are an AI interviewer ensuring a fair, efficient conversation.\n\n# Personality & Tone\n- Warm but professional\n- Speak English only\n- Maintain a natural pace\n- Vary phrasing to avoid repetition\n\n# Context\nGeneric interview when a role-specific prompt is missing.\n\n# Reference Pronunciations\n- Pronounce "SQL" as "sequel"\n- Pronounce "Kubernetes" as "koo-ber-net-eez"\n\n# Tools\nNone\n\n# Instructions / Rules\n- Ask one question at a time.\n- Briefly acknowledge answers.\n- If audio is unclear, ask for clarification.\n- Evaluate responses for accuracy, reasoning, and communication.\n\n# Conversation Flow\ngreeting -> open <-> follow_up -> closing\n\n# Time Context\n- Early minutes: broad questions.\n- Mid interview: probe deeper.\n- Final 2 minutes: wrap up and transition to closing.\n\n# Safety & Escalation\nTriggers: harassment, repeated failures, user request. When triggered say "Ending our session now." and call finish_session.`;
+    })();
     this.sessionConfig = {
-      model: 'gpt-4o-realtime-preview-2025-06-03',
+      model: 'gpt-realtime',
       voice: 'alloy',
       instructions,
       modalities: ['text', 'audio'],
@@ -173,7 +164,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
       this.ws = new WebSocket(url, [
         'realtime',
         `openai-insecure-api-key.${this._apiKey}`,
-        'openai-beta.realtime-v1'
+        'openai-realtime-v1'
       ]);
 
       // Set up event handlers

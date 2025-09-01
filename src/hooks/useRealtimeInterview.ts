@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
-import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt } from '../utils/promptTemplates';
+import { conversationFlow, ConversationStateName } from '../utils/conversationFlow';
 import { InterviewSetup } from '../types/interview';
 import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
@@ -8,7 +8,9 @@ import { useInterviewState } from './useInterviewState';
 import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
-// import { getQuestions } from '../utils/questionBank';
+import masterPrompt from "../masterprompt/masterPrompt";
+import { detectFocusAndSeniority } from '../utils/specialization';
+import { SessionLogger } from '../utils/sessionLogger';
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetrics {
@@ -39,6 +41,11 @@ const classifyQuestionCategory = (text: string): string => {
   return 'general';
 };
 
+const getElapsedMinutes = (start: Date | null): number => {
+  if (!start) return 0;
+  return Math.floor((Date.now() - start.getTime()) / 60000);
+};
+
 interface UseRealtimeInterviewOptions {
   setup: InterviewSetup;
   interviewType?: string;
@@ -46,6 +53,8 @@ interface UseRealtimeInterviewOptions {
   mediaStream?: MediaStream | null; // Allow null values
   onComplete?: (sessionData: any) => void;
   onError?: (error: string) => void;
+  onEscalation?: (reason: string) => void;
+  experienceLevel?: 'beginner' | 'intermediate' | 'advanced';
 }
 
 // Get interview duration based on type
@@ -66,10 +75,12 @@ export function useRealtimeInterview({
   focusedType,
   mediaStream,
   onComplete,
-  onError
+  onError,
+  onEscalation,
+  experienceLevel
 }: UseRealtimeInterviewOptions) {
   const maxDuration = getInterviewDuration(interviewType); // Get duration in minutes
-  
+
   const {
     state,
     setStatus,
@@ -79,18 +90,16 @@ export function useRealtimeInterview({
     setRecording,
     setSpeakerStatus,
     processTranscriptChunk,
-    handleAssistantResponse,
+    handleAssistantResponse: baseHandleAssistantResponse,
     handleUserTranscript,
   } = useInterviewState();
 
   const clientRef = useRef<OpenAIRealtimeClient | null>(null);
   const stateRef = useRef(state);
   // A/B testing flag for prompt strategy (A = current adaptive prompt, B = softer/gentle variant)
-  const promptVariantRef = useRef<'A' | 'B'>('B');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<Date | null>(null);
-  const performanceScoresRef = useRef<number[]>([]);
-  const candidateResponsesRef = useRef<string[]>([]);
+  const experienceRef = useRef(experienceLevel || setup.experienceLevel);
   const speechMetricsRef = useRef<SpeechMetricEntry[]>([]);
   const currentQuestionRef = useRef<string>('');
   const currentQuestionCategoryRef = useRef<string>('general');
@@ -111,182 +120,120 @@ export function useRealtimeInterview({
   }>>([]);
   // Add a ref to collect transcript chunks for the current user response
   const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
+  const currentStateRef = useRef<ConversationStateName>('greeting');
+  const previousStateRef = useRef<ConversationStateName | null>(null);
+  const questionsInStateRef = useRef<number>(0);
+  const stateStartRef = useRef<number>(Date.now());
+  const previousStateStartRef = useRef<number>(0);
+  const currentPromptRef = useRef<string>('');
+  const loggerRef = useRef(new SessionLogger());
+  const focusRef = useRef<string>('general_systems');
+  const seniorityRef = useRef<'junior'|'mid'|'senior'>('mid');
+  const initialResponsesRef = useRef<string[]>([]);
+  const focusDeterminedRef = useRef<boolean>(false);
+  const questionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const QUESTION_TIME_LIMIT = 2; // minutes
+
+  const transitionState = useCallback((next?: ConversationStateName) => {
+    if (!next || !clientRef.current) return;
+    currentStateRef.current = next;
+    questionsInStateRef.current = 0;
+    stateStartRef.current = Date.now();
+    const cfg = conversationFlow[next];
+    currentPromptRef.current = cfg.instructions;
+    const elapsed = getElapsedMinutes(startTimeRef.current);
+    const exp = experienceRef.current;
+    const focus = focusRef.current;
+    const seniority = seniorityRef.current;
+    clientRef.current.sendEvent('session.update', {
+      session: { instructions: `${cfg.instructions}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m] [Focus: ${focus}] [Seniority: ${seniority}]` }
+    });
+  }, []);
+
+  const triggerEscalation = useCallback((reason: string) => {
+    if (clientRef.current) {
+      clientRef.current.createResponse('Ending our session now.');
+      clientRef.current.sendEvent('session.update', {
+        session: { instructions: 'finish_session' }
+      });
+    }
+    if (onEscalation) onEscalation(reason);
+  }, [onEscalation]);
+
+  const requestFollowUp = useCallback((text: string) => {
+    const state = conversationFlow[currentStateRef.current];
+    if (!state.onFollowUp || !clientRef.current) return;
+    previousStateRef.current = currentStateRef.current;
+    previousStateStartRef.current = stateStartRef.current;
+    clientRef.current.createResponse(text);
+    transitionState(state.onFollowUp);
+  }, [transitionState]);
+
+  const checkEscalation = useCallback((text: string) => {
+    const lower = text.toLowerCase();
+    if (/harass|abuse|threat/.test(lower)) {
+      triggerEscalation('harassment');
+    } else if (/human|escalate|supervisor/.test(lower)) {
+      triggerEscalation('user_request');
+    }
+  }, [triggerEscalation]);
+
+  const handleAssistantResponseWithFlow = useCallback((text: string, isFinal: boolean) => {
+    baseHandleAssistantResponse(text, isFinal);
+    if (isFinal && text.includes('I do not provide feedback, hints, or solutions')) {
+      loggerRef.current.log({ timestamp: Date.now(), type: 'refusal', text });
+    }
+    if (isFinal) {
+      questionsInStateRef.current += 1;
+      const state = conversationFlow[currentStateRef.current];
+      if (state.exitCriteria.questions && questionsInStateRef.current >= state.exitCriteria.questions) {
+        if (currentStateRef.current === 'follow_up' && previousStateRef.current) {
+          const prev = previousStateRef.current;
+          previousStateRef.current = null;
+          currentStateRef.current = prev;
+          stateStartRef.current = previousStateStartRef.current;
+          const cfg = conversationFlow[prev];
+          currentPromptRef.current = cfg.instructions;
+          const elapsed = getElapsedMinutes(startTimeRef.current);
+          const exp = experienceRef.current;
+          clientRef.current?.sendEvent('session.update', { session: { instructions: `${cfg.instructions}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m]` } });
+        } else {
+          transitionState(state.next);
+        }
+      } else if (currentStateRef.current === 'closing') {
+        endInterviewRef.current?.();
+      }
+    }
+  }, [baseHandleAssistantResponse, transitionState]);
 
   // Keep a ref to the latest state for event listener closures
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  // Add timing-based session updates
-  const sendTimingUpdate = useCallback((phase: string, duration: number, context?: string) => {
-    if (clientRef.current) {
-      const timingInstruction = `[TIMING UPDATE]: You are now in the ${phase.toUpperCase()} phase (${duration.toFixed(1)} minutes elapsed). ${context || ''}`;
-      clientRef.current.sendUserMessage(timingInstruction);
-    }
-  }, []);
-
   // Phase management based on timing
   const manageInterviewPhases = useCallback((duration: number) => {
     const minutes = duration / 60;
-    
-    if (minutes >= 2.5 && minutes < 3 && smallTalkNeededRef.current) {
-      // Transition from small talk to interview
-      smallTalkNeededRef.current = false;
-      sendTimingUpdate('INTERVIEW_START', minutes, 'Time to transition from small talk to the main interview. Begin with a natural opener about their background or motivation.');
-    } else if (minutes >= 6 && minutes < 6.5) {
-      // Suggest moving to situational questions
-      sendTimingUpdate('SITUATIONAL_PHASE', minutes, 'Consider transitioning to situational or scenario-based questions if you haven\'t already.');
-    } else if (minutes >= 12 && minutes < 12.5) {
-      // Suggest technical/analytical questions
-      sendTimingUpdate('TECHNICAL_PHASE', minutes, 'Time to focus on technical and analytical capabilities if not covered yet.');
-    } else if (minutes >= 17 && minutes < 17.5) {
-      // Start wrapping up
-      sendTimingUpdate('WRAP_UP_PHASE', minutes, 'Begin thinking about wrapping up the interview. Ask any final important questions and prepare for closure.');
-    } else if (minutes >= 20) {
-      // Force wrap up
-      sendTimingUpdate('CLOSING_PHASE', minutes, 'Interview should be concluding now. Thank the candidate and provide closure.');
+    if (minutes >= maxDuration) {
+      if (clientRef.current) {
+        clientRef.current.createResponse('That concludes the interviewer-only session. Thank you.');
+        clientRef.current.sendEvent('session.update', { session: { instructions: 'finish_session' } });
+      }
+      endInterviewRef.current?.();
+      return;
     }
-  }, [sendTimingUpdate]);
+    const state = conversationFlow[currentStateRef.current];
+    if (state.exitCriteria.time) {
+      const elapsed = (Date.now() - stateStartRef.current) / 60000;
+      if (elapsed >= state.exitCriteria.time) {
+        const next = state.onTimeout || state.next;
+        transitionState(next);
+      }
+    }
+  }, [maxDuration, transitionState]);
 
   // Generate adaptive system prompt
-  const generateAdaptiveInstructions = useCallback((
-    questionCount: number = 1,
-    duration: number = 0,
-    recentScores: number[] = [],
-    overallPerformance: number = 5
-  ) => {
-    const minutes = duration / 60;
-    const currentPhase = minutes < 3 ? 'SMALL_TALK' : 
-                       minutes < 8 ? 'BACKGROUND_BEHAVIORAL' :
-                       minutes < 15 ? 'SITUATIONAL_TECHNICAL' :
-                       minutes < 18 ? 'ROLE_FIT' : 'WRAP_UP';
-    
-    const options: AdaptivePromptOptions = {
-      setup,
-      recentScores,
-      overallPerformance,
-      interviewDuration: duration,
-      questionCount,
-      shouldWrapUp:
-        duration >= maxDuration ||
-        (duration >= maxDuration * 0.8 && overallPerformance <= 4),
-      categoryCounts: categoryCountsRef.current,
-      categoryStruggles: categoryStruggleCountsRef.current
-    };
-    
-    const basePrompt = buildAdaptiveSystemPrompt(options);
-    
-    // Add phase-specific context
-    const phaseContext = `\n\n[CURRENT PHASE]: ${currentPhase} (${minutes.toFixed(1)} minutes elapsed)\n` +
-      `[PHASE GUIDANCE]: ${getPhaseGuidance(currentPhase, minutes, overallPerformance)}`;
-    
-    return basePrompt + phaseContext;
-  }, [setup, maxDuration]);
-  
-  // Helper function for phase-specific guidance
-  const getPhaseGuidance = useCallback((phase: string, minutes: number, performance: number) => {
-    switch (phase) {
-      case 'SMALL_TALK':
-        return 'Focus on building rapport and natural conversation. Ask genuine follow-up questions based on their responses.';
-      case 'BACKGROUND_BEHAVIORAL':
-        return 'Transition to understanding their background and behavioral examples. Ask about their journey and specific experiences.';
-      case 'SITUATIONAL_TECHNICAL':
-        return 'Present realistic scenarios and probe for technical/analytical thinking. Focus on methodology and problem-solving approach.';
-      case 'ROLE_FIT':
-        return 'Explore how they would approach this specific role and deliver value. Focus on their vision and practical application.';
-      case 'WRAP_UP':
-        return 'Begin concluding the interview. Ask any final important questions and prepare for closure.';
-      default:
-        return 'Continue with natural interview flow.';
-    }
-  }, []);
-
-  // Update the AI's behavior based on candidate performance
-  const updateInterviewerBehavior = useCallback((
-    candidateResponse: string,
-    estimatedScore: number = 5,
-    questionCategory: string = 'general'
-  ) => {
-    // Enforce stricter policy across the interview: require at least two substantive user turns between major topic shifts
-    try {
-      const t = candidateResponse.trim().toLowerCase();
-      const isLow = t.length <= 8 || /^(no|nah|ok|okay|fine|good|yep|yup|sure|idk|i don't know|hmm|lol|not really|i dunno)$/.test(t);
-      if (isLow && clientRef.current) {
-        clientRef.current.sendUserMessage('[POLICY]: Their reply was minimal. Ask for elaboration and avoid advancing difficulty or changing topic.');
-      }
-    } catch { /* ignore */ }
-    // Store the response and score for adaptive behavior
-    candidateResponsesRef.current.push(candidateResponse);
-    performanceScoresRef.current.push(estimatedScore);
-
-    if (estimatedScore <= 4) {
-      categoryStruggleCountsRef.current[questionCategory] =
-        (categoryStruggleCountsRef.current[questionCategory] || 0) + 1;
-    }
-    
-    // Calculate metrics for adaptive prompting
-    const recentScores = performanceScoresRef.current.slice(-3);
-    const overallPerformance = performanceScoresRef.current.length > 0 ?
-      performanceScoresRef.current.reduce((sum, score) => sum + score, 0) / performanceScoresRef.current.length : 5;
-    
-    const duration = startTimeRef.current ? 
-      (Date.now() - startTimeRef.current.getTime()) / 1000 / 60 : 0;
-
-    // Extract insights for context-aware follow-ups
-    const recentContext = candidateResponsesRef.current.slice(-2).join(' ');
-    const candidateStrengths = ['communication', 'problem-solving']; // Could be enhanced with AI analysis
-    const areasOfInterest = extractKeyTopics(recentContext);
-    const performanceLevel = overallPerformance <= 4 ? 'struggling' : overallPerformance >= 7 ? 'excellent' : 'moderate';
-
-    // Generate follow-up prompt for more contextual responses
-    const followUpPrompt = buildFollowUpPrompt(
-      recentContext,
-      candidateStrengths,
-      areasOfInterest,
-      performanceLevel,
-      setup.jobType,
-      setup.industry,
-      categoryCountsRef.current
-    );
-
-    // Update the system prompt with adaptive behavior
-    const updatedInstructions = generateAdaptiveInstructions(
-      state.questionCount + 1,
-      duration,
-      recentScores,
-      overallPerformance
-    );
-
-    // Send the updated instructions to the AI
-    if (clientRef.current) {
-      clientRef.current.updateSystemPrompt(updatedInstructions);
-
-      // Also send context as a user message to influence the next question
-      setTimeout(() => {
-        clientRef.current?.sendUserMessage(
-          `[INTERNAL CONTEXT FOR NEXT QUESTION: ${followUpPrompt}]`
-        );
-      }, 500);
-
-      // Auto-end conditions
-      if (
-        recentScores.slice(-2).every(s => s <= 3) &&
-        state.questionCount >= 3
-      ) {
-        clientRef.current.createResponse(
-          'It seems this conversation is no longer productive, so I will end the interview here.'
-        );
-        setTimeout(() => endInterviewRef.current?.(), 500);
-      } else if (
-        state.questionCount >= 5 && overallPerformance >= 8
-      ) {
-        clientRef.current.createResponse(
-          'Thanks, I have enough information for now. Let\'s wrap up the interview.'
-        );
-        setTimeout(() => endInterviewRef.current?.(), 500);
-      }
-    }
-  }, [generateAdaptiveInstructions, state.questionCount]);
+  // Static prompt usage – no adaptive system prompt builders
 
   const handleCompleteTranscriptChunk = useCallback(async (chunk: TranscriptChunk) => {
     // Save complete chunks to Supabase
@@ -310,26 +257,38 @@ export function useRealtimeInterview({
       categoryCountsRef.current[currentQuestionCategoryRef.current] =
         (categoryCountsRef.current[currentQuestionCategoryRef.current] || 0) + 1;
       questionTimestampRef.current = chunk.timestamp;
+      loggerRef.current.log({ timestamp: chunk.timestamp, type: 'question', text: chunk.text });
+      if (questionTimerRef.current) clearTimeout(questionTimerRef.current);
+      clientRef.current?.createResponse(`You have ${QUESTION_TIME_LIMIT} minutes.`);
+      questionTimerRef.current = setTimeout(() => {
+        clientRef.current?.createResponse('Time is up, let\'s move on.');
+        const state = conversationFlow[currentStateRef.current];
+        transitionState(state.next);
+      }, QUESTION_TIME_LIMIT * 60000);
     }
 
     // Collect user transcript chunks for accurate timing
     if (chunk.speaker === 'user') {
       currentUserChunksRef.current.push(chunk);
+      loggerRef.current.log({ timestamp: chunk.timestamp, type: 'answer', text: chunk.text });
+      initialResponsesRef.current.push(chunk.text);
+      if (questionTimerRef.current) {
+        clearTimeout(questionTimerRef.current);
+        questionTimerRef.current = null;
+      }
+      if (!focusDeterminedRef.current && initialResponsesRef.current.length >= 2) {
+        const { focus, seniority } = detectFocusAndSeniority(initialResponsesRef.current);
+        focusRef.current = focus;
+        seniorityRef.current = seniority;
+        focusDeterminedRef.current = true;
+        const elapsed = getElapsedMinutes(startTimeRef.current);
+        const exp = experienceRef.current;
+        clientRef.current?.sendEvent('session.update', { session: { instructions: `${currentPromptRef.current}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m] [Focus: ${focus}] [Seniority: ${seniority}]` } });
+      }
     }
 
-    // Analyze user responses for adaptive behavior and voice metrics
+    // Analyze user responses for voice metrics
     if (chunk.speaker === 'user' && chunk.text.trim().length > 10) {
-      const responseLength = chunk.text.split(' ').length;
-      const hasKeywords = ['experience', 'project', 'team', 'challenge', 'solution'].some(
-        keyword => chunk.text.toLowerCase().includes(keyword)
-      );
-      const estimatedScore = Math.min(10, Math.max(3, 
-        (responseLength > 20 ? 7 : 5) + (hasKeywords ? 2 : 0)
-      ));
-      updateInterviewerBehavior(chunk.text, estimatedScore, currentQuestionCategoryRef.current);
-
-      // --- Voice Timeline Segmentation (fixed timestamps) ---
-      // Use the first and last chunk timestamps for this response
       const userChunks = [...currentUserChunksRef.current];
       if (userChunks.length > 0) {
         const startTimestamp = userChunks[0].timestamp;
@@ -342,9 +301,22 @@ export function useRealtimeInterview({
         });
       }
       currentUserChunksRef.current = [];
-      // --- End Voice Timeline Segmentation ---
     }
-  }, [state.sessionId, updateInterviewerBehavior, setup.interviewMode]);
+
+    // Evaluate dynamic transitions based on user input
+    if (chunk.speaker === 'user') {
+      const stateCfg = conversationFlow[currentStateRef.current];
+      if (stateCfg.onKeyword) {
+        const lower = chunk.text.toLowerCase();
+        for (const [keyword, next] of Object.entries(stateCfg.onKeyword)) {
+          if (lower.includes(keyword)) {
+            transitionState(next);
+            break;
+          }
+        }
+      }
+    }
+  }, [state.sessionId, setup.interviewMode, transitionState]);
 
 
   // Initialize realtime client with adaptive prompting
@@ -353,41 +325,11 @@ export function useRealtimeInterview({
       clientRef.current.disconnect();
     }
 
-    // Use focused prompt for focused interviews, otherwise use adaptive prompt
-    // Simple A/B toggle read from localStorage for now; default 'A'
-    try {
-      const v = (window.localStorage.getItem('kelv_prompt_variant') as 'A' | 'B' | null);
-      if (v === 'A' || v === 'B') promptVariantRef.current = v;
-    } catch {}
+    const baseInstructions = masterPrompt;
 
-    // Prefer individual strict prompts when available
-    const individual = ((): string | undefined => {
-      try {
-        // Dynamically import to avoid bundling issues if folder is missing
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { resolveIndividualPrompt } = require('../individualprompts/resolver');
-        return resolveIndividualPrompt(setup);
-      } catch { return undefined; }
-    })();
-
-    const baseInstructions = (() => {
-      const core = focusedType ? getFocusedInterviewPrompt(focusedType, setup) : generateAdaptiveInstructions();
-      if (individual && individual.trim()) {
-        // Use the single role+industry system prompt as the source of truth (includes small talk/behavioral/technical)
-        return individual;
-      }
-      return core;
-    })();
-
-    // Variant B: slightly reduce aggressiveness by hinting gentle transitions
-    const instructions = promptVariantRef.current === 'B'
-      ? `${baseInstructions}
-
-GENTLE TRANSITION POLICY (Variant B):
-- After small talk, ask a high-level opener before deep dives
-- Avoid immediate project walkthroughs; start with background/motivation
-- If last user reply is very short, downshift difficulty`
-      : baseInstructions;
+    currentPromptRef.current = baseInstructions;
+    const expInit = experienceRef.current;
+    const instructions = `${baseInstructions}\n\n[Experience: ${expInit}] [Elapsed: 0m]`;
 
     const config: Partial<RealtimeConfig> = {
       voice: 'alloy',
@@ -409,20 +351,9 @@ GENTLE TRANSITION POLICY (Variant B):
         startTimeRef.current = new Date();
         smallTalkNeededRef.current = !focusedType; // Needed for non-focused
         smallTalkTurnsRef.current = 0;
-        // Start the timer after connection is established
-        const startTime = Date.now();
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-        timerRef.current = setInterval(() => {
-          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-          setDuration(elapsedSeconds);
-          const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-          if (elapsedSeconds % 60 === 0 && clientRef.current) { // Send update every minute
-            clientRef.current.sendUserMessage(`[TIME UPDATE]: Elapsed time: ${elapsedMinutes} minutes. Time remaining: ${maxDuration - elapsedMinutes} minutes. Adjust question depth and pace accordingly. If near end, prepare to wrap up.`);
-          }
-        }, 1000);
-        
+        startTimer();
+        transitionState(currentStateRef.current);
+
         // Send initial greeting message to start the interview with small talk (skip for focused interviews)
         setTimeout(() => {
           if (focusedType) {
@@ -517,10 +448,6 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             
             clientRef.current?.createResponse(veryHumanSmallTalkInstruction);
 
-            // If Variant B, send a follow-up internal guide reinforcing gentle first question
-            if (promptVariantRef.current === 'B') {
-              clientRef.current?.sendUserMessage('[INTERNAL CONTEXT]: After small talk, use a gentle opening about background/motivation before technicals.');
-            }
           }
         }, 1000);
         
@@ -546,6 +473,9 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       clientRef.current.on('transcript.update', (chunk: TranscriptChunk) => {
         if (chunk.speaker === 'user') {
           handleUserTranscript(chunk.text, !chunk.isPartial);
+          if (!chunk.isPartial) {
+            checkEscalation(chunk.text);
+          }
           // Small-talk persistence: if early and reply is minimal, force another small-talk follow-up
           try {
             const minutesSinceStart = startTimeRef.current ? (Date.now() - startTimeRef.current.getTime()) / 60000 : 0;
@@ -568,7 +498,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           } catch { /* ignore */ }
         } else if (chunk.speaker === 'assistant') {
           // Use handleAssistantResponse for AI text, which manages buffering
-          handleAssistantResponse(chunk.text, !chunk.isPartial);
+          handleAssistantResponseWithFlow(chunk.text, !chunk.isPartial);
 
           // Nudge: if early and last user reply was very short, ask one more small-talk follow-up before opener
           try {
@@ -617,7 +547,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       clientRef.current.on('response.done', () => {
         setSpeakerStatus('ai', false);
         // Finalize any buffered text for the assistant's response
-        handleAssistantResponse('', true);
+        handleAssistantResponseWithFlow('', true);
       });
 
       clientRef.current.on('response.audio.delta', (event: any) => {
@@ -638,18 +568,18 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       onError?.(errorMessage);
     }
   }, [
-    setup, 
-    mediaStream, 
-    generateAdaptiveInstructions, 
-    onError, 
+    setup,
+    mediaStream,
+    onError,
     focusedType, 
     setStatus, 
     setError, 
     setDuration, 
-    setSpeakerStatus, 
-    handleAssistantResponse, 
+    setSpeakerStatus,
+    handleAssistantResponseWithFlow,
     handleUserTranscript,
-    handleCompleteTranscriptChunk
+    handleCompleteTranscriptChunk,
+    checkEscalation
   ]);
 
   // Start timer
@@ -657,12 +587,22 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    
+
     const startTime = Date.now();
     timerRef.current = setInterval(() => {
       const currentDuration = Math.floor((Date.now() - startTime) / 1000);
       setDuration(currentDuration);
-      
+
+      if (clientRef.current && currentDuration % 60 === 0) {
+        const minutes = Math.floor(currentDuration / 60);
+        const exp = experienceRef.current;
+        clientRef.current.sendEvent('session.update', {
+          session: { instructions: `${currentPromptRef.current}\n\n[Experience: ${exp}] [Elapsed: ${minutes}m]` }
+        });
+        loggerRef.current.log({ timestamp: Date.now(), type: 'elapsed', text: `${minutes}m` });
+        console.debug(`[elapsed] ${minutes}m`);
+      }
+
       // Manage interview phases based on timing
       manageInterviewPhases(currentDuration);
     }, 1000);
@@ -812,7 +752,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             interview_type: interviewType,
             start_time: new Date().toISOString(),
             status: 'active',
-            model_type: 'gpt-4o-realtime-preview',
+            model_type: 'gpt-realtime',
             total_duration: 0,
             question_count: 0
           });
@@ -1069,6 +1009,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             duration: state.duration,
             questionCount: state.questionCount,
             questionsAnswered: responses.length,
+            logs: loggerRef.current.getEntries(),
             overallScore,
             questions, // Add structured questions
             responses, // Add structured responses with analysis
@@ -1099,6 +1040,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             transcript: state.transcript,
             duration: state.duration,
             questionCount: state.questionCount,
+            logs: loggerRef.current.getEntries(),
             interviewType,
             focusedType,
             completedAt: new Date().toISOString(),
@@ -1115,6 +1057,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           transcript: state.transcript,
           duration: state.duration,
           questionCount: state.questionCount,
+          logs: loggerRef.current.getEntries(),
           interviewType,
           focusedType,
           completedAt: new Date().toISOString(),
@@ -1179,10 +1122,11 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     }
 
     clientRef.current.sendUserMessage(message);
-    
+    checkEscalation(message);
+
     // Manually add user message to transcript for text-based interviews
     if (setup.interviewMode === 'text') {
-        const userChunk: TranscriptChunk = {
+      const userChunk: TranscriptChunk = {
             id: `user-text-${generateUUID()}`,
             speaker: 'user',
             text: message,
@@ -1192,7 +1136,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         processTranscriptChunk(userChunk);
         handleCompleteTranscriptChunk(userChunk);
     }
-  }, [setup.interviewMode, processTranscriptChunk, handleCompleteTranscriptChunk]);
+  }, [setup.interviewMode, processTranscriptChunk, handleCompleteTranscriptChunk, checkEscalation]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1213,6 +1157,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     client: clientRef.current,
     maxDuration, // Export the duration limit
     startInterview,
+    requestFollowUp,
     pauseInterview,
     resumeInterview,
     endInterview,
