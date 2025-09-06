@@ -66,6 +66,7 @@ export interface RealtimeEvents {
   'connection.opened': () => void;
   'connection.closed': () => void;
   'transcript.update': (chunk: TranscriptChunk) => void;
+  'finish_session': () => void;
 }
 
 export class OpenAIRealtimeClient extends EventEmitter {
@@ -236,6 +237,15 @@ export class OpenAIRealtimeClient extends EventEmitter {
       // Emit specific events based on message type
       if (data.type) {
         this.emit(data.type as keyof RealtimeEvents, data);
+      }
+
+      // Detect finish_session function calls from the model
+      if (
+        data.type === 'response.output_item.added' &&
+        data.item?.type === 'function_call' &&
+        data.item?.name === 'finish_session'
+      ) {
+        this.emit('finish_session');
       }
 
       // Handle user speech events

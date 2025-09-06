@@ -157,6 +157,7 @@ export function useRealtimeInterview({
         session: { instructions: 'finish_session' }
       });
     }
+    endInterviewRef.current?.();
     if (onEscalation) onEscalation(reason);
   }, [onEscalation]);
 
@@ -560,6 +561,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
       clientRef.current.on('input_audio_buffer.committed', () => {
         // User audio is committed, we can analyze it
+      });
+
+      clientRef.current.on('finish_session', () => {
+        endInterviewRef.current?.();
       });
 
     } catch (error) {

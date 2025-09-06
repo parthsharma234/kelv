@@ -331,12 +331,7 @@ async function initLandmarkers() {
   });
 }
 
-// Add global variables for previous states
-let prevFaceLandmarks: Array<{x: number, y: number, z?: number}> | null = null;
-let prevEyeAspectRatio: {left: number, right: number} | null = null;
-let blinkCount = 0;
-let totalFrames = 0;
-const blinkStart = Date.now();
+// Removed duplicate global variable declarations
 
 async function analyzeFrame(frame: ImageBitmap, width: number, height: number, faceBox?: { x: number; y: number; width: number; height: number } | null): Promise<WorkerResponse> {
   ensureCanvas(width, height);
