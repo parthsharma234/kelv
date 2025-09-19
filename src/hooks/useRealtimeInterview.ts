@@ -5,7 +5,7 @@ import { InterviewSetup } from '../types/interview';
 import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
-import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '../utils/openai';
+import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI, summarizeCandidateTurn } from '../utils/openai';
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
 import masterPrompt from "../masterprompt/masterPrompt";
@@ -39,6 +39,36 @@ const classifyQuestionCategory = (text: string): string => {
   if (/scenario|how would you|what would you do/.test(q)) return 'situational';
   if (/why do you want|company|culture|fit|values/.test(q)) return 'fit';
   return 'general';
+};
+
+const QUESTION_TIME_LIMITS: Record<ConversationStateName, { default: number; byCategory?: Record<string, number> }> = {
+  small_talk: { default: 0 },
+  warm_up: { default: 3, byCategory: { behavioral: 3, situational: 4, general: 3 } },
+  core: { default: 4, byCategory: { technical: 5, situational: 4, behavioral: 3, fit: 3, general: 4 } },
+  closing: { default: 2, byCategory: { fit: 2, general: 2 } }
+};
+
+const formatTimePrompt = (state: ConversationStateName, minutes: number, category?: string): string => {
+  const suffix = minutes === 1 ? 'minute' : 'minutes';
+  if (state === 'warm_up') {
+    return `Feel free to take about ${minutes} ${suffix} to walk me through it.`;
+  }
+  if (state === 'core' && category === 'technical') {
+    return `Take around ${minutes} ${suffix} here—thinking aloud is welcome.`;
+  }
+  if (state === 'closing') {
+    return `Let's keep this to about ${minutes} ${suffix}.`;
+  }
+  return `Take up to ${minutes} ${suffix} for this one.`;
+};
+
+const getQuestionTimeLimitFor = (state: ConversationStateName, category?: string | null): number => {
+  const config = QUESTION_TIME_LIMITS[state];
+  if (!config) return 0;
+  if (category && config.byCategory?.[category]) {
+    return config.byCategory[category];
+  }
+  return config.default;
 };
 
 const getElapsedMinutes = (start: Date | null): number => {
@@ -94,6 +124,8 @@ export function useRealtimeInterview({
     handleUserTranscript,
   } = useInterviewState();
 
+  const initialFocusDetection = detectFocusAndSeniority([], { setup });
+
   const clientRef = useRef<OpenAIRealtimeClient | null>(null);
   const stateRef = useRef(state);
   // A/B testing flag for prompt strategy (A = current adaptive prompt, B = softer/gentle variant)
@@ -120,35 +152,130 @@ export function useRealtimeInterview({
   }>>([]);
   // Add a ref to collect transcript chunks for the current user response
   const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
-  const currentStateRef = useRef<ConversationStateName>('greeting');
-  const previousStateRef = useRef<ConversationStateName | null>(null);
+  const currentStateRef = useRef<ConversationStateName>('small_talk');
   const questionsInStateRef = useRef<number>(0);
   const stateStartRef = useRef<number>(Date.now());
-  const previousStateStartRef = useRef<number>(0);
-  const currentPromptRef = useRef<string>('');
+  const currentPromptRef = useRef<string>(masterPrompt);
+  const phaseOverlayRef = useRef<string>('');
   const loggerRef = useRef(new SessionLogger());
-  const focusRef = useRef<string>('general_systems');
-  const seniorityRef = useRef<'junior'|'mid'|'senior'>('mid');
+  const focusRef = useRef<string>(initialFocusDetection.focus);
+  const seniorityRef = useRef<'junior'|'mid'|'senior'>(initialFocusDetection.seniority);
   const initialResponsesRef = useRef<string[]>([]);
   const focusDeterminedRef = useRef<boolean>(false);
   const questionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const QUESTION_TIME_LIMIT = 2; // minutes
+  const questionTimerStateRef = useRef<{ limitMinutes: number; extended: boolean } | null>(null);
+  const recentNotesRef = useRef<Array<{ content: string; createdAt: number }>>([]);
+  const lastSummarizedHashRef = useRef<string | null>(null);
+  const lastUserSpeechTimestampRef = useRef<number>(0);
+
+  const pruneRecentNotes = useCallback(() => {
+    const now = Date.now();
+    recentNotesRef.current = recentNotesRef.current
+      .filter(note => now - note.createdAt <= 15 * 60 * 1000)
+      .slice(-4);
+  }, []);
+
+  const composeInstruction = useCallback(() => {
+    pruneRecentNotes();
+    const notes = recentNotesRef.current;
+    const noteBlock = notes.length
+      ? `\n\n[Recent Candidate Takeaways]\n${notes.map(note => `- ${note.content}`).join('\n')}`
+      : '';
+    const exp = experienceRef.current;
+    const elapsed = getElapsedMinutes(startTimeRef.current);
+    const focus = focusRef.current;
+    const seniority = seniorityRef.current;
+    const basePrompt = currentPromptRef.current || masterPrompt;
+    const overlay = phaseOverlayRef.current ? `\n\n${phaseOverlayRef.current}` : '';
+    return `${basePrompt}${overlay}${noteBlock}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m] [Focus: ${focus}] [Seniority: ${seniority}]`;
+  }, [pruneRecentNotes]);
+
+  const pushInstruction = useCallback((overlay?: string) => {
+    if (typeof overlay === 'string') {
+      phaseOverlayRef.current = overlay;
+    }
+    if (!clientRef.current) return;
+    const instructions = composeInstruction();
+    clientRef.current.sendEvent('session.update', { session: { instructions } });
+  }, [composeInstruction]);
+
+  const addActiveListeningNotes = useCallback((notes: string[]) => {
+    if (!notes.length) return;
+    const cleaned = notes.map(note => note.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (!cleaned.length) return;
+    const now = Date.now();
+    const existing = new Set(recentNotesRef.current.map(note => note.content));
+    const toAppend = cleaned.filter(note => !existing.has(note));
+    if (!toAppend.length) return;
+    recentNotesRef.current = [
+      ...recentNotesRef.current,
+      ...toAppend.map(content => ({ content, createdAt: now }))
+    ];
+    pruneRecentNotes();
+    pushInstruction();
+  }, [pruneRecentNotes, pushInstruction]);
 
   const transitionState = useCallback((next?: ConversationStateName) => {
-    if (!next || !clientRef.current) return;
+    if (!next) return;
     currentStateRef.current = next;
     questionsInStateRef.current = 0;
     stateStartRef.current = Date.now();
     const cfg = conversationFlow[next];
-    currentPromptRef.current = cfg.instructions;
-    const elapsed = getElapsedMinutes(startTimeRef.current);
-    const exp = experienceRef.current;
-    const focus = focusRef.current;
-    const seniority = seniorityRef.current;
-    clientRef.current.sendEvent('session.update', {
-      session: { instructions: `${cfg.instructions}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m] [Focus: ${focus}] [Seniority: ${seniority}]` }
-    });
-  }, []);
+    pushInstruction(cfg.instructions);
+  }, [pushInstruction]);
+
+  const handleQuestionTimerExpired = useCallback(() => {
+    const timerState = questionTimerStateRef.current;
+    if (!timerState) return;
+
+    const lastSpokeAgo = lastUserSpeechTimestampRef.current
+      ? Date.now() - lastUserSpeechTimestampRef.current
+      : Number.POSITIVE_INFINITY;
+
+    if (!timerState.extended && lastSpokeAgo < 15000) {
+      timerState.extended = true;
+      questionTimerStateRef.current = timerState;
+      clientRef.current?.createResponse('No rush—take another minute if you need to finish your thought.');
+      questionTimerRef.current = setTimeout(handleQuestionTimerExpired, 60000);
+      return;
+    }
+
+    clientRef.current?.createResponse("Let's pause there and move to the next topic.");
+    if (questionTimerRef.current) {
+      clearTimeout(questionTimerRef.current);
+      questionTimerRef.current = null;
+    }
+    questionTimerStateRef.current = null;
+
+    const stateName = currentStateRef.current;
+    const state = conversationFlow[stateName];
+    if (!state) return;
+
+    const elapsedInPhase = (Date.now() - stateStartRef.current) / 60000;
+
+    if (stateName === 'small_talk' || stateName === 'warm_up') {
+      if (state.next) {
+        transitionState(state.next);
+      }
+      return;
+    }
+
+    if (stateName === 'core') {
+      const phaseLimit = state.exitCriteria.time;
+      if (phaseLimit && elapsedInPhase >= phaseLimit) {
+        if (state.next) {
+          transitionState(state.next);
+        }
+      } else {
+        pushInstruction();
+      }
+      return;
+    }
+
+    if (state.next && state.exitCriteria.time && elapsedInPhase >= state.exitCriteria.time) {
+      transitionState(state.next);
+    }
+  }, [pushInstruction, transitionState]);
 
   const triggerEscalation = useCallback((reason: string) => {
     if (clientRef.current) {
@@ -163,12 +290,12 @@ export function useRealtimeInterview({
 
   const requestFollowUp = useCallback((text: string) => {
     const state = conversationFlow[currentStateRef.current];
-    if (!state.onFollowUp || !clientRef.current) return;
-    previousStateRef.current = currentStateRef.current;
-    previousStateStartRef.current = stateStartRef.current;
-    clientRef.current.createResponse(text);
-    transitionState(state.onFollowUp);
-  }, [transitionState]);
+    const followUpBlock = state.followUpInstruction
+      ? `${state.instructions}\n\n[Follow-up Reminder] ${state.followUpInstruction}`
+      : state.instructions;
+    pushInstruction(followUpBlock);
+    clientRef.current?.createResponse(text);
+  }, [pushInstruction]);
 
   const checkEscalation = useCallback((text: string) => {
     const lower = text.toLowerCase();
@@ -188,17 +315,7 @@ export function useRealtimeInterview({
       questionsInStateRef.current += 1;
       const state = conversationFlow[currentStateRef.current];
       if (state.exitCriteria.questions && questionsInStateRef.current >= state.exitCriteria.questions) {
-        if (currentStateRef.current === 'follow_up' && previousStateRef.current) {
-          const prev = previousStateRef.current;
-          previousStateRef.current = null;
-          currentStateRef.current = prev;
-          stateStartRef.current = previousStateStartRef.current;
-          const cfg = conversationFlow[prev];
-          currentPromptRef.current = cfg.instructions;
-          const elapsed = getElapsedMinutes(startTimeRef.current);
-          const exp = experienceRef.current;
-          clientRef.current?.sendEvent('session.update', { session: { instructions: `${cfg.instructions}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m]` } });
-        } else {
+        if (state.next) {
           transitionState(state.next);
         }
       } else if (currentStateRef.current === 'closing') {
@@ -259,13 +376,18 @@ export function useRealtimeInterview({
         (categoryCountsRef.current[currentQuestionCategoryRef.current] || 0) + 1;
       questionTimestampRef.current = chunk.timestamp;
       loggerRef.current.log({ timestamp: chunk.timestamp, type: 'question', text: chunk.text });
-      if (questionTimerRef.current) clearTimeout(questionTimerRef.current);
-      clientRef.current?.createResponse(`You have ${QUESTION_TIME_LIMIT} minutes.`);
-      questionTimerRef.current = setTimeout(() => {
-        clientRef.current?.createResponse('Time is up, let\'s move on.');
-        const state = conversationFlow[currentStateRef.current];
-        transitionState(state.next);
-      }, QUESTION_TIME_LIMIT * 60000);
+      if (questionTimerRef.current) {
+        clearTimeout(questionTimerRef.current);
+        questionTimerRef.current = null;
+      }
+      questionTimerStateRef.current = null;
+      const limitMinutes = getQuestionTimeLimitFor(currentStateRef.current, currentQuestionCategoryRef.current);
+      if (limitMinutes > 0) {
+        questionTimerStateRef.current = { limitMinutes, extended: false };
+        const timePrompt = formatTimePrompt(currentStateRef.current, limitMinutes, currentQuestionCategoryRef.current);
+        clientRef.current?.createResponse(timePrompt);
+        questionTimerRef.current = setTimeout(handleQuestionTimerExpired, limitMinutes * 60000);
+      }
     }
 
     // Collect user transcript chunks for accurate timing
@@ -273,18 +395,20 @@ export function useRealtimeInterview({
       currentUserChunksRef.current.push(chunk);
       loggerRef.current.log({ timestamp: chunk.timestamp, type: 'answer', text: chunk.text });
       initialResponsesRef.current.push(chunk.text);
+      if (initialResponsesRef.current.length > 6) {
+        initialResponsesRef.current.shift();
+      }
       if (questionTimerRef.current) {
         clearTimeout(questionTimerRef.current);
         questionTimerRef.current = null;
       }
+      questionTimerStateRef.current = null;
       if (!focusDeterminedRef.current && initialResponsesRef.current.length >= 2) {
-        const { focus, seniority } = detectFocusAndSeniority(initialResponsesRef.current);
+        const { focus, seniority } = detectFocusAndSeniority(initialResponsesRef.current, { setup });
         focusRef.current = focus;
         seniorityRef.current = seniority;
         focusDeterminedRef.current = true;
-        const elapsed = getElapsedMinutes(startTimeRef.current);
-        const exp = experienceRef.current;
-        clientRef.current?.sendEvent('session.update', { session: { instructions: `${currentPromptRef.current}\n\n[Experience: ${exp}] [Elapsed: ${elapsed}m] [Focus: ${focus}] [Seniority: ${seniority}]` } });
+        pushInstruction();
       }
     }
 
@@ -294,12 +418,33 @@ export function useRealtimeInterview({
       if (userChunks.length > 0) {
         const startTimestamp = userChunks[0].timestamp;
         const endTimestamp = userChunks[userChunks.length - 1].timestamp;
+        const combinedAnswer = userChunks.map(c => c.text).join(' ').replace(/\s+/g, ' ').trim();
         voiceTimelineSegmentsRef.current.push({
-          transcript: userChunks.map(c => c.text).join(' '),
+          transcript: combinedAnswer,
           startTimestamp,
           endTimestamp,
           questionContext: currentQuestionRef.current || undefined
         });
+        const answerHash = `${currentQuestionRef.current}|${combinedAnswer}`;
+        if (
+          combinedAnswer &&
+          combinedAnswer.split(' ').length >= 8 &&
+          currentStateRef.current !== 'small_talk' &&
+          answerHash !== lastSummarizedHashRef.current
+        ) {
+          try {
+            const notes = await summarizeCandidateTurn(combinedAnswer, {
+              question: currentQuestionRef.current,
+              setup
+            });
+            if (notes.length) {
+              addActiveListeningNotes(notes);
+              lastSummarizedHashRef.current = answerHash;
+            }
+          } catch (error) {
+            console.error('Failed to summarize candidate response', error);
+          }
+        }
       }
       currentUserChunksRef.current = [];
     }
@@ -317,7 +462,15 @@ export function useRealtimeInterview({
         }
       }
     }
-  }, [state.sessionId, setup.interviewMode, transitionState]);
+  }, [
+    state.sessionId,
+    setup,
+    setup.interviewMode,
+    transitionState,
+    pushInstruction,
+    handleQuestionTimerExpired,
+    addActiveListeningNotes
+  ]);
 
 
   // Initialize realtime client with adaptive prompting
@@ -329,8 +482,8 @@ export function useRealtimeInterview({
     const baseInstructions = masterPrompt;
 
     currentPromptRef.current = baseInstructions;
-    const expInit = experienceRef.current;
-    const instructions = `${baseInstructions}\n\n[Experience: ${expInit}] [Elapsed: 0m]`;
+    phaseOverlayRef.current = '';
+    const instructions = composeInstruction();
 
     const config: Partial<RealtimeConfig> = {
       voice: 'alloy',
@@ -436,7 +589,7 @@ Be super conversational and human-like:
 - Use casual language and contractions ("I'm," "you're," "that's," "what's")
 - Show genuine interest in their answers - don't just ask and move on
 
-Take 2-3 minutes for this natural conversation. Let it flow organically. When it feels natural, transition with something like:
+Take about 2 minutes for this natural conversation. Let it flow organically. When it feels natural, transition with something like:
 - "Well, I'm really excited to learn more about you and your background..."
 - "This has been great getting to know you a bit! So let's dive into..."
 - "I love that! Okay, so let's talk about your experience..."
@@ -445,7 +598,7 @@ ${bridgeInstruction}
 
 Remember: Be genuinely human, not scripted. Listen actively and respond like a real person having a real conversation would.
 
-[TIMING CONTEXT]: You are in the SMALL TALK phase (0-3 minutes). Focus on building rapport and natural conversation. The system will automatically guide you to transition to interview questions after 2-3 minutes of genuine conversation.`;
+[TIMING CONTEXT]: You are in the SMALL TALK phase (0-2 minutes). Focus on building rapport and natural conversation. The system will automatically guide you to transition to interview questions after roughly 2 minutes of genuine conversation.`;
             
             clientRef.current?.createResponse(veryHumanSmallTalkInstruction);
 
@@ -473,6 +626,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
 
       clientRef.current.on('transcript.update', (chunk: TranscriptChunk) => {
         if (chunk.speaker === 'user') {
+          lastUserSpeechTimestampRef.current = Date.now();
           handleUserTranscript(chunk.text, !chunk.isPartial);
           if (!chunk.isPartial) {
             checkEscalation(chunk.text);
@@ -480,7 +634,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           // Small-talk persistence: if early and reply is minimal, force another small-talk follow-up
           try {
             const minutesSinceStart = startTimeRef.current ? (Date.now() - startTimeRef.current.getTime()) / 60000 : 0;
-            if (!chunk.isPartial && minutesSinceStart < 3 && smallTalkNeededRef.current) {
+            if (!chunk.isPartial && minutesSinceStart < 2.5 && smallTalkNeededRef.current) {
               const t = (chunk.text || '').trim().toLowerCase();
               const isLowContent = t.length <= 8 || /^(no|nah|ok|okay|fine|good|yep|yup|sure|idk|i don't know|hmm|lol|not really|i dunno)$/.test(t);
               if (isLowContent) {
@@ -504,7 +658,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           // Nudge: if early and last user reply was very short, ask one more small-talk follow-up before opener
           try {
             const minutesSinceStart = startTimeRef.current ? (Date.now() - startTimeRef.current.getTime()) / 60000 : 0;
-            if (minutesSinceStart < 3 && !chunk.isPartial) {
+            if (minutesSinceStart < 2.5 && !chunk.isPartial) {
               const transcriptSoFar = stateRef.current?.transcript || [];
               const lastUser = [...transcriptSoFar].reverse().find(c => c.speaker === 'user' && !c.isPartial);
               if (lastUser) {
@@ -576,15 +730,16 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     setup,
     mediaStream,
     onError,
-    focusedType, 
-    setStatus, 
-    setError, 
-    setDuration, 
+    focusedType,
+    setStatus,
+    setError,
+    setDuration,
     setSpeakerStatus,
     handleAssistantResponseWithFlow,
     handleUserTranscript,
     handleCompleteTranscriptChunk,
-    checkEscalation
+    checkEscalation,
+    composeInstruction
   ]);
 
   // Start timer
@@ -599,11 +754,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       setDuration(currentDuration);
 
       if (clientRef.current && currentDuration % 60 === 0) {
+        pushInstruction();
         const minutes = Math.floor(currentDuration / 60);
-        const exp = experienceRef.current;
-        clientRef.current.sendEvent('session.update', {
-          session: { instructions: `${currentPromptRef.current}\n\n[Experience: ${exp}] [Elapsed: ${minutes}m]` }
-        });
         loggerRef.current.log({ timestamp: Date.now(), type: 'elapsed', text: `${minutes}m` });
         console.debug(`[elapsed] ${minutes}m`);
       }
@@ -611,7 +763,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       // Manage interview phases based on timing
       manageInterviewPhases(currentDuration);
     }, 1000);
-  }, [setDuration, manageInterviewPhases]);
+  }, [setDuration, manageInterviewPhases, pushInstruction]);
 
   // Stop timer
   const stopTimer = useCallback(() => {

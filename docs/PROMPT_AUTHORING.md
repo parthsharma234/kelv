@@ -8,7 +8,7 @@ Kelv uses a single master system prompt located at `src/masterprompt/masterPromp
 4. `# Reference Pronunciations` – instructs the model to infer pronunciations from context.
 5. `# Tools` – `answer(question)`, `escalate_to_human()`, `finish_session()`.
 6. `# Instructions / Rules` – dynamic depth via `[Experience: LEVEL]`, follow-up logic, math formatting, no pronouns.
-7. `# Conversation Flow` – `greeting → open ↔ follow_up → closing` with sample phrases and exit criteria.
+7. `# Conversation Flow` – phased timeline (`small_talk → warm_up → core → closing`) with objectives, transitions, and exit criteria.
 8. `# Safety & Escalation` – triggers, required phrase, and termination sequence.
 
 ## Experience Level
@@ -21,6 +21,6 @@ Elapsed minutes are appended as `[Elapsed: Xm]` each minute. The prompt may refe
 Rather than a fixed list, the prompt instructs the model to infer pronunciations from surrounding context and only ask when uncertain.
 
 ## Dynamic Flow Configuration
-`src/utils/conversationFlow.ts` defines a lightweight state machine. Only `greeting` and `closing` are mandatory; the middle `open` state branches freely based on interviewer direction. `requestFollowUp(text)` lets interviewers inject their own follow-up questions, and the flow returns to the previous state after one.
+`src/utils/conversationFlow.ts` defines the four-phase state machine that mirrors the 20-minute timeline: `small_talk`, `warm_up`, `core`, and `closing`. Each phase includes pacing notes, sample phrases, and timeout-driven transitions. `requestFollowUp(text)` now enriches the current phase with a targeted follow-up reminder instead of swapping to a dedicated `follow_up` state.
 
 Maintain this structure when updating the master prompt to ensure consistent realtime behavior.

@@ -6,6 +6,93 @@ import Sentiment from 'sentiment';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
+const MAX_ACTIVE_LISTENING_BULLETS = 2;
+
+const basicFallbackSummaries = (answer: string): string[] => {
+  const normalized = answer.replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+  const sentences = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (sentences.length === 0) {
+    return [normalized.length > 160 ? `${normalized.slice(0, 157).trim()}…` : normalized];
+  }
+  return sentences.slice(0, MAX_ACTIVE_LISTENING_BULLETS).map(sentence => {
+    const trimmed = sentence.trim();
+    return trimmed.length > 160 ? `${trimmed.slice(0, 157).trim()}…` : trimmed;
+  });
+};
+
+export async function summarizeCandidateTurn(
+  answer: string,
+  options: { question?: string; setup?: InterviewSetup } = {}
+): Promise<string[]> {
+  const trimmedAnswer = answer.replace(/\s+/g, ' ').trim();
+  if (!trimmedAnswer) {
+    return [];
+  }
+
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    return basicFallbackSummaries(trimmedAnswer);
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.3,
+        max_tokens: 180,
+        messages: [
+          {
+            role: 'system',
+            content: 'You capture concise active-listening notes during interviews. Respond with a JSON array containing 1-2 natural-language bullet strings (max 18 words each). Do not add commentary.'
+          },
+          {
+            role: 'user',
+            content: `Question: ${options.question ?? 'Unknown question'}\nIndustry: ${options.setup?.industry ?? 'Unknown'}\nRole: ${options.setup?.jobType ?? 'Unknown'}\n\nCandidate response:\n${trimmedAnswer}`
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    let bullets: string[] = [];
+    try {
+      bullets = JSON.parse(content);
+      if (!Array.isArray(bullets)) {
+        throw new Error('Invalid JSON structure');
+      }
+    } catch {
+      bullets = content
+        .split(/\n|•|-/)
+        .map((entry: string) => entry.trim())
+        .filter(Boolean);
+    }
+
+    const sanitized = bullets
+      .map((entry: string) => entry.replace(/^[-•\s]+/, '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .slice(0, MAX_ACTIVE_LISTENING_BULLETS);
+
+    if (sanitized.length === 0) {
+      return basicFallbackSummaries(trimmedAnswer);
+    }
+
+    return sanitized;
+  } catch (error) {
+    console.warn('[summarizeCandidateTurn] Falling back to heuristic summary', error);
+    return basicFallbackSummaries(trimmedAnswer);
+  }
+}
+
 // Audio recorder class for voice input
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
