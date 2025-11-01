@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
-import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt } from '../utils/promptTemplates';
-import { InterviewSetup, CollegeInterviewSetup } from '../types/interview';
+import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt, buildUnpredictableInterviewPrompt } from '../utils/promptTemplates';
+import { InterviewSetup, CollegeInterviewSetup, TimeContext } from '../types/interview';
 import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
 import { supabase } from '../lib/supabase';
 import { useInterviewState } from './useInterviewState';
@@ -90,6 +90,174 @@ export function useRealtimeInterview({
   // Add a ref to collect transcript chunks for the current user response
   const currentUserChunksRef = useRef<TranscriptChunk[]>([]);
 
+  // Time-aware interview tracking refs
+  const coveredQuestionTypesRef = useRef<Set<string>>(new Set());
+  const recentTopicsRef = useRef<string[]>([]);
+  const candidateClaimsRef = useRef<Array<{ question: string; claim: string; timestamp: number }>>([]);
+  const promptUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const questionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentQuestionStartTimeRef = useRef<number | null>(null);
+
+  // All possible question types for tracking
+  const ALL_QUESTION_TYPES = [
+    'background',
+    'behavioral',
+    'technical',
+    'situational',
+    'problem-solving',
+    'conflict-resolution',
+    'leadership',
+    'failure-recovery',
+    'goals-motivation',
+    'culture-fit',
+    'strengths-weaknesses',
+    'specific-skills'
+  ];
+
+  // Classify question type using keyword matching (fast, local classification)
+  const classifyQuestionType = useCallback((questionText: string): string => {
+    const lower = questionText.toLowerCase();
+
+    if (lower.includes('tell me about yourself') || lower.includes('walk me through your resume') ||
+        lower.includes('your background')) {
+      return 'background';
+    }
+    if (lower.includes('time when') || lower.includes('example of') || lower.includes('describe a situation') ||
+        lower.includes('tell me about a time')) {
+      return 'behavioral';
+    }
+    if (lower.includes('technical') || lower.includes('code') || lower.includes('algorithm') ||
+        lower.includes('programming') || lower.includes('implement')) {
+      return 'technical';
+    }
+    if (lower.includes('if you') || lower.includes('what would you do') || lower.includes('how would you handle') ||
+        lower.includes('imagine')) {
+      return 'situational';
+    }
+    if (lower.includes('solve') || lower.includes('approach') || lower.includes('problem') ||
+        lower.includes('challenge')) {
+      return 'problem-solving';
+    }
+    if (lower.includes('conflict') || lower.includes('disagreement') || lower.includes('difficult person')) {
+      return 'conflict-resolution';
+    }
+    if (lower.includes('lead') || lower.includes('manage') || lower.includes('team') || lower.includes('delegate')) {
+      return 'leadership';
+    }
+    if (lower.includes('fail') || lower.includes('mistake') || lower.includes('setback') ||
+        lower.includes('didn\'t go well')) {
+      return 'failure-recovery';
+    }
+    if (lower.includes('goal') || lower.includes('career') || lower.includes('future') ||
+        lower.includes('where do you see') || lower.includes('motivate')) {
+      return 'goals-motivation';
+    }
+    if (lower.includes('culture') || lower.includes('values') || lower.includes('work environment') ||
+        lower.includes('why do you want')) {
+      return 'culture-fit';
+    }
+    if (lower.includes('strength') || lower.includes('weakness') || lower.includes('what are you good at')) {
+      return 'strengths-weaknesses';
+    }
+    if (lower.includes('experience with') || lower.includes('skill') || lower.includes('proficiency')) {
+      return 'specific-skills';
+    }
+
+    return 'behavioral'; // default fallback
+  }, []);
+
+  // Extract topics from question text
+  const extractTopicsFromQuestion = useCallback((questionText: string): string[] => {
+    const topics: string[] = [];
+    const lower = questionText.toLowerCase();
+
+    // Common interview topics
+    const topicKeywords = [
+      'leadership', 'teamwork', 'communication', 'problem-solving', 'technical skills',
+      'project management', 'conflict resolution', 'time management', 'adaptability',
+      'innovation', 'customer service', 'data analysis', 'strategy', 'collaboration',
+      'decision making', 'pressure', 'deadline', 'prioritization', 'negotiation'
+    ];
+
+    topicKeywords.forEach(topic => {
+      if (lower.includes(topic)) {
+        topics.push(topic);
+      }
+    });
+
+    return topics;
+  }, []);
+
+  // Extract and track candidate claims for consistency testing
+  const extractAndTrackClaims = useCallback((responseText: string, questionText: string, timestamp: number) => {
+    const lower = responseText.toLowerCase();
+
+    // Keywords that indicate specific claims
+    const claimIndicators = [
+      'i led', 'i managed', 'i built', 'i created', 'i developed', 'i designed',
+      'i implemented', 'i increased', 'i reduced', 'i improved', 'i achieved',
+      'my team', 'i was responsible', 'i worked with', 'i collaborated',
+      'i have experience', 'i specialize', 'i\'m skilled', 'i\'m proficient'
+    ];
+
+    // Check if response contains specific claims worth tracking
+    const containsClaim = claimIndicators.some(indicator => lower.includes(indicator));
+
+    if (containsClaim && responseText.length > 30) {
+      // Extract the key claim (simplified - in production would use NLP)
+      const claim = responseText.substring(0, 150); // First 150 chars as the claim
+
+      candidateClaimsRef.current.push({
+        question: questionText,
+        claim: claim,
+        timestamp: timestamp
+      });
+
+      // Keep only last 10 claims to avoid memory bloat
+      if (candidateClaimsRef.current.length > 10) {
+        candidateClaimsRef.current = candidateClaimsRef.current.slice(-10);
+      }
+
+      console.log(`[Claim Tracked] "${claim.substring(0, 50)}..."`);
+    }
+  }, []);
+
+  // Generate time-aware context for unpredictable interview prompts
+  const generateTimeContext = useCallback((): TimeContext => {
+    const now = Date.now();
+    const startTime = startTimeRef.current ? startTimeRef.current.getTime() : now;
+    const elapsedMs = now - startTime;
+    const elapsedMinutes = elapsedMs / 1000 / 60;
+    const remainingMinutes = Math.max(0, maxDuration - elapsedMinutes);
+    const percentComplete = Math.min(100, (elapsedMinutes / maxDuration) * 100);
+
+    const coveredTypes = Array.from(coveredQuestionTypesRef.current);
+    const uncoveredTypes = ALL_QUESTION_TYPES.filter(type => !coveredTypes.includes(type));
+    const coveragePercent = (coveredTypes.length / ALL_QUESTION_TYPES.length) * 100;
+
+    const pace = elapsedMinutes > 0 ? state.questionCount / elapsedMinutes : 0;
+
+    let urgency: 'low' | 'medium' | 'high' = 'low';
+    if (percentComplete > 70 && uncoveredTypes.length > 4) {
+      urgency = 'high';
+    } else if (percentComplete > 50 && uncoveredTypes.length > 6) {
+      urgency = 'medium';
+    }
+
+    return {
+      duration: elapsedMinutes,
+      timeRemaining: remainingMinutes,
+      percentComplete,
+      questionCount: state.questionCount,
+      recentTopics: recentTopicsRef.current.slice(-5), // Last 5 topics
+      coveredTypes,
+      uncoveredTypes,
+      coveragePercent,
+      pace,
+      urgency
+    };
+  }, [maxDuration, state.questionCount, ALL_QUESTION_TYPES]);
+
   // Generate adaptive system prompt
   const generateAdaptiveInstructions = useCallback((
     questionCount: number = 1,
@@ -108,6 +276,143 @@ export function useRealtimeInterview({
     return buildAdaptiveSystemPrompt(options);
   }, [setup, maxDuration]);
 
+  // Continuous prompt update system for time-aware unpredictable interviews
+  const updateTimeAwarePrompt = useCallback(() => {
+    // Only update for standard realtime interviews (not focused or college)
+    if (focusedType || interviewType === 'college') {
+      return;
+    }
+
+    // Skip if the interview setup doesn't have required fields
+    if (!('jobType' in setup)) {
+      return;
+    }
+
+    const timeContext = generateTimeContext();
+    let updatedPrompt = buildUnpredictableInterviewPrompt({
+      setup: setup as InterviewSetup,
+      timeContext
+    });
+
+    // Add candidate claims for consistency testing (if we're past the 8-minute mark)
+    if (timeContext.duration >= 8 && candidateClaimsRef.current.length > 0) {
+      const claimsSummary = candidateClaimsRef.current.map((c, i) =>
+        `${i + 1}. "${c.claim.substring(0, 80)}..." (${Math.floor((Date.now() - c.timestamp) / 1000 / 60)} min ago)`
+      ).join('\n');
+
+      updatedPrompt += `\n\n# CANDIDATE CLAIMS TO TEST FOR CONSISTENCY
+
+You've collected these claims from the candidate. Consider circling back to test consistency:
+
+${claimsSummary}
+
+**When to test consistency:**
+- Mid-interview (8-15 min): Casually reference an earlier claim: "You mentioned earlier that you led X. How did you handle Y aspect?"
+- Late interview (15-18 min): More direct: "I want to go back to something you said about X. Can you elaborate on..."
+
+Be natural about it - don't make it obvious you're testing consistency. Make it feel like genuine curiosity or clarification.`;
+    }
+
+    if (clientRef.current) {
+      clientRef.current.updateSystemPrompt(updatedPrompt);
+      console.log(`[Time-Aware] Updated prompt at ${timeContext.duration.toFixed(1)} min - Coverage: ${timeContext.coveragePercent.toFixed(0)}% - Urgency: ${timeContext.urgency} - Claims: ${candidateClaimsRef.current.length}`);
+    }
+  }, [focusedType, interviewType, setup, generateTimeContext]);
+
+  // Start continuous prompt updates every 30 seconds
+  const startContinuousPromptUpdates = useCallback(() => {
+    // Clear any existing timer
+    if (promptUpdateTimerRef.current) {
+      clearInterval(promptUpdateTimerRef.current);
+    }
+
+    // Only for standard realtime interviews
+    if (focusedType || interviewType === 'college') {
+      return;
+    }
+
+    // Update immediately
+    updateTimeAwarePrompt();
+
+    // Set up 30-second interval
+    promptUpdateTimerRef.current = setInterval(() => {
+      updateTimeAwarePrompt();
+    }, 30000); // 30 seconds
+  }, [focusedType, interviewType, updateTimeAwarePrompt]);
+
+  // Stop continuous prompt updates
+  const stopContinuousPromptUpdates = useCallback(() => {
+    if (promptUpdateTimerRef.current) {
+      clearInterval(promptUpdateTimerRef.current);
+      promptUpdateTimerRef.current = null;
+    }
+  }, []);
+
+  // Per-question time limit system (polite interruptions)
+  const startQuestionTimer = useCallback((questionText: string) => {
+    // Only for standard realtime interviews
+    if (focusedType || interviewType === 'college' || !('jobType' in setup)) {
+      return;
+    }
+
+    // Clear any existing timer
+    if (questionTimerRef.current) {
+      clearTimeout(questionTimerRef.current);
+    }
+
+    currentQuestionStartTimeRef.current = Date.now();
+
+    // Set time limit based on question complexity
+    // Background questions: 2 minutes max
+    // Behavioral/situational: 2.5 minutes max
+    // Technical/problem-solving: 3 minutes max
+    // Other questions: 2 minutes max
+    const lower = questionText.toLowerCase();
+    let timeLimit = 120000; // 2 minutes default
+
+    if (lower.includes('technical') || lower.includes('algorithm') || lower.includes('system design') ||
+        lower.includes('problem') || lower.includes('solve')) {
+      timeLimit = 180000; // 3 minutes for complex questions
+    } else if (lower.includes('time when') || lower.includes('situation') || lower.includes('example of') ||
+               lower.includes('challenge') || lower.includes('conflict')) {
+      timeLimit = 150000; // 2.5 minutes for behavioral questions
+    }
+
+    // Set timer to politely interrupt after time limit
+    questionTimerRef.current = setTimeout(() => {
+      if (clientRef.current) {
+        // Send polite interruption as an internal message
+        const politeInterruptions = [
+          "I appreciate the detail you're sharing. Let me ask a follow-up to keep us moving forward.",
+          "That's really valuable insight. I want to make sure we cover everything, so let me build on that with another question.",
+          "Thank you for that response. I'd like to explore another area while we have time.",
+          "I see. Let me direct us to another topic to make the most of our time together.",
+          "Great. Let's continue with the next question to ensure we cover all the important areas."
+        ];
+
+        const interruption = politeInterruptions[Math.floor(Math.random() * politeInterruptions.length)];
+
+        // Send the interruption instruction to the AI
+        clientRef.current.sendUserMessage(
+          `[INTERNAL: Candidate has been speaking for ${timeLimit / 1000 / 60} minutes. Politely interrupt now with: "${interruption}" and then immediately move to your next planned question. Be smooth and natural about the transition.]`
+        );
+
+        console.log(`[Question Timer] Polite interruption triggered after ${timeLimit / 1000} seconds`);
+      }
+
+      questionTimerRef.current = null;
+    }, timeLimit);
+  }, [focusedType, interviewType, setup]);
+
+  // Stop question timer
+  const stopQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current) {
+      clearTimeout(questionTimerRef.current);
+      questionTimerRef.current = null;
+    }
+    currentQuestionStartTimeRef.current = null;
+  }, []);
+
   // Update the AI's behavior based on candidate performance
   const updateInterviewerBehavior = useCallback((
     candidateResponse: string,
@@ -116,13 +421,13 @@ export function useRealtimeInterview({
     // Store the response and score for adaptive behavior
     candidateResponsesRef.current.push(candidateResponse);
     performanceScoresRef.current.push(estimatedScore);
-    
+
     // Calculate metrics for adaptive prompting
     const recentScores = performanceScoresRef.current.slice(-3);
     const overallPerformance = performanceScoresRef.current.length > 0 ?
       performanceScoresRef.current.reduce((sum, score) => sum + score, 0) / performanceScoresRef.current.length : 5;
-    
-    const duration = startTimeRef.current ? 
+
+    const duration = startTimeRef.current ?
       (Date.now() - startTimeRef.current.getTime()) / 1000 / 60 : 0;
 
     // Extract insights for context-aware follow-ups
@@ -139,26 +444,30 @@ export function useRealtimeInterview({
       performanceLevel
     );
 
-    // Update the system prompt with adaptive behavior
-    const updatedInstructions = generateAdaptiveInstructions(
-      state.questionCount + 1,
-      duration,
-      recentScores,
-      overallPerformance
-    );
+    // For time-aware interviews, the continuous update system handles prompt updates
+    // For other interviews, use the legacy adaptive system
+    if (focusedType || interviewType === 'college') {
+      // Update the system prompt with adaptive behavior (legacy)
+      const updatedInstructions = generateAdaptiveInstructions(
+        state.questionCount + 1,
+        duration,
+        recentScores,
+        overallPerformance
+      );
 
-    // Send the updated instructions to the AI
-    if (clientRef.current) {
-      clientRef.current.updateSystemPrompt(updatedInstructions);
-      
-      // Also send context as a user message to influence the next question
-      setTimeout(() => {
-        clientRef.current?.sendUserMessage(
-          `[INTERNAL CONTEXT FOR NEXT QUESTION: ${followUpPrompt}]`
-        );
-      }, 500);
+      // Send the updated instructions to the AI
+      if (clientRef.current) {
+        clientRef.current.updateSystemPrompt(updatedInstructions);
+
+        // Also send context as a user message to influence the next question
+        setTimeout(() => {
+          clientRef.current?.sendUserMessage(
+            `[INTERNAL CONTEXT FOR NEXT QUESTION: ${followUpPrompt}]`
+          );
+        }, 500);
+      }
     }
-  }, [generateAdaptiveInstructions, state.questionCount]);
+  }, [generateAdaptiveInstructions, state.questionCount, focusedType, interviewType]);
 
   const handleCompleteTranscriptChunk = useCallback(async (chunk: TranscriptChunk) => {
     // Save complete chunks to Supabase
@@ -175,10 +484,27 @@ export function useRealtimeInterview({
       });
     }
 
-    // Track current question context for voice analysis
+    // Track current question context for voice analysis and question type classification
     if (chunk.speaker === 'assistant' && chunk.text.trim().endsWith('?')) {
       currentQuestionRef.current = chunk.text;
       questionTimestampRef.current = chunk.timestamp;
+
+      // Classify and track question type for time-aware context (only for standard/realtime interviews)
+      if (!focusedType && interviewType !== 'college') {
+        const questionType = classifyQuestionType(chunk.text);
+        coveredQuestionTypesRef.current.add(questionType);
+
+        // Extract and track topics
+        const topics = extractTopicsFromQuestion(chunk.text);
+        recentTopicsRef.current.push(...topics);
+        // Keep only last 10 topics
+        if (recentTopicsRef.current.length > 10) {
+          recentTopicsRef.current = recentTopicsRef.current.slice(-10);
+        }
+
+        // Start per-question timer for this question
+        startQuestionTimer(chunk.text);
+      }
     }
 
     // Collect user transcript chunks for accurate timing
@@ -192,10 +518,15 @@ export function useRealtimeInterview({
       const hasKeywords = ['experience', 'project', 'team', 'challenge', 'solution'].some(
         keyword => chunk.text.toLowerCase().includes(keyword)
       );
-      const estimatedScore = Math.min(10, Math.max(3, 
+      const estimatedScore = Math.min(10, Math.max(3,
         (responseLength > 20 ? 7 : 5) + (hasKeywords ? 2 : 0)
       ));
       updateInterviewerBehavior(chunk.text, estimatedScore);
+
+      // Track candidate claims for consistency testing (only for standard realtime interviews)
+      if (!focusedType && interviewType !== 'college' && currentQuestionRef.current) {
+        extractAndTrackClaims(chunk.text, currentQuestionRef.current, chunk.timestamp);
+      }
 
       // --- Voice Timeline Segmentation (fixed timestamps) ---
       // Use the first and last chunk timestamps for this response
@@ -213,7 +544,7 @@ export function useRealtimeInterview({
       currentUserChunksRef.current = [];
       // --- End Voice Timeline Segmentation ---
     }
-  }, [state.sessionId, updateInterviewerBehavior, setup.interviewMode]);
+  }, [state.sessionId, updateInterviewerBehavior, setup.interviewMode, focusedType, interviewType, extractAndTrackClaims]);
 
 
   // Initialize realtime client with adaptive prompting
@@ -222,10 +553,25 @@ export function useRealtimeInterview({
       clientRef.current.disconnect();
     }
 
-    // Use focused prompt for focused interviews, otherwise use adaptive prompt
-    const instructions = focusedType ? 
-      getFocusedInterviewPrompt(focusedType, setup) :
-      generateAdaptiveInstructions();
+    // Determine which prompt system to use:
+    // 1. Focused interviews: Use focused prompt
+    // 2. College interviews: Use adaptive prompt (legacy)
+    // 3. Standard realtime interviews: Use new time-aware unpredictable prompt
+    let instructions: string;
+
+    if (focusedType) {
+      instructions = getFocusedInterviewPrompt(focusedType, setup);
+    } else if (interviewType === 'college' || !('jobType' in setup)) {
+      // Legacy adaptive prompt for college or non-standard setups
+      instructions = generateAdaptiveInstructions();
+    } else {
+      // New time-aware unpredictable prompt for standard realtime interviews
+      const initialTimeContext = generateTimeContext();
+      instructions = buildUnpredictableInterviewPrompt({
+        setup: setup as InterviewSetup,
+        timeContext: initialTimeContext
+      });
+    }
 
     const config: Partial<RealtimeConfig> = {
       voice: 'alloy',
@@ -253,50 +599,78 @@ export function useRealtimeInterview({
         timerRef.current = setInterval(() => {
           setDuration(Math.floor((Date.now() - startTime) / 1000));
         }, 1000);
-        
-        // Send initial greeting message to start the interview with small talk (skip for focused interviews)
+
+        // Start continuous prompt updates for time-aware interviews
+        startContinuousPromptUpdates();
+
+        // Send initial greeting message to start the interview (professional and brief)
         setTimeout(() => {
           if (focusedType) {
             // For focused interviews, start immediately with direct instruction
             const directInstruction = `Start the interview immediately. This is a focused ${focusedType} interview session. Follow your instructions precisely - be direct, efficient, and get straight to the relevant questions. No small talk needed.`;
             clientRef.current?.createResponse(directInstruction);
+          } else if (interviewType !== 'college' && 'jobType' in setup) {
+            // For standard realtime interviews, use brief professional greeting (15 seconds max)
+            const currentTime = new Date();
+            const hour = currentTime.getHours();
+
+            const timeBasedGreeting =
+              hour < 12 ? "Good morning" :
+              hour < 17 ? "Good afternoon" :
+              "Good evening";
+
+            const professionalGreeting = `${timeBasedGreeting}! Thanks for joining me today. I'm looking forward to learning more about you and your experience. Let's get started - tell me a bit about your background and what brings you here today.`;
+
+            const briefProfessionalInstruction = `Start with this professional greeting (keep it under 15 seconds): "${professionalGreeting}"
+
+IMPORTANT RULES:
+- Keep the opening VERY brief - under 15 seconds total
+- NO small talk about weather, coffee, weekend, etc.
+- Get straight to the interview questions after they respond
+- Be professional and friendly, but efficient
+- After they introduce themselves, immediately transition to your first substantive interview question
+- Do NOT ask how their day is going or any casual conversation topics
+
+After they respond to your greeting, IMMEDIATELY move into the interview with your first real question based on your interview strategy.`;
+
+            clientRef.current?.createResponse(briefProfessionalInstruction);
           } else {
-            // For regular interviews, use the full small talk approach
+            // For college interviews or legacy interviews, keep the existing small talk approach
             const currentTime = new Date();
             const hour = currentTime.getHours();
             const dayOfWeek = currentTime.toLocaleDateString('en-US', { weekday: 'long' });
             const isWeekend = dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
-            
+
             // More human, contextual greetings
             const humanGreetings = [
               // Time-based natural greetings
-              hour < 10 ? "Good morning! I hope you've had a chance to grab some coffee or tea." : 
+              hour < 10 ? "Good morning! I hope you've had a chance to grab some coffee or tea." :
               hour < 12 ? "Good morning! How's your day shaping up so far?" :
               hour < 17 ? "Good afternoon! I hope you're having a good day." :
               hour < 20 ? "Good evening! How has your day been?" :
               "Good evening! I hope I'm not keeping you too late.",
-              
+
               // Day-specific greetings
               isWeekend ? `Happy ${dayOfWeek}! I appreciate you taking time on the weekend for this.` :
               dayOfWeek === 'Monday' ? "Happy Monday! How are you starting your week?" :
               dayOfWeek === 'Friday' ? "Happy Friday! Almost to the weekend - how are you feeling?" :
               `Happy ${dayOfWeek}! How's your week going so far?`,
-              
+
               // Weather/mood based (more conversational)
               "Hi there! Thanks for joining me today. How are you feeling right now?",
               "Hello! I'm really looking forward to our conversation. How has your day been treating you?",
               "Hey! Great to meet you. Are you somewhere comfortable to chat?",
               "Hi! I hope you're doing well today. How are you feeling about our conversation?",
-              
+
               // Energy/casual greetings
               "Hello there! I'm excited to get to know you better. How's everything going on your end?",
               "Hi! Thanks for making time to chat with me. What's been the highlight of your day so far?",
               "Good to see you! I hope you're having a nice day. How are you doing?",
               "Hello! I really appreciate you being here. How are you feeling today?"
             ];
-            
+
             const selectedGreeting = humanGreetings[Math.floor(Math.random() * humanGreetings.length)];
-            
+
             // More conversational follow-up prompts
             const conversationalPrompts = [
               "I'm curious - what's your energy level like today? Are you a morning person or more of an afternoon person?",
@@ -308,9 +682,9 @@ export function useRealtimeInterview({
               "I always like to check in - how has your week been going so far?",
               "Before we get started, what's one thing you're looking forward to this week?"
             ];
-            
+
             const followUpPrompt = conversationalPrompts[Math.floor(Math.random() * conversationalPrompts.length)];
-            
+
             const veryHumanSmallTalkInstruction = `Start with this natural greeting: "${selectedGreeting}"
 
 Wait for their response, then continue with genuine curiosity by asking: "${followUpPrompt}"
@@ -329,7 +703,7 @@ Take 2-3 minutes for this natural conversation. Let it flow organically. When it
 - "I love that! Okay, so let's talk about your experience..."
 
 Remember: Be genuinely human, not scripted. Listen actively and respond like a real person having a real conversation would.`;
-            
+
             clientRef.current?.createResponse(veryHumanSmallTalkInstruction);
           }
         }, 1000);
@@ -417,18 +791,23 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       onError?.(errorMessage);
     }
   }, [
-    setup, 
-    mediaStream, 
-    generateAdaptiveInstructions, 
-    onError, 
-    focusedType, 
-    setStatus, 
-    setError, 
-    setDuration, 
-    setSpeakerStatus, 
-    handleAssistantResponse, 
+    setup,
+    mediaStream,
+    generateAdaptiveInstructions,
+    onError,
+    focusedType,
+    interviewType,
+    setStatus,
+    setError,
+    setDuration,
+    setSpeakerStatus,
+    handleAssistantResponse,
     handleUserTranscript,
-    handleCompleteTranscriptChunk
+    handleCompleteTranscriptChunk,
+    generateTimeContext,
+    startContinuousPromptUpdates,
+    classifyQuestionType,
+    extractTopicsFromQuestion
   ]);
 
   // Start timer
@@ -594,7 +973,9 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     setStatus('paused');
     setRecording(false);
     stopTimer();
-    
+    stopContinuousPromptUpdates();
+    stopQuestionTimer();
+
     // Update session status in Supabase
     if (state.sessionId) {
       try {
@@ -607,12 +988,13 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         console.error('Failed to update realtime session status to paused:', supabaseError);
       }
     }
-  }, [stopTimer, state.sessionId, state.duration, state.questionCount, setStatus, setRecording]);
+  }, [stopTimer, stopContinuousPromptUpdates, stopQuestionTimer, state.sessionId, state.duration, state.questionCount, setStatus, setRecording]);
 
   const resumeInterview = useCallback(async () => {
     setStatus('interviewing');
     startTimer();
-    
+    startContinuousPromptUpdates();
+
     // Update session status in Supabase
     if (state.sessionId) {
       try {
@@ -623,7 +1005,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         console.error('Failed to update realtime session status to active:', supabaseError);
       }
     }
-  }, [startTimer, state.sessionId, setStatus]);
+  }, [startTimer, startContinuousPromptUpdates, state.sessionId, setStatus]);
 
   const getSpeechMetrics = useCallback(() => {
     return speechMetricsRef.current;
@@ -674,8 +1056,10 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
   const endInterview = useCallback(async () => {
     console.log('Ending realtime interview...');
     stopTimer();
+    stopContinuousPromptUpdates();
+    stopQuestionTimer();
     setStatus('processing');
-    
+
     // Stop sophisticated analytics
     sophisticatedAnalyticsEngine.stopAnalysis();
 
@@ -939,7 +1323,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       
       onComplete?.(fallbackData);
     }
-  }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
+  }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, stopContinuousPromptUpdates, stopQuestionTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
 
   const startRecording = useCallback(async () => {
     if (!clientRef.current || state.status !== 'interviewing') {
@@ -996,6 +1380,12 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       }
       if (timerRef.current) {
         clearInterval(timerRef.current);
+      }
+      if (promptUpdateTimerRef.current) {
+        clearInterval(promptUpdateTimerRef.current);
+      }
+      if (questionTimerRef.current) {
+        clearTimeout(questionTimerRef.current);
       }
       // Reset voice analysis
       resetSpeechMetrics();

@@ -74,7 +74,7 @@ const WaitlistSuccess: React.FC = () => {
     },    {
       icon: Calendar,
       label: "Beta Launch",
-      value: "August, 2025",
+      value: "January, 2026",
       change: "Coming soon"
     }
   ];

@@ -147,7 +147,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   onBack
 }) => {
   
-  const [isTranscriptCollapsed, setIsTranscriptCollapsed] = useState(false);
+  const [isTranscriptCollapsed, setIsTranscriptCollapsed] = useState(true);
   const [userMessage, setUserMessage] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);

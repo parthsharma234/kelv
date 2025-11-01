@@ -28,13 +28,6 @@ export interface VoiceMetrics {
   };
 }
 
-export interface CollegeInterviewSetup {
-  schoolType: string;
-  program: string;
-  major: string;
-  interviewMode: 'voice' | 'text';
-}
-
 export interface InterviewSetup {
   industry: string;
   jobType: string;
@@ -171,4 +164,35 @@ export interface AIInterviewerState {
   adaptationLevel: number; // How much to adapt based on responses
   questionFlow: 'linear' | 'adaptive' | 'branching';
   focusAreas: string[]; // Areas to focus on based on performance
+}
+
+// Time context for realtime interviews
+export interface TimeContext {
+  duration: number; // minutes elapsed
+  timeRemaining: number; // minutes remaining
+  percentComplete: number; // 0-100
+  questionCount: number;
+  recentTopics: string[];
+  coveredTypes: string[];
+  uncoveredTypes: string[];
+  coveragePercent: number; // 0-100
+  pace: number; // questions per minute
+  urgency: 'low' | 'medium' | 'high';
+}
+
+// Interview phase structure
+export interface InterviewPhase {
+  name: string;
+  startTime: number; // minutes
+  endTime: number; // minutes
+  questionTypes: string[];
+  intensity: number; // 1-10
+  objective: string;
+}
+
+// Candidate claim tracking for consistency testing
+export interface CandidateClaim {
+  question: string;
+  claim: string;
+  timestamp: number;
 }
