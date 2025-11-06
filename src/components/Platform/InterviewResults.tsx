@@ -1,95 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Target,
+import { motion, AnimatePresence } from 'framer-motion';
+import {
   ArrowLeft,
-  Trophy,
-  Brain,
-  MessageCircle,
-  TrendingUp,
-  Lightbulb,
-  Star,
-  CheckCircle,
-  FileText,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
   BarChart3,
-  Volume2,
-  Mic,
-  BookOpen,
-  Play,
+  TrendingUp,
+  Target,
   MessageSquare,
-  AlertCircle,
-  Clock
+  Award,
+  Mic,
+  Video,
+  FileText,
+  MessageCircle,
+  Heart
 } from 'lucide-react';
-import VoiceTimeline from './VoiceTimeline';
-import RedPandaLogo from '../RedPandaLogo';
-import SophisticatedResultsView from './SophisticatedResultsView';
-
-// Utility function to format category labels for standard interviews
-const formatCategoryLabel = (category: string): string => {
-  const categoryMappings: { [key: string]: string } = {
-    'behavioral': 'Behavioral',
-    'technical': 'Technical',
-    'situational': 'Situational',
-    'follow_up': 'Follow-up',
-    'cultural_fit': 'Cultural Fit',
-    'leadership': 'Leadership',
-    'problem_solving': 'Problem Solving',
-    'communication': 'Communication',
-    'teamwork': 'Teamwork',
-    'motivation': 'Motivation',
-    'goals': 'Goals',
-    'fit': 'Fit',
-    'challenge': 'Challenge',
-  };
-  
-  return categoryMappings[category] || category.split('_').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ');
-};
-
-// Add InterviewMetricDetail inline for use in this file
-const InterviewMetricDetail = ({ metric, sessionData, onBack }: { metric: string, sessionData: any, onBack: () => void }) => {
-  const responses = sessionData.responses || [];
-  const questions = sessionData.questions || [];
-  const transcript = sessionData.transcript || [];
-  return (
-    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
-      <div className="container max-w-3xl mx-auto px-4">
-        <button className="mb-6 px-4 py-2 bg-gray-700 text-white rounded" onClick={onBack}>Back</button>
-        <h1 className="text-3xl font-bold text-white mb-4 capitalize">{metric.replace('_', ' ')} Details</h1>
-        <div className="space-y-6 mb-12">
-          {responses.map((r: any, idx: number) => {
-            const q = questions.find((q: any) => q.id === r.questionId);
-            const score = r.analysis?.[metric];
-            if (score === undefined) return null;
-            return (
-              <div key={r.questionId || idx} className="bg-dark-800 rounded p-4 border border-dark-700">
-                <div className="mb-2 text-orange-400 font-semibold">Q{idx + 1}: {q?.text || r.question}</div>
-                <div className="mb-1 text-white">Score: <span className="font-bold">{score}/10</span></div>
-                <div className="mb-1 text-gray-300">Your Response: {r.response}</div>
-                <div className="text-gray-400">AI Feedback: {r.analysis?.feedback}</div>
-              </div>
-            );
-          })}
-        </div>
-        {/* Full Transcript Section */}
-        <div className="bg-dark-800 rounded p-4 border border-dark-700">
-          <h2 className="text-2xl font-semibold text-white mb-4">Full Transcript</h2>
-          <div className="space-y-2">
-            {transcript.length === 0 && <div className="text-gray-400">No transcript available.</div>}
-            {transcript.map((chunk: any, idx: number) => (
-              <div key={chunk.id || idx} className="flex items-start gap-3">
-                <span className={`font-bold ${chunk.speaker === 'user' ? 'text-blue-400' : 'text-orange-400'}`}>{chunk.speaker === 'user' ? 'You' : 'AI'}:</span>
-                <span className="text-gray-200">{chunk.text}</span>
-                <span className="text-xs text-gray-500 ml-auto">{chunk.timestamp ? new Date(chunk.timestamp).toLocaleTimeString() : ''}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 interface InterviewResultsProps {
   sessionData: any;
@@ -102,839 +28,644 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({
   onBackToDashboard,
   onStartNewInterview
 }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'transcript' | 'voice' | 'vision' | 'expression'>('overview');
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Add state for selected metric
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  // Extract data with safe fallbacks
+  const score = sessionData?.overallScore || 0;
+  const duration = sessionData?.duration || 0;
+  const questionsAnswered = sessionData?.questionsAnswered || sessionData?.questionCount || 0;
+  const responses = sessionData?.responses || [];
+  const questions = sessionData?.questions || [];
+  const transcript = sessionData?.transcript || [];
+  const expressionInsights = sessionData?.expressionInsights;
 
-  // Check if sophisticated analytics are available
-  const hasSophisticatedAnalytics = sessionData.sophisticatedAnalytics && 
-    sessionData.sophisticatedAnalytics.summary && 
-    sessionData.sophisticatedAnalytics.timeline;
-  if (!sessionData) {
-    return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center pt-24">
-        <div className="text-center">
-          <p className="text-red-400 text-lg">Session data not found</p>
-          <p className="text-gray-400 text-sm mt-2">Unable to load interview results</p>
-          <button
-            onClick={onBackToDashboard}
-            className="mt-4 px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const rawSetup = sessionData.setup || {};
-  const normalizedSetup = {
-    interviewType: sessionData.interviewType || rawSetup.jobType || 'general',
-    difficulty: rawSetup.experienceLevel || 'intermediate',
-    industry: rawSetup.industry || 'general',
-    interviewMode: rawSetup.interviewMode || 'text'
-  };
-
-  // Convert score to realistic percentage (40-95% range)
-  const convertToRealisticPercentage = (score: number) => {
-    // Score comes in as 1-10 or 0-100, normalize to 0-10 range
-    const normalizedScore = score > 10 ? score / 10 : score;
-    // Map 1-10 to 40-95% range with better distribution
-    // 1-2 = F (40-55%), 3-4 = D (56-65%), 5-6 = C (66-75%), 7-8 = B (76-85%), 9-10 = A (86-95%)
-    const percentage = Math.round(40 + (normalizedScore - 1) * (55 / 9));
-    return Math.max(40, Math.min(95, percentage));
-  };
-
-  const safeSessionData = {
-    ...sessionData,
-    overallScore: convertToRealisticPercentage(sessionData.overallScore || 7),
-    responses: sessionData.responses || [],
-    questions: sessionData.questions || [],
-    setup: normalizedSetup,
-    duration: sessionData.duration || 0,
-    questionsAnswered: sessionData.questionsAnswered || sessionData.responses?.length || 0,
-    startTime: sessionData.startTime || new Date(),
-    interviewType: sessionData.interviewType || 'general'
-  };
-
-  const formatTime = (seconds: number) => {
+  // Format duration
+  const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
   };
 
-  const getOverallGrade = (score: number) => {
-    const percentage = score;
-    if (percentage >= 90) return { grade: 'A', color: 'text-green-400', description: 'Outstanding performance! You\'re interview-ready.' };
-    if (percentage >= 80) return { grade: 'B', color: 'text-green-300', description: 'Excellent work! Strong professional readiness.' };
-    if (percentage >= 70) return { grade: 'C', color: 'text-yellow-400', description: 'Good responses that demonstrate competence.' };
-    if (percentage >= 60) return { grade: 'D', color: 'text-orange-400', description: 'Shows promise but needs focused improvement.' };
-    return { grade: 'F', color: 'text-red-400', description: 'Significant improvement needed for interview readiness.' };
+  // Get performance level
+  const getPerformanceLevel = (score: number) => {
+    if (score >= 90) return { label: 'Exceptional', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/30' };
+    if (score >= 75) return { label: 'Strong', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
+    if (score >= 60) return { label: 'Good', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' };
+    return { label: 'Needs Work', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' };
   };
 
-  const getMetricInsight = (metric: string, score: number) => {
-    const insights = {
-      'problem solving': {
-        high: "Excellent analytical thinking! You break down complex problems effectively.",
-        medium: "Good problem-solving approach, work on structuring your methodology more clearly.",
-        low: "Actionable: Before answering, take a moment to outline your approach. Start with a high-level summary, then dive into details."
-      },
-      communication: {
-        high: "Outstanding communication! Your ideas are clear, concise, and persuasive.",
-        medium: "Good communication. Actionable: Try using the PREP (Point, Reason, Example, Point) structure for more impact.",
-        low: "Actionable: Practice articulating your thoughts. Record yourself answering questions to identify areas for improvement."
-      },
-      depth: {
-        high: "Impressive depth of knowledge and detailed responses.",
-        medium: "Good depth, try to provide more specific examples and details.",
-        low: "Actionable: For each key skill on your resume, prepare a story that demonstrates your expertise with specific details and outcomes."
-      },
-      relevance: {
-        high: "Excellent focus! Your answers directly address the questions.",
-        medium: "Good relevance. Actionable: Listen carefully to the entire question and pause before answering to ensure you address all parts of it.",
-        low: "Actionable: Before answering, repeat the question to yourself to ensure you've understood it correctly. Stick to the question asked."
-      },
-      'speech rate': {
-        high: "Perfect speaking pace - ideal rhythm for interviews.",
-        medium: "Good speaking pace, try to maintain consistency.",
-        low: "Actionable: Your pace is a bit off. Practice with a metronome or a pacing app to get a feel for the ideal 140-170 WPM range."
-      },
-      fluency: {
-        high: "Outstanding fluency! You speak smoothly and naturally.",
-        medium: "Good fluency. Actionable: Identify your common filler words (e.g., 'um', 'like') and make a conscious effort to pause instead.",
-        low: "Actionable: Practice speaking in complete sentences without stopping. This will help improve your flow and reduce hesitations."
-      },
-      'voice confidence': {
-        high: "Excellent vocal confidence - you sound authoritative and engaging.",
-        medium: "Good voice confidence, project more conviction in your tone.",
-        low: "Actionable: Practice power posing before your interview. Speak from your diaphragm to project a stronger, more confident voice."
-      },
-      delivery: {
-        high: "Outstanding delivery! Your pacing and rhythm are engaging.",
-        medium: "Good delivery. Actionable: Modulate your tone and volume to add emphasis and keep the listener engaged.",
-        low: "Actionable: Record yourself and listen to your vocal variety. Practice emphasizing key words and varying your pace."
-      },
-    };
-    const level = score >= 8 ? 'high' : score >= 6 ? 'medium' : 'low';
-    const insight = insights[metric.toLowerCase() as keyof typeof insights]?.[level];
+  const performance = getPerformanceLevel(score);
 
-    if (metric.toLowerCase() === 'response time') {
-        if (score >= 8) return "Excellent response time! You're quick and decisive.";
-        if (score >= 6) return "Good response time. Actionable: A brief pause is fine, but aim to start your answer a little sooner.";
-        return "Actionable: You're taking a bit long to respond. Practice answering questions immediately after they are asked.";
+  // Process transcript into segments with questions
+  const transcriptSegments = React.useMemo(() => {
+    const segments: any[] = [];
+    let currentSegment: any = null;
+
+    transcript.forEach((chunk: any) => {
+      // Check if this is a new question
+      const isNewQuestion = chunk.speaker === 'assistant' && chunk.text.endsWith('?');
+
+      if (isNewQuestion) {
+        if (currentSegment) {
+          segments.push(currentSegment);
+        }
+        currentSegment = {
+          question: chunk.text,
+          conversation: [chunk]
+        };
+      } else if (currentSegment) {
+        currentSegment.conversation.push(chunk);
+      }
+    });
+
+    if (currentSegment) {
+      segments.push(currentSegment);
     }
 
-    return insight || "Keep practicing to improve this area.";
-  };
+    return segments;
+  }, [transcript]);
 
-  const getInterviewTypeAdvice = (interviewType: string) => {
-    const advice = {
-      behavioral: {
-        title: 'Behavioral Interview Tips',
-        tips: [
-          'Use The STAR Method For Structured Responses',
-          'Prepare Specific Examples From Your Experience',
-          'Show Growth Mindset In Challenge Situations',
-          'Demonstrate Leadership And Collaboration Skills'
-        ]
-      },
-      technical: {
-        title: 'Technical Interview Tips',
-        tips: [
-          'Practice Coding Problems Daily And Think Out Loud',
-          'Master Data Structures And Algorithm Fundamentals',
-          'Explain Your Approach Before Writing Code',
-          'Test Your Solutions With Edge Cases'
-        ]
-      },
-    };
-    return advice[interviewType as keyof typeof advice] || {
-      title: 'General Interview Tips',
-      tips: [
-        'Research The Company And Role Thoroughly',
-        'Prepare Specific Examples From Your Experience',
-        'Practice Common Interview Questions',
-        'Show Genuine Interest And Enthusiasm'
-      ]
-    };
-  };
+  return (
+    <div className="min-h-screen bg-dark-900">
+      {/* Header */}
+      <div className="border-b border-dark-700/50 bg-dark-800/30 backdrop-blur-xl sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xl font-semibold text-white">Interview Results</div>
 
-  const getSkillAdvice = (interviewType: string) => {
-    const advice = {
-      behavioral: [
-        'Reflect On Past Experiences And Lessons Learned',
-        'Practice Storytelling With Clear Structure',
-        'Develop Self-Awareness And Emotional Intelligence',
-        'Work On Communication And Presentation Skills'
-      ],
-      technical: [
-        'Practice LeetCode Problems Regularly',
-        'Study System Design Concepts',
-        'Review Computer Science Fundamentals',
-        'Build Projects To Demonstrate Skills'
-      ],
-    };
-    return advice[interviewType as keyof typeof advice] || [
-      'Continue Learning And Improving Relevant Skills',
-      'Seek Feedback From Mentors And Peers',
-      'Practice Interview Skills Regularly',
-      'Stay Updated With Industry Trends'
-    ];
-  };
-
-  const getNextSteps = (overallScore: number) => {
-    const percentage = overallScore;
-    if (percentage >= 85) {
-      return {
-        title: "You're Interview Ready! 🎉",
-        steps: [
-          "Apply to target roles with confidence",
-          "Research specific company cultures and values",
-          "Prepare thoughtful questions for your interviewers",
-          "Practice with senior professionals or mentors"
-        ]
-      };
-    } else if (percentage >= 75) {
-      return {
-        title: "Almost There - Polish Your Skills ✨",
-        steps: [
-          `Practice more behavioral and situational questions`,
-          "Refine your examples using the STAR method",
-          "Record yourself and review your performance",
-          "Get feedback from peers or experienced professionals"
-        ]
-      };
-    } else {
-      return {
-        title: "Build Your Foundation 💪",
-        steps: [
-          `Focus on interview fundamentals and core concepts`,
-          "Develop your professional story and key achievements",
-          "Practice basic interview etiquette and communication",
-          "Work with a mentor or interview coach for guidance"
-        ]
-      };
-    }
-  };
-
-  const overallGrade = getOverallGrade(safeSessionData.overallScore);
-  const interviewAdvice = getInterviewTypeAdvice(safeSessionData.interviewType);
-  const skillAdvice = getSkillAdvice(safeSessionData.interviewType);
-  const nextSteps = getNextSteps(safeSessionData.overallScore);
-
-  // If a metric is selected, show the detail page
-  if (selectedMetric) {
-    return <InterviewMetricDetail metric={selectedMetric} sessionData={sessionData} onBack={() => setSelectedMetric(null)} />;
-  }
-
-  // Show sophisticated analytics if available
-  if (hasSophisticatedAnalytics) {
-    return (
-      <div className="min-h-screen bg-dark-900 pt-24 pb-16">
-        <div className="container max-w-6xl mx-auto px-4">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
-          >
-            <div className="flex items-center gap-4 mb-6">
-              <button
-                onClick={() => {
-                  onBackToDashboard();
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-400" />
-              </button>
-              <div>
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-orange-500 rounded-full flex items-center justify-center mb-4">
-                  <Brain className="w-10 h-10 text-white" />
-                </div>
-                <h1 className="text-4xl font-bold gradient-text-orange mb-4">Sophisticated AI Analysis Complete!</h1>
-                <p className="text-gray-400 text-lg">
-                  Advanced computer vision and voice analytics have analyzed every aspect of your performance.
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Sophisticated Results */}
-          <SophisticatedResultsView analyticsReport={sessionData.sophisticatedAnalytics} />
-
-          {/* Action Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center mt-12"
-          >
             <button
-              onClick={() => {
-                onStartNewInterview();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="px-8 py-4 bg-gradient-to-r from-purple-500 to-orange-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-purple-500/25"
+              onClick={onStartNewInterview}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition-all"
             >
-              <Play className="w-5 h-5" />
-              Practice Another Interview
+              New Interview
+              <ArrowRight className="w-4 h-4" />
             </button>
-            
-            <button
-              onClick={() => {
-                onBackToDashboard();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="px-8 py-4 bg-dark-800 hover:bg-dark-700 text-gray-300 rounded-xl font-semibold transition-colors border border-gray-700"
-            >
-              Back to Dashboard
-            </button>
-          </motion.div>
+          </div>
         </div>
       </div>
-    );
-  }
-  return (
-    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
-      <div className="container max-w-6xl mx-auto px-4">
-        {/* Header */}
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-12">
+
+        {/* Hero Score Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <CheckCircle2 className="w-7 h-7 text-green-400" />
+            <span className="text-lg font-semibold text-green-400">Interview Complete</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Score Card */}
+            <div className="lg:col-span-2 bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-8">
+              <div className="flex items-end gap-6">
+                <div>
+                  <div className="text-sm text-gray-500 mb-2">Overall Score</div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-7xl font-bold text-white">{score}</span>
+                    <span className="text-4xl text-gray-600 font-semibold">/100</span>
+                  </div>
+                  <div className={`inline-flex items-center gap-2 mt-4 px-4 py-2 ${performance.bg} border ${performance.border} rounded-full`}>
+                    <Award className={`w-4 h-4 ${performance.color}`} />
+                    <span className={`font-semibold ${performance.color}`}>{performance.label} Performance</span>
+                  </div>
+                </div>
+
+                {/* Visual Score Ring */}
+                <div className="flex-1 flex justify-center items-center">
+                  <div className="relative w-48 h-48">
+                    <svg className="transform -rotate-90 w-48 h-48">
+                      <circle
+                        cx="96"
+                        cy="96"
+                        r="88"
+                        stroke="currentColor"
+                        strokeWidth="12"
+                        fill="transparent"
+                        className="text-dark-700"
+                      />
+                      <motion.circle
+                        cx="96"
+                        cy="96"
+                        r="88"
+                        stroke="currentColor"
+                        strokeWidth="12"
+                        fill="transparent"
+                        strokeDasharray={`${2 * Math.PI * 88}`}
+                        strokeDashoffset={`${2 * Math.PI * 88 * (1 - score / 100)}`}
+                        className="text-orange-500"
+                        strokeLinecap="round"
+                        initial={{ strokeDashoffset: 2 * Math.PI * 88 }}
+                        animate={{ strokeDashoffset: 2 * Math.PI * 88 * (1 - score / 100) }}
+                        transition={{ duration: 1.5, ease: "easeInOut" }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <TrendingUp className="w-12 h-12 text-orange-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="space-y-4">
+              <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Clock className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <span className="text-sm text-gray-500">Duration</span>
+                </div>
+                <div className="text-3xl font-bold text-white">{formatDuration(duration)}</div>
+              </div>
+
+              <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-orange-500/10 rounded-lg">
+                    <MessageSquare className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <span className="text-sm text-gray-500">Questions</span>
+                </div>
+                <div className="text-3xl font-bold text-white">{questionsAnswered}</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-4 mb-8 border-b border-dark-700/50">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-6 py-3 font-semibold transition-all relative ${
+              activeTab === 'overview'
+                ? 'text-orange-400'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Overview
+            </div>
+            {activeTab === 'overview' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('transcript')}
+            className={`px-6 py-3 font-semibold transition-all relative ${
+              activeTab === 'transcript'
+                ? 'text-orange-400'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Transcript Analysis
+            </div>
+            {activeTab === 'transcript' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('voice')}
+            className={`px-6 py-3 font-semibold transition-all relative ${
+              activeTab === 'voice'
+                ? 'text-orange-400'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Mic className="w-4 h-4" />
+              Voice Analysis
+            </div>
+            {activeTab === 'voice' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('vision')}
+            className={`px-6 py-3 font-semibold transition-all relative ${
+              activeTab === 'vision'
+                ? 'text-orange-400'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Video className="w-4 h-4" />
+              Vision Analysis
+            </div>
+            {activeTab === 'vision' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"
+              />
+            )}
+          </button>
+          {expressionInsights && (
             <button
-              onClick={() => {
-                onBackToDashboard();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
+              onClick={() => setActiveTab('expression')}
+              className={`px-6 py-3 font-semibold transition-all relative ${
+                activeTab === 'expression'
+                  ? 'text-orange-400'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
             >
-              <ArrowLeft className="w-5 h-5 text-gray-400" />
+              <div className="flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Expression Analysis
+              </div>
+              {activeTab === 'expression' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"
+                />
+              )}
             </button>
-            <div>
-              <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center mb-4">
-                <Trophy className="w-10 h-10 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold gradient-text-orange mb-4">Interview Complete!</h1>
-              <p className="text-gray-400 text-lg">
-                Your standard interview practice session has been analyzed with detailed AI feedback.
-              </p>
-            </div>
-          </div>
-        </motion.div>
+          )}
+        </div>
 
-        {/* Overall Performance Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-orange-500/10 to-amber-400/5 rounded-2xl p-8 border border-orange-500/20 mb-8"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-5xl font-bold gradient-text-orange mb-2">{safeSessionData.overallScore}%</div>
-              <div className={`text-2xl font-bold ${overallGrade.color} mb-1`}>{overallGrade.grade}</div>
-              <p className="text-gray-400 text-sm">{overallGrade.description}</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">{formatTime(safeSessionData.duration)}</div>
-              <p className="text-gray-400 text-sm">Interview Duration</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">{safeSessionData.questionsAnswered}</div>
-              <p className="text-gray-400 text-sm">Questions Answered</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <Trophy className={`w-8 h-8 ${safeSessionData.overallScore >= 80 ? 'text-yellow-400' : 'text-gray-500'}`} />
-                {safeSessionData.overallScore >= 80 ? 'Role Ready' : 'Needs Practice'}
-              </div>
-              <p className="text-gray-400 text-sm">Standard Interview</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Interview Performance Metrics */}
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'overview' && (
             <motion.div
+              key="overview"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
             >
-              <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
-                <BarChart3 className="w-5 h-5 text-orange-400" />
-                Interview Performance
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(() => {
-                  const metrics = safeSessionData.metrics || {};
-                  const responses = safeSessionData.responses || [];
-                  const validResponses = responses.filter((r: any) => r.analysis);
-                  
-                  const getAvgScore = (metricName: string, fallbackMetric?: string) => {
-                    if (metrics[metricName]) return metrics[metricName];
-                    if (validResponses.length === 0) return 5;
-                    const scores = validResponses.map((r: any) => r.analysis[metricName] || (fallbackMetric ? r.analysis[fallbackMetric] : 0) || 0);
-                    return Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
-                  };
-
-                  return [
-                    { name: 'Problem Solving', score: getAvgScore('problem_solving', 'depth'), icon: Brain, color: 'from-orange-500 to-amber-500' },
-                    { name: 'Communication', score: getAvgScore('communication', 'clarity'), icon: MessageCircle, color: 'from-amber-500 to-orange-500' },
-                    { name: 'Depth', score: getAvgScore('depth'), icon: Target, color: 'from-orange-600 to-amber-500' },
-                    { name: 'Relevance', score: getAvgScore('relevance', 'specificity'), icon: CheckCircle, color: 'from-amber-600 to-orange-500' }
-                  ];
-                })().map((metric, index) => (
-                  <motion.div
-                    key={metric.name}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + index * 0.1 }}
-                    className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30 cursor-pointer hover:bg-dark-600/40 transition-colors"
-                    onClick={() => setSelectedMetric(metric.name.toLowerCase().replace(/\s/g, '_'))}
-                    role="button"
-                    tabIndex={0}
-                    onKeyPress={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedMetric(metric.name.toLowerCase().replace(/\s/g, '_')); }}
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
-                        <metric.icon className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-white">{metric.name}</span>
-                          <span className="text-lg font-semibold text-white">{metric.score}/10</span>
+              <div className="grid grid-cols-1 gap-6">
+                {/* Question Performance */}
+                <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Target className="w-6 h-6 text-blue-400" />
+                    <h3 className="text-xl font-bold text-white">Question Performance</h3>
+                  </div>
+                  <div className="space-y-6">
+                    {responses.map((response: any, idx: number) => {
+                      const responseScore = (response.analysis?.score || 0) * 10;
+                      const question = questions[idx];
+                      return (
+                        <div key={idx}>
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="text-sm text-gray-400 mb-1">Question {idx + 1}</div>
+                              <div className="text-white font-medium">{question?.text || response.question || 'Question'}</div>
+                            </div>
+                            <div className="ml-4 text-right">
+                              <div className="text-2xl font-bold text-white">{Math.round(responseScore)}</div>
+                              <div className="text-xs text-gray-500">/ 100</div>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${responseScore}%` }}
+                              transition={{ duration: 1, delay: idx * 0.1 }}
+                              className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
+                            />
+                          </div>
+                          {response.analysis?.feedback && (
+                            <div className="mt-3 text-sm text-gray-400 bg-dark-700/30 rounded-lg p-3">
+                              {response.analysis.feedback}
+                            </div>
+                          )}
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'transcript' && (
+            <motion.div
+              key="transcript"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl"
+            >
+              {/* Document-style header */}
+              <div className="border-b border-dark-700/50 px-8 py-4">
+                <h3 className="text-xl font-semibold text-white">Interview Transcript</h3>
+                <div className="text-sm text-gray-500 mt-1">
+                  {formatDuration(duration)} • {questionsAnswered} questions
+                </div>
+              </div>
+
+              {/* Document-style content */}
+              <div className="px-16 py-8 max-h-[800px] overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
+                  {transcriptSegments.map((segment: any, segIdx: number) => {
+                    const response = responses[segIdx];
+                    const responseScore = response ? (response.analysis?.score || 0) * 10 : 0;
+
+                    return (
+                      <div key={segIdx} className="mb-12 relative group">
+                        {/* Question as heading */}
+                        <h4 className="text-lg font-semibold text-white mb-4 pr-24">
+                          Q{segIdx + 1}: {segment.question}
+                        </h4>
+
+                        {/* Score badge on the right */}
+                        <div className="absolute top-0 right-0 flex items-center gap-2">
+                          <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            responseScore >= 80 ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                            responseScore >= 60 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                            responseScore >= 40 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                            'bg-red-500/20 text-red-400 border border-red-500/30'
+                          }`}>
+                            {Math.round(responseScore)}%
+                          </div>
+                        </div>
+
+                        {/* Conversation */}
+                        <div className="space-y-3">
+                          {segment.conversation.slice(1).map((chunk: any, chunkIdx: number) => (
+                            <div key={chunkIdx} className={`${chunk.speaker === 'user' ? 'pl-8' : ''}`}>
+                              <div className={`text-gray-300 leading-relaxed ${
+                                chunk.speaker === 'user' ? 'font-medium' : ''
+                              }`}>
+                                <span className={`text-xs font-semibold uppercase tracking-wide mr-2 ${
+                                  chunk.speaker === 'user' ? 'text-blue-400' : 'text-gray-500'
+                                }`}>
+                                  {chunk.speaker === 'user' ? 'You' : 'AI'}:
+                                </span>
+                                {chunk.text}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* AI Comment (like Google Docs comment) */}
+                        {response?.analysis?.feedback && (
+                          <div className="mt-4 ml-8 border-l-4 border-orange-500 pl-4 py-2 bg-orange-500/10 rounded-r">
+                            <div className="flex items-start gap-2">
+                              <MessageCircle className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <div className="text-xs font-semibold text-orange-400 mb-1">AI Feedback</div>
+                                <div className="text-sm text-gray-300">{response.analysis.feedback}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'voice' && (
+            <motion.div
+              key="voice"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-12 text-center"
+            >
+              <Mic className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-white mb-3">Voice Analysis Coming Soon</h3>
+              <p className="text-gray-400 max-w-2xl mx-auto">
+                We're working on advanced voice analytics including tone, pace, filler words, and confidence detection.
+              </p>
+            </motion.div>
+          )}
+
+          {activeTab === 'vision' && (
+            <motion.div
+              key="vision"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-12 text-center"
+            >
+              <Video className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-white mb-3">Vision Analysis Coming Soon</h3>
+              <p className="text-gray-400 max-w-2xl mx-auto">
+                Computer vision analysis will provide insights on body language, eye contact, posture, and facial expressions.
+              </p>
+            </motion.div>
+          )}
+
+          {activeTab === 'expression' && expressionInsights && (
+            <motion.div
+              key="expression"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-1 gap-6">
+                {/* Emotional Profile */}
+                <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Heart className="w-6 h-6 text-pink-400" />
+                    <h3 className="text-xl font-bold text-white">Emotional Profile</h3>
+                  </div>
+
+                  {/* Dominant Emotions */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Top Emotions</h4>
+                    <div className="space-y-3">
+                      {expressionInsights.overallEmotionalProfile.dominantEmotions.map((emotion: any, index: number) => (
+                        <div key={index} className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-white">{emotion.name}</span>
+                              <span className="text-sm text-gray-400">{(emotion.score * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  index === 0 ? 'bg-pink-500' :
+                                  index === 1 ? 'bg-purple-500' :
+                                  index === 2 ? 'bg-blue-500' :
+                                  'bg-gray-500'
+                                }`}
+                                style={{ width: `${emotion.score * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Emotional Metrics */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-dark-900/50 rounded-xl p-4 border border-dark-700/30">
+                      <div className="text-sm text-gray-400 mb-1">Emotional Stability</div>
+                      <div className="text-2xl font-bold text-white">
+                        {(expressionInsights.overallEmotionalProfile.emotionalStability * 100).toFixed(0)}%
                       </div>
                     </div>
-                    <div className="mb-3">
-                      <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${metric.score * 10}%` }}
-                          transition={{ duration: 1.5, delay: 0.3 + index * 0.1 }}
-                          className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                    <div className="bg-dark-900/50 rounded-xl p-4 border border-dark-700/30">
+                      <div className="text-sm text-gray-400 mb-1">Positive Emotion Ratio</div>
+                      <div className="text-2xl font-bold text-white">
+                        {(expressionInsights.overallEmotionalProfile.positiveEmotionRatio * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Communication Style */}
+                <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <MessageSquare className="w-6 h-6 text-blue-400" />
+                    <h3 className="text-xl font-bold text-white">Communication Style</h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-300">Confidence</span>
+                        <span className="text-sm text-gray-400">{(expressionInsights.communicationStyle.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-3 bg-dark-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full"
+                          style={{ width: `${expressionInsights.communicationStyle.confidence * 100}%` }}
                         />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
 
-            {/* Voice Analysis Section */}
-            {safeSessionData.setup.interviewMode === 'voice' && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
-                className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-              >
-                <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
-                  <Mic className="w-5 h-5 text-orange-400" />
-                  Advanced Voice Analysis
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {(() => {
-                    const metricsObj = safeSessionData.voice_metrics_summary || safeSessionData.speech_metrics?.[0]?.metrics || {};
-                    const voiceMetrics = [];
-                    
-                    // 6 main voice metrics with realistic fallbacks
-                    if (metricsObj.speechRate !== undefined) {
-                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.speechRate / 20)));
-                      voiceMetrics.push({ name: 'Speech Rate', score, icon: TrendingUp, color: 'from-orange-500 to-amber-500', detail: `${Math.round(metricsObj.speechRate)} WPM` });
-                    } else {
-                      // Fallback based on overall performance
-                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
-                      voiceMetrics.push({ name: 'Speech Rate', score: fallbackScore, icon: TrendingUp, color: 'from-orange-500 to-amber-500', detail: `${120 + (fallbackScore - 5) * 10} WPM` });
-                    }
-                    
-                    if (metricsObj.fluencyScore !== undefined) {
-                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.fluencyScore / 10)));
-                      voiceMetrics.push({ name: 'Fluency', score, icon: Volume2, color: 'from-amber-500 to-orange-500', detail: `${Math.round(metricsObj.fluencyScore)}% fluency` });
-                    } else {
-                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
-                      voiceMetrics.push({ name: 'Fluency', score: fallbackScore, icon: Volume2, color: 'from-amber-500 to-orange-500', detail: `${40 + fallbackScore * 6}% fluency` });
-                    }
-                    
-                    if (metricsObj.voiceConfidence !== undefined) {
-                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.voiceConfidence / 10)));
-                      voiceMetrics.push({ name: 'Voice Confidence', score, icon: Mic, color: 'from-orange-600 to-amber-500', detail: `${Math.round(metricsObj.voiceConfidence)}% confidence` });
-                    } else {
-                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
-                      voiceMetrics.push({ name: 'Voice Confidence', score: fallbackScore, icon: Mic, color: 'from-orange-600 to-amber-500', detail: `${45 + fallbackScore * 5}% confidence` });
-                    }
-                    
-                    if (metricsObj.deliveryScore !== undefined) {
-                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.deliveryScore / 10)));
-                      voiceMetrics.push({ name: 'Delivery', score, icon: Play, color: 'from-amber-600 to-orange-500', detail: `${Math.round(metricsObj.deliveryScore)}% delivery` });
-                    } else {
-                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
-                      voiceMetrics.push({ name: 'Delivery', score: fallbackScore, icon: Play, color: 'from-amber-600 to-orange-500', detail: `${50 + fallbackScore * 5}% delivery` });
-                    }
-                    
-                    if (metricsObj.clarityScore !== undefined) {
-                      const score = Math.round(Math.min(10, Math.max(1, metricsObj.clarityScore / 10)));
-                      voiceMetrics.push({ name: 'Clarity', score, icon: MessageSquare, color: 'from-orange-500 to-amber-600', detail: `${Math.round(metricsObj.clarityScore)}% clarity` });
-                    } else {
-                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
-                      voiceMetrics.push({ name: 'Clarity', score: fallbackScore, icon: MessageSquare, color: 'from-orange-500 to-amber-600', detail: `${55 + fallbackScore * 4}% clarity` });
-                    }
-                    
-                    if (metricsObj.fillerWordCount !== undefined) {
-                      // Invert filler word count - fewer is better (max 10 for scoring)
-                      const score = Math.round(Math.min(10, Math.max(1, 10 - Math.min(9, metricsObj.fillerWordCount))));
-                      voiceMetrics.push({ name: 'Filler Words', score, icon: AlertCircle, color: 'from-amber-500 to-orange-600', detail: `${Math.round(metricsObj.fillerWordCount)} fillers` });
-                    } else {
-                      const fallbackScore = Math.max(4, Math.min(9, Math.round(safeSessionData.overallScore / 10)));
-                      const fillerCount = Math.max(0, 12 - fallbackScore);
-                      voiceMetrics.push({ name: 'Filler Words', score: fallbackScore, icon: AlertCircle, color: 'from-amber-500 to-orange-600', detail: `${fillerCount} fillers` });
-                    }
-
-                    if (safeSessionData.responseTimes && safeSessionData.responseTimes.length > 0) {
-                        const avgResponseTime = safeSessionData.responseTimes.reduce((a: number, b: number) => a + b, 0) / safeSessionData.responseTimes.length;
-                        const score = Math.round(Math.min(10, Math.max(1, 10 - (avgResponseTime / 1000))));
-                        voiceMetrics.push({ name: 'Response Time', score, icon: Clock, color: 'from-teal-500 to-cyan-500', detail: `${(avgResponseTime / 1000).toFixed(2)}s avg` });
-                    }
-                    
-                    return voiceMetrics;
-                  })().map((metric, index) => (
-                    <motion.div
-                      key={metric.name}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + index * 0.1 }}
-                      className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/30"
-                    >
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.color}`}>
-                          <metric.icon className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-white">{metric.name}</span>
-                            <span className="text-lg font-semibold text-white">{metric.score}/10</span>
-                          </div>
-                        </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-300">Enthusiasm</span>
+                        <span className="text-sm text-gray-400">{(expressionInsights.communicationStyle.enthusiasm * 100).toFixed(0)}%</span>
                       </div>
-                      <div className="mb-3">
-                        <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${metric.score * 10}%` }}
-                            transition={{ duration: 1.5, delay: 0.4 + index * 0.1 }}
-                            className={`h-full bg-gradient-to-r ${metric.color} rounded-full`}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-400">{metric.detail}</p>
-                        <p className="text-xs text-gray-400">{getMetricInsight(metric.name.toLowerCase(), metric.score)}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-                
-                {/* Voice Timeline within Advanced Voice Analysis */}
-                {safeSessionData.voiceTimeline && (
-                  <div className="mt-8">
-                    <VoiceTimeline 
-                      voiceTimeline={safeSessionData.voiceTimeline} 
-                    />
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* Question-by-Question Analysis - Compact Style */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-                  <RedPandaLogo size="sm" animate={false} className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-orange-400" />
-                    Question-by-Question Analysis
-                  </h3>
-                  <p className="text-gray-400 text-sm">Detailed feedback from your AI interview coach</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {safeSessionData.responses.map((response: any, index: number) => {
-                  const question = safeSessionData.questions.find((q: any) => q.id === response.questionId);
-                  const analysis = response.analysis || {};
-                  const responseTime = safeSessionData.responseTimes?.[index];
-
-                  const score = analysis.score || 7;
-                  const scoreColorClass = score >= 8
-                      ? 'bg-green-500/20 text-green-400'
-                      : score >= 6
-                      ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'bg-red-500/20 text-red-400';
-
-                  const feedbackText = analysis.feedback ||
-                      (score >= 8
-                      ? 'Excellent response! You demonstrated strong understanding and clear communication.'
-                      : score >= 6
-                      ? 'Good response with room for improvement in detail and structure.'
-                      : 'This is a learning opportunity. Focus on providing more specific examples.');
-
-                  const strengths = (analysis.strengths && analysis.strengths.length > 0
-                      ? analysis.strengths
-                      : ['Responded to the question clearly.', 'Structured the answer logically.']
-                  ).slice(0, 2);
-
-                  const areasForImprovement = (analysis.areasForImprovement && analysis.areasForImprovement.length > 0
-                      ? analysis.areasForImprovement
-                      : [
-                          'Actionable: Add more specific details to your examples.',
-                          'Actionable: Conclude your answer with a strong summary.',
-                          ]
-                  ).slice(0, 2);
-
-                  return (
-                    <div key={response.questionId || index} className="border border-dark-600/50 rounded-lg overflow-hidden">
-                      {/* Question Header - Compact */}
-                      <div className="bg-dark-700/30 p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-gray-400">Q{index + 1}</span>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400">
-                                {formatCategoryLabel(question?.category || 'General')}
-                              </span>
-                            </div>
-                            <p className="text-white text-sm font-medium">{question?.text || response.question}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {responseTime !== undefined && (
-                                <div className="text-xs text-gray-400 flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{(responseTime / 1000).toFixed(2)}s</span>
-                                </div>
-                            )}
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${scoreColorClass}`}>
-                                {score}/10
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Response and Feedback - Compact */}
-                      <div className="p-3 space-y-3">
-                        <div className="bg-dark-700/20 rounded p-2">
-                          <h5 className="text-xs font-medium text-gray-400 mb-1">Your Response</h5>
-                          <p className="text-gray-300 text-xs leading-relaxed">
-                            {response.response || response.text || 'No response recorded'}
-                          </p>
-                        </div>
-
-                        {analysis && (
-                          <>
-                            <div>
-                              <h5 className="text-xs font-medium text-gray-400 mb-1">Feedback</h5>
-                              <p className="text-gray-300 text-xs">{feedbackText}</p>
-                            </div>
-
-                            {/* Compact metrics grid */}
-                            <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                              <div>
-                                <div className="text-white font-medium">{analysis.clarity || analysis.communication || 7}</div>
-                                <div className="text-gray-500">Clarity</div>
-                              </div>
-                              <div>
-                                <div className="text-white font-medium">{analysis.relevance || analysis.specificity || 7}</div>
-                                <div className="text-gray-500">Relevance</div>
-                              </div>
-                              <div>
-                                <div className="text-white font-medium">{analysis.depth || 6}</div>
-                                <div className="text-gray-500">Depth</div>
-                              </div>
-                              <div>
-                                <div className="text-white font-medium">{analysis.confidence || analysis.voice_confidence || 7}</div>
-                                <div className="text-gray-500">Confidence</div>
-                              </div>
-                            </div>
-
-                            {/* Compact strengths and improvements */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-2 border-t border-dark-600/30">
-                              <div>
-                                <h5 className="text-xs font-medium text-green-400 mb-1 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  Strengths
-                                </h5>
-                                <ul className="space-y-0.5">
-                                  {strengths.map((strength: string, idx: number) => (
-                                      <li key={idx} className="text-xs text-gray-300 flex items-start">
-                                          <div className="w-1 h-1 bg-green-400 rounded-full mr-1 mt-1.5 flex-shrink-0" />
-                                          {strength.charAt(0).toUpperCase() + strength.slice(1)}
-                                      </li>
-                                  ))}
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h5 className="text-xs font-medium text-orange-400 mb-1 flex items-center gap-1">
-                                  <Target className="w-3 h-3" />
-                                  Improve
-                                </h5>
-                                <ul className="space-y-0.5">
-                                  {areasForImprovement.map((area: string, idx: number) => (
-                                      <li key={idx} className="text-xs text-gray-300 flex items-start">
-                                          <div className="w-1 h-1 bg-orange-400 rounded-full mr-1 mt-1.5 flex-shrink-0" />
-                                          {area.charAt(0).toUpperCase() + area.slice(1)}
-                                      </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                      <div className="h-3 bg-dark-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-500 rounded-full"
+                          style={{ width: `${expressionInsights.communicationStyle.enthusiasm * 100}%` }}
+                        />
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Next Steps */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-orange-400" />
-                {nextSteps.title}
-              </h3>
-              <div className="space-y-3">
-                {nextSteps.steps.map((step, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <span className="text-white text-xs font-bold">{index + 1}</span>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-300">Authenticity</span>
+                        <span className="text-sm text-gray-400">{(expressionInsights.communicationStyle.authenticity * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-3 bg-dark-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-500 rounded-full"
+                          style={{ width: `${expressionInsights.communicationStyle.authenticity * 100}%` }}
+                        />
+                      </div>
                     </div>
-                    <p className="text-gray-300 text-sm">{step}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 space-y-3">
-                <button
-                  onClick={() => {
-                    onStartNewInterview();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg hover:from-orange-400 hover:to-amber-400 transition-all font-medium flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Practice Again
-                </button>
-              </div>
-            </motion.div>
 
-            {/* Interview Type Advice */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Brain className="w-5 h-5 text-orange-400" />
-                {interviewAdvice.title}
-              </h3>
-              <div className="space-y-3">
-                {interviewAdvice.tips.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Lightbulb className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-1" />
-                    <p className="text-gray-300 text-sm">{tip}</p>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-300">Stress Level</span>
+                        <span className="text-sm text-gray-400">{(expressionInsights.communicationStyle.stress * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-3 bg-dark-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-red-500 rounded-full"
+                          style={{ width: `${expressionInsights.communicationStyle.stress * 100}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </motion.div>
+                </div>
 
-            {/* Skill Development */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-orange-400" />
-                Skill Development Tips
-              </h3>
-              <div className="space-y-3">
-                {skillAdvice.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Star className="w-4 h-4 text-orange-400 flex-shrink-0 mt-1" />
-                    <p className="text-gray-300 text-sm">{tip}</p>
+                {/* Timeline Analysis */}
+                <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <TrendingUp className="w-6 h-6 text-green-400" />
+                    <h3 className="text-xl font-bold text-white">Emotional Trajectory</h3>
                   </div>
-                ))}
-              </div>
-            </motion.div>
 
-            {/* Session Details */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
-              className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700"
-            >
-              <h3 className="text-lg font-semibold text-white mb-4">Session Details</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Interview Type:</span>
-                  <span className="text-white capitalize">
-                    {safeSessionData.interviewType.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()).trim()}
-                  </span>
+                  <div className="mb-6">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-dark-900/50 rounded-lg border border-dark-700/30">
+                      <span className="text-sm text-gray-400">Overall Trajectory:</span>
+                      <span className={`text-sm font-semibold ${
+                        expressionInsights.timelineAnalysis.emotionalTrajectory === 'improving' ? 'text-green-400' :
+                        expressionInsights.timelineAnalysis.emotionalTrajectory === 'declining' ? 'text-red-400' :
+                        'text-yellow-400'
+                      }`}>
+                        {expressionInsights.timelineAnalysis.emotionalTrajectory.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {expressionInsights.timelineAnalysis.peakMoments.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Peak Moments</h4>
+                      <div className="space-y-2">
+                        {expressionInsights.timelineAnalysis.peakMoments.map((moment: any, index: number) => (
+                          <div key={index} className="flex items-center gap-3 text-sm">
+                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                            <span className="text-gray-300">{moment.emotion}</span>
+                            <span className="text-gray-500">at {Math.floor(moment.time)}s</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {expressionInsights.timelineAnalysis.lowMoments.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Challenging Moments</h4>
+                      <div className="space-y-2">
+                        {expressionInsights.timelineAnalysis.lowMoments.map((moment: any, index: number) => (
+                          <div key={index} className="flex items-center gap-3 text-sm">
+                            <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                            <span className="text-gray-300">{moment.emotion}</span>
+                            <span className="text-gray-500">at {Math.floor(moment.time)}s</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Difficulty:</span>
-                  <span className="text-white capitalize">{safeSessionData.setup.difficulty}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Industry:</span>
-                  <span className="text-white capitalize">{safeSessionData.setup.industry}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Interview Mode:</span>
-                  <span className="text-white capitalize">{safeSessionData.setup.interviewMode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Date:</span>
-                  <span className="text-white">
-                    {new Date(safeSessionData.startTime).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Interview Focus:</span>
-                  <span className="text-orange-400">Standard Practice</span>
+
+                {/* Recommendations */}
+                <div className="bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 rounded-2xl p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Award className="w-6 h-6 text-orange-400" />
+                    <h3 className="text-xl font-bold text-white">Recommendations</h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    {expressionInsights.recommendations.map((recommendation: string, index: number) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-gray-300 leading-relaxed">{recommendation}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>
-          </div>
-        </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

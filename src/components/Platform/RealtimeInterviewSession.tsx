@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Clock, ArrowLeft, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, Brain, MessageCircle, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Clock, ArrowLeft, ArrowRight, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, Brain, MessageCircle, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
 import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
 import AIInterviewer from '../AIInterviewer';
-import SophisticatedAnalyticsOverlay from './SophisticatedAnalyticsOverlay';
-import { computerVisionAnalyzer } from '../../utils/computerVision';
-import { advancedVoiceAnalyzer } from '../../utils/advancedVoiceAnalytics';
 
 interface RealtimeInterviewSessionProps {
   setup: InterviewSetup | CollegeInterviewSetup;
@@ -154,8 +152,6 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<any>(null); // Store final session data after completion
-  const [showAnalytics, setShowAnalytics] = useState(true);
-  const [analyticsMinimized, setAnalyticsMinimized] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -165,23 +161,30 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const focusedType = isFocusedInterview ? interviewType : undefined;
   const actualInterviewType = isFocusedInterview ? 'focused' : interviewType;
 
-  // Memoize the hook options to prevent recreation on each render
+  // Memoize the completion handler
   const handleComplete = useCallback((data: any) => {
+    if (!data) {
+      console.error('❌ RealtimeInterviewSession: Received null/undefined data');
+      return;
+    }
     setSessionData(data);
     onComplete(data);
   }, [onComplete]);
 
-  const hookOptions = useMemo(() => ({
-    setup,
-    interviewType: actualInterviewType,
-    focusedType,
-    mediaStream: stream, // Pass the media stream to avoid duplicate audio streams
-    onComplete: handleComplete,
-    onError: (error: string) => {
-      console.error('Realtime interview error:', error);
-      setCameraError(error);
-    }
-  }), [setup, actualInterviewType, focusedType, stream, handleComplete]);
+  const hookOptions = useMemo(() => {
+    return {
+      setup,
+      interviewType: actualInterviewType,
+      focusedType,
+      mediaStream: stream,
+      onComplete: handleComplete,
+      onError: (error: string) => {
+        console.error('Realtime interview error:', error);
+        setCameraError(error);
+      },
+      provider: 'hume' as const
+    };
+  }, [setup, actualInterviewType, focusedType, stream, handleComplete]);
 
   const { 
     state, 
@@ -336,45 +339,43 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   // Full-screen start overlay
   if (!hasStarted) {
     return (
-      <div className="min-h-screen bg-dark-900 flex flex-col relative">
+      <div className="min-h-screen bg-dark-900 flex flex-col relative overflow-hidden">
+        {/* Subtle background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-dark-900 via-dark-900 to-dark-800/50"></div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800 relative z-20">
+        <div className="flex items-center justify-between px-6 py-4 bg-dark-800/30 backdrop-blur-sm border-b border-dark-700/30 relative z-20">
           <div className="flex items-center space-x-3">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+              className="p-2 hover:bg-dark-700/30 rounded-lg transition-colors group"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-400" />
+              <ArrowLeft className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
             </button>
-            <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-pulse"></div>
-            <span className="text-white font-medium">
-              Realtime {isVoiceMode ? 'Voice' : 'Text'} Interview
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
+              <span className="text-white font-medium text-sm">
+                {isVoiceMode ? 'Voice' : 'Text'} Interview
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Background content - blurred */}
         <div className="flex-1 flex relative">
           {/* Blurred background */}
-          <div className="absolute inset-0 filter blur-sm opacity-50">
-            {/* Left side - Empty transcript area */}
-            <div className="w-[28rem] bg-gray-900/95 backdrop-blur-sm border-r border-gray-800">
-              <div className="p-4 border-b border-gray-800">
+          <div className="absolute inset-0 filter blur-md opacity-30">
+            <div className="w-[28rem] bg-dark-800/95 backdrop-blur-sm border-r border-dark-700">
+              <div className="p-4 border-b border-dark-700">
                 <div className="flex items-center space-x-3">
-                  <MessageSquare className="w-5 h-5 text-[#FF5722]" />
+                  <MessageSquare className="w-5 h-5 text-orange-400" />
                   <h3 className="text-white font-medium">Live Transcript</h3>
                 </div>
               </div>
-              <div className="p-4 text-center text-gray-500 mt-8">
-                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Transcript will appear here</p>
-              </div>
             </div>
-
-            {/* Right side - Video area */}
-            <div className="flex-1 relative bg-gray-900">
+            <div className="flex-1 relative bg-dark-900">
               <div className="absolute inset-0 flex items-center justify-center">
-                <AIInterviewer 
+                <AIInterviewer
                   isActive={false}
                   isSpeaking={false}
                   isListening={false}
@@ -383,9 +384,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
                   showStatus={false}
                 />
               </div>
-
-              {/* User video preview */}
-              <div className="absolute bottom-6 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700">
+              <div className="absolute bottom-6 right-6 w-64 h-48 bg-dark-800 rounded-2xl overflow-hidden border border-dark-700">
                 <video
                   ref={previewVideoRef}
                   autoPlay
@@ -398,68 +397,92 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           </div>
 
           {/* Full-screen start overlay */}
-          <div className="absolute inset-0 bg-dark-900/85 backdrop-blur-lg flex items-center justify-center z-10">
-            <div className="bg-gray-900/95 rounded-2xl p-8 max-w-md w-full mx-6 border border-gray-800 shadow-2xl backdrop-blur-sm">
-              {/* Icon and Title */}
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#FF5722] to-[#D84315] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Brain className="w-8 h-8 text-white" />
+          <div className="absolute inset-0 bg-dark-900/95 backdrop-blur-sm flex items-center justify-center z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="bg-dark-800/40 backdrop-blur-md rounded-2xl p-12 max-w-xl w-full mx-6 border border-dark-700/30 relative"
+            >
+              <div className="relative z-10">
+                {/* Icon and Title */}
+                <div className="text-center mb-10">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                    className="inline-flex items-center justify-center w-14 h-14 bg-orange-500/10 rounded-xl mb-6"
+                  >
+                    <Brain className="w-7 h-7 text-orange-500" />
+                  </motion.div>
+                  <h2 className="text-2xl font-semibold mb-2 text-white">
+                    Ready to Begin
+                  </h2>
+                  <p className="text-gray-400 text-sm">
+                    Your AI interviewer is ready for an adaptive conversation
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Ready to Start</h2>
-                <p className="text-gray-400 leading-relaxed">
-                  Your personalized realtime interview with adaptive conversation flow is ready to begin.
-                </p>
-              </div>
 
-              {/* Features list - more compact */}
-              <div className="mb-6">
-                <h3 className="text-white font-medium mb-3 text-sm">What to expect:</h3>
-                <ul className="space-y-1.5 text-sm text-gray-300">
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>Live conversation with AI interviewer</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>Real-time transcript and question flow</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>{isVoiceMode ? 'Natural voice interaction' : 'Dynamic text conversation'}</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <div className="w-1 h-1 bg-[#FF5722] rounded-full"></div>
-                    <span>Adaptive questions based on responses</span>
-                  </li>
-                </ul>
-              </div>
+                {/* Features list */}
+                <div className="space-y-3 mb-10">
+                  {[
+                    { icon: Brain, text: 'AI-powered interviewer' },
+                    { icon: MessageSquare, text: 'Real-time transcript' },
+                    { icon: isVoiceMode ? Mic : MessageCircle, text: isVoiceMode ? 'Voice-based interview' : 'Text-based interview' },
+                    { icon: TrendingUp, text: 'Adaptive difficulty' }
+                  ].map((feature, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2, delay: 0.2 + index * 0.05 }}
+                      className="flex items-center gap-3 text-gray-300"
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 bg-dark-700/50 rounded-lg flex items-center justify-center">
+                        <feature.icon className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <span className="text-sm">{feature.text}</span>
+                    </motion.div>
+                  ))}
+                </div>
 
-              {/* Start button */}
-              <button
-                onClick={handleStartInterview}
-                disabled={state.status === 'connecting' || !!cameraError}
-                className="w-full px-6 py-4 bg-gradient-to-r from-[#FF5722] to-[#D84315] text-white rounded-xl hover:from-[#D84315] hover:to-[#BF360C] disabled:opacity-50 disabled:cursor-not-allowed transition-all text-lg font-semibold flex items-center justify-center space-x-3 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {state.status === 'connecting' ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Brain className="w-6 h-6" />
-                    <span>Start Interview</span>
-                  </>
+                {/* Start button */}
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                  onClick={handleStartInterview}
+                  disabled={state.status === 'connecting' || !!cameraError}
+                  className="w-full px-6 py-3.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  {state.status === 'connecting' ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Connecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Start Interview</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </motion.button>
+
+                {/* Error message */}
+                {cameraError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl"
+                  >
+                    <p className="text-red-400 text-sm flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {cameraError}
+                    </p>
+                  </motion.div>
                 )}
-              </button>
-
-              {/* Error message if any */}
-              {cameraError && (
-                <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
-                  <p className="text-red-400 text-sm">{cameraError}</p>
-                </div>
-              )}
-            </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
@@ -467,40 +490,47 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex flex-col">
+    <div className="min-h-screen bg-dark-900 flex flex-col relative overflow-hidden">
+      {/* Animated background glow */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl animate-pulse pointer-events-none"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-600/3 rounded-full blur-3xl animate-pulse delay-1000 pointer-events-none"></div>
+
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800">
+      <div className="flex items-center justify-between px-6 py-4 bg-dark-800/40 backdrop-blur-xl border-b border-dark-700/50 relative z-20">
         <div className="flex items-center space-x-3">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-dark-700/50 rounded-xl transition-all group"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-400" />
+            <ArrowLeft className="w-5 h-5 text-gray-400 group-hover:text-orange-400 transition-colors" />
           </button>
-          <div className="w-3 h-3 bg-[#FF5722] rounded-full animate-pulse"></div>
-          <span className="text-white font-medium">
-            Realtime {isVoiceMode ? 'Voice' : 'Text'} Interview
+          <div className="relative">
+            <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 w-2.5 h-2.5 bg-orange-500 rounded-full animate-ping"></div>
+          </div>
+          <span className="text-white font-semibold">
+            {isVoiceMode ? 'Voice' : 'Text'} Interview
           </span>
           {hasStarted && (
-            <div className="px-2 py-1 bg-[#FF5722]/20 rounded text-[#FF5722] text-xs font-medium border border-[#FF5722]/30">
-              Live Session
+            <div className="px-3 py-1 bg-orange-500/10 rounded-full text-orange-400 text-xs font-medium border border-orange-500/20">
+              Live
             </div>
           )}
         </div>
         <div className="flex items-center space-x-4">
           {hasStarted && (
             <>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-[#FF5722]" />
-                <span className="text-white font-medium">
-                  {formatTime(state.duration)} / {formatTime(maxDuration * 60)}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-dark-700/30 rounded-full border border-dark-600/50">
+                <Clock className="w-4 h-4 text-orange-400" />
+                <span className="text-white font-mono font-medium text-sm">
+                  {formatTime(state.duration)} <span className="text-gray-500">/</span> {formatTime(maxDuration * 60)}
                 </span>
               </div>
               {isVoiceMode && (
                 <button
                   onClick={toggleAudio}
-                  className={`p-2 rounded-lg transition-colors ${
-                    audioEnabled ? 'bg-gray-800 hover:bg-gray-700' : 'bg-red-500 hover:bg-red-600'
+                  className={`p-2 rounded-xl transition-all ${
+                    audioEnabled ? 'bg-dark-700/50 hover:bg-dark-700' : 'bg-red-500 hover:bg-red-600'
                   }`}
                 >
                   {audioEnabled ? (
@@ -549,34 +579,37 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
           {/* Current question overlay - top right */}
           {state.currentQuestion && (
-            <div className={`absolute top-6 ${showAnalytics && !analyticsMinimized ? 'right-[22rem]' : 'right-6'} max-w-md bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 border border-[#FF5722]/20 z-20 transition-all duration-300`}>
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-[#FF5722] flex items-center justify-center flex-shrink-0">
-                  <MessageSquare className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <h4 className="text-white font-medium text-sm mb-2">Current Question</h4>
-                  <p className="text-gray-300 text-sm leading-relaxed">{state.currentQuestion}</p>
-                  {state.questionCount > 0 && (
-                    <div className="mt-2">
-                      <span className="px-2 py-1 rounded text-xs font-medium bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30">
-                        Question {state.questionCount}
-                      </span>
+            <motion.div
+              initial={{ opacity: 0, x: 20, y: -20 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+              className="absolute top-6 right-6 max-w-md bg-dark-800/60 backdrop-blur-xl rounded-2xl p-5 border border-dark-700/50 shadow-2xl z-20"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-transparent rounded-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-start gap-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-lg">
+                      <MessageSquare className="w-5 h-5 text-white" />
                     </div>
-                  )}
+                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl blur-md opacity-50"></div>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold text-sm mb-2">Current Question</h4>
+                    <p className="text-gray-300 text-sm leading-relaxed">{state.currentQuestion}</p>
+                    {state.questionCount > 0 && (
+                      <div className="mt-3">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                          <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse"></span>
+                          Question {state.questionCount}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
-
-          {/* Sophisticated Analytics Overlay */}
-          <SophisticatedAnalyticsOverlay
-            videoElement={videoRef.current}
-            audioStream={stream}
-            isActive={hasStarted}
-            onToggleMinimize={() => setAnalyticsMinimized(!analyticsMinimized)}
-            isMinimized={analyticsMinimized}
-          />
 
           {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
@@ -595,20 +628,20 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
           {/* Text mode input - bottom overlay */}
           {!isVoiceMode && hasStarted && (
-            <div className={`absolute bottom-6 left-6 ${showAnalytics && !analyticsMinimized ? 'right-[22rem]' : 'right-6'} bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 border border-gray-800 z-20 transition-all duration-300`}>
-              <div className="flex space-x-3">
+            <div className="absolute bottom-6 left-6 right-6 bg-dark-800/60 backdrop-blur-xl rounded-2xl p-4 border border-dark-700/50 shadow-2xl z-20">
+              <div className="flex gap-3">
                 <textarea
                   value={userMessage}
                   onChange={(e) => setUserMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Type your response here..."
-                  className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors resize-none"
+                  className="flex-1 px-4 py-3 bg-dark-700/50 border border-dark-600 rounded-xl text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none transition-colors resize-none"
                   rows={2}
                 />
                 <button
                   onClick={handleSendMessage}
                   disabled={!userMessage.trim()}
-                  className="px-4 py-3 bg-[#FF5722] text-white rounded-lg hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  className="px-5 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-lg shadow-orange-500/25 hover:scale-105 active:scale-95"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -617,7 +650,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
           )}
 
           {/* User video - picture in picture style */}
-          <div className={`absolute bottom-6 ${showAnalytics && !analyticsMinimized ? 'right-[22rem]' : 'right-6'} w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 z-10 transition-all duration-300`}>
+          <div className="absolute bottom-6 right-6 w-64 h-48 bg-dark-800 rounded-2xl overflow-hidden shadow-2xl border border-dark-700/50 z-10">
             <video
               ref={videoRef}
               autoPlay
@@ -625,39 +658,39 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
               playsInline
               className="w-full h-full object-cover"
             />
+            <div className="absolute bottom-2 left-2 px-2 py-1 bg-dark-900/80 backdrop-blur-sm rounded-lg border border-dark-700/50">
+              <span className="text-xs text-gray-400 font-medium">You</span>
+            </div>
           </div>
 
           {/* Camera controls */}
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-gray-900/90 backdrop-blur-sm px-6 py-3 rounded-full border border-gray-800 z-20">
-            <button
-              onClick={() => setShowAnalytics(!showAnalytics)}
-              className={`p-2 rounded-full transition-colors ${
-                showAnalytics ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-800 hover:bg-gray-700'
-              }`}
-            >
-              <Brain className="w-5 h-5 text-white" />
-            </button>
-            
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-dark-800/60 backdrop-blur-xl px-5 py-3 rounded-2xl border border-dark-700/50 shadow-2xl z-20">
             {isVoiceMode && (
               <button
                 onClick={toggleMute}
-                className={`p-2 rounded-full transition-colors ${
-                  isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-800 hover:bg-gray-700'
+                className={`group p-3 rounded-xl transition-all ${
+                  isMuted
+                    ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25'
+                    : 'bg-dark-700/50 hover:bg-dark-700'
                 }`}
+                title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (
                   <MicOff className="w-5 h-5 text-white" />
                 ) : (
-                  <Mic className="w-5 h-5 text-gray-400" />
+                  <Mic className="w-5 h-5 text-gray-400 group-hover:text-white" />
                 )}
               </button>
             )}
-            
+
+            <div className="w-px h-8 bg-dark-600"></div>
+
             <button
               onClick={handleEndInterview}
-              className="p-2 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+              className="group p-3 rounded-xl bg-red-500 hover:bg-red-600 transition-all shadow-lg shadow-red-500/25 hover:scale-105 active:scale-95"
+              title="End Interview"
             >
-              <Phone className="w-5 h-5 text-white transform rotate-135" />
+              <Phone className="w-5 h-5 text-white transform rotate-135 group-hover:rotate-180 transition-transform" />
             </button>
           </div>
         </div>

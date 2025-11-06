@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { OpenAIRealtimeClient, TranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
+import { OpenAIRealtimeClient, TranscriptChunk as OpenAITranscriptChunk, RealtimeConfig } from '../utils/openaiRealtime';
+import { HumeRealtimeClient, TranscriptChunk as HumeTranscriptChunk, HumeConfig } from '../utils/humeRealtime';
 import { buildAdaptiveSystemPrompt, AdaptivePromptOptions, buildFollowUpPrompt, extractKeyTopics, getFocusedInterviewPrompt, buildUnpredictableInterviewPrompt } from '../utils/promptTemplates';
 import { InterviewSetup, CollegeInterviewSetup, TimeContext } from '../types/interview';
 import { createRealtimeSession, updateRealtimeSession, saveTranscriptChunk, saveRealtimeInterviewSession } from '../utils/supabase-interview';
@@ -9,6 +10,14 @@ import { extractSpeechMetrics, analyzeResponse as analyzeResponseWithAI } from '
 import { pcmToWav } from '../utils/audio';
 import { VoiceTimelinePoint, ActionableFeedback, generateActionableFeedback } from '../utils/speechAnalysis';
 import { sophisticatedAnalyticsEngine } from '../utils/sophisticatedAnalytics';
+import { useExpressionMeasurement } from './useExpressionMeasurement';
+import { ProsodyPrediction, LanguagePrediction } from '../utils/humeExpressionMeasurement';
+
+// Unified transcript chunk type
+export type TranscriptChunk = OpenAITranscriptChunk | HumeTranscriptChunk;
+
+// Unified client type
+type RealtimeClient = OpenAIRealtimeClient | HumeRealtimeClient;
 
 // Simple interface for speech metrics in realtime interviews
 interface SpeechMetricEntry {
@@ -32,6 +41,8 @@ interface UseRealtimeInterviewOptions {
   mediaStream?: MediaStream | null; // Allow null values
   onComplete?: (sessionData: any) => void;
   onError?: (error: string) => void;
+  provider?: 'openai' | 'hume'; // Choose AI provider
+  enableExpressionMeasurement?: boolean; // Enable Hume Expression Measurement
 }
 
 // Get interview duration based on type
@@ -54,10 +65,12 @@ export function useRealtimeInterview({
   focusedType,
   mediaStream,
   onComplete,
-  onError
+  onError,
+  provider = 'hume', // Default to Hume AI
+  enableExpressionMeasurement = true // Default: enable expression measurement
 }: UseRealtimeInterviewOptions) {
   const maxDuration = getInterviewDuration(interviewType); // Get duration in minutes
-  
+
   const {
     state,
     setStatus,
@@ -71,7 +84,27 @@ export function useRealtimeInterview({
     handleUserTranscript,
   } = useInterviewState();
 
-  const clientRef = useRef<OpenAIRealtimeClient | null>(null);
+  // Initialize expression measurement hook
+  const expressionMeasurement = useExpressionMeasurement({
+    enabled: enableExpressionMeasurement && provider === 'hume', // Only for Hume provider
+    enableProsody: true, // Voice emotion analysis
+    enableLanguage: true, // Text emotion analysis
+    enableFace: false, // Face analysis disabled by default (requires video processing)
+    onProsodyMeasurement: useCallback((prediction: ProsodyPrediction) => {
+      // Store prosody predictions for later analysis
+      console.log('[Interview Expression] Prosody measurement received');
+    }, []),
+    onLanguageMeasurement: useCallback((prediction: LanguagePrediction) => {
+      // Store language predictions for later analysis
+      console.log('[Interview Expression] Language measurement received:', prediction.text);
+    }, []),
+    onError: useCallback((error: Error) => {
+      console.error('[Interview Expression] Error:', error);
+      // Don't fail the interview if expression measurement fails
+    }, [])
+  });
+
+  const clientRef = useRef<RealtimeClient | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<Date | null>(null);
   const performanceScoresRef = useRef<number[]>([]);
@@ -523,6 +556,11 @@ Be natural about it - don't make it obvious you're testing consistency. Make it 
       ));
       updateInterviewerBehavior(chunk.text, estimatedScore);
 
+      // Send user transcript to expression measurement for language emotion analysis
+      if (expressionMeasurement.isConnected && !chunk.isPartial) {
+        expressionMeasurement.sendText(chunk.text);
+      }
+
       // Track candidate claims for consistency testing (only for standard realtime interviews)
       if (!focusedType && interviewType !== 'college' && currentQuestionRef.current) {
         extractAndTrackClaims(chunk.text, currentQuestionRef.current, chunk.timestamp);
@@ -581,11 +619,41 @@ Be natural about it - don't make it obvious you're testing consistency. Make it 
     };
 
     try {
-      clientRef.current = new OpenAIRealtimeClient(
-        import.meta.env.VITE_OPENAI_API_KEY,
-        config,
-        mediaStream || undefined // Pass the media stream to avoid creating multiple streams, convert null to undefined
-      );
+      // Create client based on provider
+      if (provider === 'hume') {
+        // Map experience level to simple format
+        const experienceLevelMap: Record<string, string> = {
+          'Entry Level (0-2 years)': 'entry',
+          'Mid Level (3-5 years)': 'mid',
+          'Senior Level (6-10 years)': 'senior',
+          'Executive Level (10+ years)': 'executive'
+        };
+        const experienceLevel = experienceLevelMap[setup.experienceLevel || ''] || 'mid';
+
+        const humeConfig: Partial<HumeConfig> = {
+          configId: import.meta.env.VITE_HUME_CONFIG_ID, // Required: EVI config ID
+          voice: 'Kelv', // Your custom voice from Hume platform
+          instructions,
+          variables: {
+            experience_level: experienceLevel,
+            interview_duration: '20',
+            job_type: setup.jobType || 'Software Engineer'
+          }
+        };
+
+        clientRef.current = new HumeRealtimeClient(
+          import.meta.env.VITE_HUME_API_KEY,
+          humeConfig,
+          mediaStream || undefined
+        );
+      } else {
+        // OpenAI Realtime (legacy)
+        clientRef.current = new OpenAIRealtimeClient(
+          import.meta.env.VITE_OPENAI_API_KEY,
+          config,
+          mediaStream || undefined
+        );
+      }
 
       // Set up event listeners
       clientRef.current.on('connection.opened', () => {
@@ -783,6 +851,16 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       clientRef.current.on('input_audio_buffer.committed', () => {
         // User audio is committed, we can analyze it
         console.log('[Realtime] User audio committed');
+
+        // Send user audio chunks to expression measurement for prosody analysis
+        if (expressionMeasurement.isConnected && clientRef.current) {
+          const audioChunks = clientRef.current.getAllAudioChunks();
+          // Send the most recent audio chunks (last few seconds)
+          const recentChunks = audioChunks.slice(-10); // Last 10 chunks
+          recentChunks.forEach(chunk => {
+            expressionMeasurement.sendAudioChunk(chunk);
+          });
+        }
       });
 
     } catch (error) {
@@ -797,6 +875,7 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     onError,
     focusedType,
     interviewType,
+    provider,
     setStatus,
     setError,
     setDuration,
@@ -958,13 +1037,25 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       // Initialize and connect client
       initializeClient();
       await clientRef.current?.connect();
+
+      // Connect expression measurement if enabled
+      if (enableExpressionMeasurement && provider === 'hume') {
+        try {
+          await expressionMeasurement.connect();
+          console.log('[Interview] Expression measurement connected');
+        } catch (expError) {
+          console.error('[Interview] Failed to connect expression measurement:', expError);
+          // Continue interview even if expression measurement fails
+        }
+      }
+
       // Interview will start after connection.opened event
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start interview';
       setError(errorMessage);
       onError?.(errorMessage);
     }
-  }, [initializeClient, onError, setup, interviewType, setStatus, setError, setSessionId]);
+  }, [initializeClient, onError, setup, interviewType, setStatus, setError, setSessionId, enableExpressionMeasurement, provider, expressionMeasurement]);
 
   const pauseInterview = useCallback(async () => {
     if (clientRef.current?.isCurrentlyRecording()) {
@@ -1189,7 +1280,34 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
       if (clientRef.current) {
         clientRef.current.disconnect();
       }
-      
+
+      // Disconnect expression measurement and analyze final metrics
+      let expressionInsights = null;
+      if (expressionMeasurement.isConnected) {
+        const expressionMetrics = expressionMeasurement.getMetrics();
+        console.log('[Interview] Expression measurement complete:', {
+          prosodyCount: expressionMetrics.prosodyPredictions.length,
+          languageCount: expressionMetrics.languagePredictions.length,
+          topEmotions: expressionMetrics.topEmotions
+        });
+
+        // Analyze expression measurements to get insights
+        if (expressionMetrics.prosodyPredictions.length > 0 || expressionMetrics.languagePredictions.length > 0) {
+          try {
+            const { analyzeExpressionMeasurements } = await import('../utils/expressionAnalytics');
+            expressionInsights = analyzeExpressionMeasurements(
+              expressionMetrics.prosodyPredictions,
+              expressionMetrics.languagePredictions
+            );
+            console.log('[Interview] Expression insights generated:', expressionInsights);
+          } catch (error) {
+            console.error('[Interview] Failed to analyze expression measurements:', error);
+          }
+        }
+
+        expressionMeasurement.disconnect();
+      }
+
       setStatus('completed');
       
       // Update realtime session in Supabase with final data
@@ -1233,7 +1351,8 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             voice_metrics_summary: finalSpeechMetrics.length > 0 ? finalSpeechMetrics[0].metrics : null,
             responseTimes: responseTimesRef.current,
             voiceTimeline, // <-- Add the timeline here
-            sophisticatedAnalytics: sophisticatedReport // <-- Add sophisticated analytics
+            sophisticatedAnalytics: sophisticatedReport, // <-- Add sophisticated analytics
+            expressionInsights // <-- Add expression measurement insights
           };
 
           // Save structured interview data for viewing in recent interviews
@@ -1245,7 +1364,18 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             // Continue even if save fails
           }
 
-          console.log('Calling onComplete with session data...');
+          console.log('💙 useRealtimeInterview: Calling onComplete with session data...');
+          console.log('💙 useRealtimeInterview: sessionData:', sessionData);
+          console.log('💙 useRealtimeInterview: sessionData keys:', Object.keys(sessionData));
+          console.log('💙 useRealtimeInterview: responses length:', sessionData.responses?.length);
+          console.log('💙 useRealtimeInterview: questions length:', sessionData.questions?.length);
+          console.log('💙 useRealtimeInterview: onComplete exists?', !!onComplete);
+
+          if (!sessionData.responses || sessionData.responses.length === 0) {
+            console.error('⚠️ useRealtimeInterview: NO RESPONSES IN SESSION DATA! This will cause black screen.');
+            console.log('⚠️ useRealtimeInterview: Transcript length:', state.transcript?.length);
+          }
+
           onComplete?.(sessionData);
         } catch (supabaseError) {
           console.error('Failed to update realtime session in Supabase:', supabaseError);
@@ -1263,14 +1393,18 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
             voiceTimeline
           };
           
-          // Add sophisticated analytics to fallback data too
+          // Add sophisticated analytics and expression insights to fallback data too
           try {
             const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
             (fallbackData as any).sophisticatedAnalytics = sophisticatedReport;
           } catch (error) {
             console.log('No sophisticated analytics available for fallback');
           }
-          
+
+          if (expressionInsights) {
+            (fallbackData as any).expressionInsights = expressionInsights;
+          }
+
           console.log('Calling onComplete with fallback data...');
           onComplete?.(fallbackData);
         }
@@ -1288,14 +1422,18 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
           voiceTimeline
         };
         
-        // Try to add sophisticated analytics even to minimal data
+        // Try to add sophisticated analytics and expression insights even to minimal data
         try {
           const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
           (minimalData as any).sophisticatedAnalytics = sophisticatedReport;
         } catch (error) {
           console.log('No sophisticated analytics available for minimal data');
         }
-        
+
+        if (expressionInsights) {
+          (minimalData as any).expressionInsights = expressionInsights;
+        }
+
         onComplete?.(minimalData);
       }
     } catch (error) {
@@ -1313,14 +1451,18 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
         voiceTimeline: []
       };
       
-      // Try to add sophisticated analytics even to error data
+      // Try to add sophisticated analytics and expression insights even to error data
       try {
         const sophisticatedReport = sophisticatedAnalyticsEngine.getFinalAnalysisReport();
         (fallbackData as any).sophisticatedAnalytics = sophisticatedReport;
       } catch (error) {
         console.log('No sophisticated analytics available for error data');
       }
-      
+
+      if (expressionInsights) {
+        (fallbackData as any).expressionInsights = expressionInsights;
+      }
+
       onComplete?.(fallbackData);
     }
   }, [state.sessionId, state.transcript, state.duration, state.questionCount, setup, interviewType, focusedType, onComplete, stopTimer, stopContinuousPromptUpdates, stopQuestionTimer, setStatus, getSpeechMetrics, processVoiceAnalytics]);
@@ -1377,6 +1519,9 @@ Remember: Be genuinely human, not scripted. Listen actively and respond like a r
     return () => {
       if (clientRef.current) {
         clientRef.current.disconnect();
+      }
+      if (expressionMeasurement.isConnected) {
+        expressionMeasurement.disconnect();
       }
       if (timerRef.current) {
         clearInterval(timerRef.current);

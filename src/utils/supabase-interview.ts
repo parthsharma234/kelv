@@ -889,10 +889,21 @@ export const getInterviewById = async (interviewId: string) => {
       } : undefined,
       metrics: data.metrics || undefined,
       voiceMetrics: data.speech_metrics || undefined,
-      transcript: data.transcript || []
+      transcript: data.transcript || [],
+      voice_metrics_summary: data.voice_metrics_summary || undefined,
+      voiceTimeline: data.voice_timeline || undefined
     };
-    
+
+    console.log('=== SUPABASE DATA LOADED ===');
     console.log('Transformed Supabase data:', transformedData);
+    console.log('Responses structure:', transformedData.responses.map((r: any) => ({
+      questionId: r.questionId,
+      hasAnalysis: !!r.analysis,
+      analysisKeys: r.analysis ? Object.keys(r.analysis) : [],
+      analysisSample: r.analysis
+    })));
+    console.log('Questions:', transformedData.questions.length);
+    console.log('Transcript chunks:', transformedData.transcript.length);
     return transformedData;
 
   } catch (error) {

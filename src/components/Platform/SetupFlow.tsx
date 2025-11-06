@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus, Trash2, Heart, Wand2, Mic, Type, AlertTriangle } from 'lucide-react';
+import {
+  ChevronRight, Briefcase, Building, GraduationCap, Edit3, Star, Clock, Plus,
+  Trash2, Heart, Wand2, Mic, Type, AlertTriangle, Sparkles, Zap, Target,
+  TrendingUp, Award, ArrowRight, Check, Brain
+} from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
-import { 
-  getUserInterviewSetups, 
-  saveInterviewSetup, 
-  updateSetupUsage, 
-  toggleSetupFavorite, 
+import {
+  getUserInterviewSetups,
+  saveInterviewSetup,
+  updateSetupUsage,
+  toggleSetupFavorite,
   deleteInterviewSetup,
-  SavedInterviewSetup 
+  SavedInterviewSetup
 } from '../../utils/supabase-interview';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -16,20 +20,42 @@ interface SetupFlowProps {
   onBack: () => void;
 }
 
+// Industry data with icons and simple colors
 const industries = [
-  'Technology', 'Healthcare', 'Finance', 'Marketing', 'Sales', 'Education',
-  'Consulting', 'Retail', 'Manufacturing', 'Non-profit', 'Government', 'Other'
+  { id: 'Technology', label: 'Technology', icon: Brain, color: 'blue' },
+  { id: 'Healthcare', label: 'Healthcare', icon: Heart, color: 'red' },
+  { id: 'Finance', label: 'Finance', icon: TrendingUp, color: 'green' },
+  { id: 'Marketing', label: 'Marketing', icon: Sparkles, color: 'purple' },
+  { id: 'Sales', label: 'Sales', icon: Target, color: 'orange' },
+  { id: 'Education', label: 'Education', icon: GraduationCap, color: 'indigo' },
+  { id: 'Consulting', label: 'Consulting', icon: Award, color: 'yellow' },
+  { id: 'Retail', label: 'Retail', icon: Building, color: 'pink' },
+  { id: 'Manufacturing', label: 'Manufacturing', icon: Zap, color: 'gray' },
+  { id: 'Non-profit', label: 'Non-profit', icon: Heart, color: 'teal' },
+  { id: 'Government', label: 'Government', icon: Building, color: 'blue' },
+  { id: 'Other', label: 'Other', icon: Sparkles, color: 'gray' }
 ];
 
 const jobTypes = [
-  'Software Engineer', 'Product Manager', 'Data Scientist', 'UX/UI Designer',
-  'Marketing Manager', 'Sales Representative', 'Business Analyst', 'DevOps Engineer',
-  'Customer Success', 'Project Manager', 'HR Specialist', 'Other'
+  { id: 'Software Engineer', label: 'Software Engineer', icon: Brain },
+  { id: 'Product Manager', label: 'Product Manager', icon: Target },
+  { id: 'Data Scientist', label: 'Data Scientist', icon: TrendingUp },
+  { id: 'UX/UI Designer', label: 'UX/UI Designer', icon: Sparkles },
+  { id: 'Marketing Manager', label: 'Marketing Manager', icon: Sparkles },
+  { id: 'Sales Representative', label: 'Sales Representative', icon: Target },
+  { id: 'Business Analyst', label: 'Business Analyst', icon: TrendingUp },
+  { id: 'DevOps Engineer', label: 'DevOps Engineer', icon: Zap },
+  { id: 'Customer Success', label: 'Customer Success', icon: Heart },
+  { id: 'Project Manager', label: 'Project Manager', icon: Award },
+  { id: 'HR Specialist', label: 'HR Specialist', icon: Heart },
+  { id: 'Other', label: 'Other', icon: Sparkles }
 ];
 
 const experienceLevels = [
-  'Entry Level (0-2 years)', 'Mid Level (3-5 years)', 
-  'Senior Level (6-10 years)', 'Executive Level (10+ years)'
+  { id: 'Entry Level (0-2 years)', label: 'Entry Level', sublabel: '0-2 years', icon: GraduationCap },
+  { id: 'Mid Level (3-5 years)', label: 'Mid Level', sublabel: '3-5 years', icon: Briefcase },
+  { id: 'Senior Level (6-10 years)', label: 'Senior Level', sublabel: '6-10 years', icon: Award },
+  { id: 'Executive Level (10+ years)', label: 'Executive Level', sublabel: '10+ years', icon: Star }
 ];
 
 const interviewModes = [
@@ -43,7 +69,7 @@ const interviewModes = [
   },
   {
     id: 'text',
-    title: 'Text Interview', 
+    title: 'Text Interview',
     description: 'Text-based interview experience',
     icon: Type,
     features: ['Written responses only', 'Focus on content analysis', 'No voice metrics', 'Silent mode'],
@@ -57,7 +83,6 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
     return '';
   }
 
-  // Extract experience level prefix
   const experienceMap: Record<string, string> = {
     'Entry Level (0-2 years)': 'Entry',
     'Mid Level (3-5 years)': 'Mid-Level',
@@ -66,8 +91,7 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
   };
 
   const experiencePrefix = experienceMap[setup.experienceLevel] || 'Mid-Level';
-  
-  // Shorten common job titles
+
   const jobTitleMap: Record<string, string> = {
     'Software Engineer': 'SWE',
     'Product Manager': 'PM',
@@ -83,8 +107,7 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
   };
 
   const jobTitle = jobTitleMap[setup.jobType] || setup.jobType;
-  
-  // Shorten industry names
+
   const industryMap: Record<string, string> = {
     'Technology': 'Tech',
     'Healthcare': 'Healthcare',
@@ -100,7 +123,6 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
   };
 
   const industry = industryMap[setup.industry] || setup.industry;
-
   const modePrefix = setup.interviewMode === 'voice' ? 'Voice' : 'Text';
 
   return `${modePrefix} ${experiencePrefix} ${jobTitle} - ${industry}`;
@@ -109,7 +131,7 @@ const generateSetupName = (setup: Partial<InterviewSetup>): string => {
 export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [setup, setSetup] = useState<Partial<InterviewSetup>>({
-    interviewMode: 'voice' // Default to voice mode
+    interviewMode: 'voice'
   });
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -123,19 +145,14 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const [saveAsFavorite, setSaveAsFavorite] = useState(false);
   const [useAutoName, setUseAutoName] = useState(true);
 
-  // Check if API key is configured
-  const hasAPIKey = import.meta.env.VITE_OPENAI_API_KEY && 
+  const hasAPIKey = import.meta.env.VITE_OPENAI_API_KEY &&
                     import.meta.env.VITE_OPENAI_API_KEY !== 'your_openai_api_key_here';
+
   useEffect(() => {
     loadSavedSetups();
-    // Scroll to top when component mounts
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Auto-generate name when setup changes
   useEffect(() => {
     if (useAutoName && setup.industry && setup.jobType && setup.experienceLevel && setup.interviewMode) {
       const autoName = generateSetupName(setup);
@@ -161,7 +178,6 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
       onComplete(savedSetup.setup);
     } catch (error) {
       console.error('Error using saved setup:', error);
-      // Still proceed with the setup even if usage update fails
       onComplete(savedSetup.setup);
     }
   };
@@ -169,7 +185,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const handleToggleFavorite = async (setupId: string, currentFavorite: boolean) => {
     try {
       await toggleSetupFavorite(setupId, !currentFavorite);
-      await loadSavedSetups(); // Refresh the list
+      await loadSavedSetups();
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
@@ -178,7 +194,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   const handleDeleteSetup = async (setupId: string) => {
     try {
       await deleteInterviewSetup(setupId);
-      await loadSavedSetups(); // Refresh the list
+      await loadSavedSetups();
     } catch (error) {
       console.error('Error deleting setup:', error);
     }
@@ -193,11 +209,10 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
       setSetupName('');
       setSaveAsFavorite(false);
       setUseAutoName(true);
-      await loadSavedSetups(); // Refresh the list
+      await loadSavedSetups();
       onComplete(setup as InterviewSetup);
     } catch (error) {
       console.error('Error saving setup:', error);
-      // Still proceed with the interview even if save fails
       onComplete(setup as InterviewSetup);
     }
   };
@@ -208,28 +223,27 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
 
   const steps = [
     {
-      title: 'Interview Mode',
+      title: 'Choose Interview Mode',
+      subtitle: 'Select how you want to practice',
       icon: Mic,
-      options: interviewModes.map(mode => mode.id),
-      key: 'interviewMode' as keyof InterviewSetup,
-      isSpecial: true
+      key: 'interviewMode' as keyof InterviewSetup
     },
     {
-      title: 'Select Industry',
+      title: 'Select Your Industry',
+      subtitle: 'What field are you targeting?',
       icon: Building,
-      options: industries,
       key: 'industry' as keyof InterviewSetup
     },
     {
-      title: 'Choose Job Type',
+      title: 'Choose Your Role',
+      subtitle: 'What position are you applying for?',
       icon: Briefcase,
-      options: jobTypes,
       key: 'jobType' as keyof InterviewSetup
     },
     {
       title: 'Experience Level',
+      subtitle: 'How many years of experience?',
       icon: GraduationCap,
-      options: experienceLevels,
       key: 'experienceLevel' as keyof InterviewSetup
     }
   ];
@@ -248,11 +262,10 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
       if (currentStep < steps.length - 1) {
         setCurrentStep(currentStep + 1);
       } else {
-        // Setup is complete, show save dialog
         setShowSaveDialog(true);
       }
       setIsAnimating(false);
-    }, 300);
+    }, 400);
   };
 
   const handleOtherSubmit = () => {
@@ -270,117 +283,124 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
         setIsAnimating(false);
         setShowOtherInput(false);
         setOtherValue('');
-      }, 300);
+      }, 400);
     }
   };
 
-  const handleBackFromOther = () => {
-    setShowOtherInput(false);
-    setOtherValue('');
-  };
-
   const currentStepData = steps[currentStep];
-  const StepIcon = currentStepData?.icon;
 
-  // Show saved setups first
+  // Saved setups screen
   if (showSavedSetups && savedSetups.length > 0) {
     return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden pt-24">
-        {/* Animated background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#FF5722]/3 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#FF7043]/3 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        </div>
-        
-        <div className="w-full max-w-5xl relative z-10">
+      <div className="min-h-screen bg-dark-900 pt-24 pb-16 px-4 relative overflow-hidden">
+        {/* Glow effects */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-600/5 rounded-full blur-3xl"></div>
+
+        <div className="container max-w-6xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
+            className="text-center mb-12"
           >
-            <h2 className="text-4xl font-bold text-white mb-4 tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Choose Interview Setup
-            </h2>
-            <p className="text-gray-400 text-lg">Use a saved setup or create a new one</p>
+            <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white via-orange-100 to-white bg-clip-text text-transparent">
+              Choose Your Setup
+            </h1>
+            <p className="text-gray-400 text-lg">Use a saved configuration or create a new one</p>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Saved Setups */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+            {/* Saved Setups - 2 columns */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-800/50"
+              className="lg:col-span-2 bg-dark-800/40 backdrop-blur-xl rounded-3xl p-6 border border-dark-700/50 relative overflow-hidden group"
             >
-              <h3 className="text-2xl font-semibold text-white mb-6 flex items-center gap-3">
-                <Star className="w-6 h-6 text-orange-400" />
-                Saved Setups
-              </h3>
-              
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-orange-500/10 rounded-xl">
+                  <Star className="w-5 h-5 text-orange-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-white">Your Saved Setups</h2>
+              </div>
+
               {isLoadingSetups ? (
-                <div className="text-center py-8">
+                <div className="text-center py-12">
                   <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-gray-400">Loading your setups...</p>
+                  <p className="text-gray-400">Loading setups...</p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {savedSetups.map((savedSetup) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
+                  {savedSetups.map((savedSetup, index) => (
                     <motion.div
                       key={savedSetup.id}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="group p-4 bg-dark-700/30 rounded-xl border border-dark-600/50 hover:border-orange-500/50 transition-all cursor-pointer"
+                      transition={{ delay: index * 0.05 }}
                       onClick={() => handleUseSavedSetup(savedSetup)}
+                      className="group/card relative p-5 bg-dark-700/30 backdrop-blur-sm rounded-2xl border border-dark-600/50 hover:border-orange-500/50 transition-all cursor-pointer overflow-hidden"
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium text-white group-hover:text-orange-400 transition-colors">
-                              {savedSetup.name}
-                            </h4>
-                            {savedSetup.is_favorite && (
-                              <Heart className="w-4 h-4 text-red-400 fill-current" />
-                            )}
-                            {savedSetup.setup.interviewMode === 'voice' ? (
-                              <Mic className="w-4 h-4 text-green-400" />
-                            ) : (
-                              <Type className="w-4 h-4 text-blue-400" />
-                            )}
+                      {/* Hover glow */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-white group-hover/card:text-orange-400 transition-colors line-clamp-1">
+                                {savedSetup.name}
+                              </h3>
+                              {savedSetup.is_favorite && (
+                                <Heart className="w-3.5 h-3.5 text-red-400 fill-current flex-shrink-0" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mb-1">
+                              {savedSetup.setup.interviewMode === 'voice' ? (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 rounded-full border border-green-500/20">
+                                  <Mic className="w-3 h-3 text-green-400" />
+                                  <span className="text-xs text-green-400 font-medium">Voice</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 rounded-full border border-blue-500/20">
+                                  <Type className="w-3 h-3 text-blue-400" />
+                                  <span className="text-xs text-blue-400 font-medium">Text</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-400 mb-1">{savedSetup.setup.jobType}</p>
+                            <p className="text-xs text-gray-500">{savedSetup.setup.industry} • {savedSetup.setup.experienceLevel}</p>
                           </div>
-                          <p className="text-sm text-gray-400">
-                            {savedSetup.setup.jobType} • {savedSetup.setup.industry}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {savedSetup.setup.experienceLevel} • {savedSetup.setup.interviewMode === 'voice' ? 'Voice Mode' : 'Text Mode'}
-                          </p>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFavorite(savedSetup.id, savedSetup.is_favorite);
+                              }}
+                              className="p-1.5 hover:bg-dark-600 rounded-lg transition-colors"
+                            >
+                              <Heart className={`w-3.5 h-3.5 ${savedSetup.is_favorite ? 'text-red-400 fill-current' : 'text-gray-500'}`} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSetup(savedSetup.id);
+                              }}
+                              className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleFavorite(savedSetup.id, savedSetup.is_favorite);
-                            }}
-                            className="p-1 hover:bg-dark-600 rounded transition-colors"
-                          >
-                            <Heart className={`w-4 h-4 ${savedSetup.is_favorite ? 'text-red-400 fill-current' : 'text-gray-500'}`} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSetup(savedSetup.id);
-                            }}
-                            className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-400" />
-                          </button>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-dark-600/50">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            <span>Used {savedSetup.usage_count}x</span>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-gray-500 group-hover/card:text-orange-400 group-hover/card:translate-x-1 transition-all" />
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span>Used {savedSetup.usage_count} times</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 group-hover:text-orange-400 transition-colors" />
                       </div>
                     </motion.div>
                   ))}
@@ -388,47 +408,49 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
               )}
             </motion.div>
 
-            {/* Create New Setup */}
+            {/* Create New - 1 column */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-800/50"
+              className="bg-dark-800/40 backdrop-blur-xl rounded-3xl p-6 border border-dark-700/50 relative overflow-hidden group flex flex-col"
             >
-              <h3 className="text-2xl font-semibold text-white mb-6 flex items-center gap-3">
-                <Plus className="w-6 h-6 text-orange-400" />
-                Create New Setup
-              </h3>
-              
-              <div className="space-y-4">
-                <p className="text-gray-400 mb-6">
-                  Create a custom interview setup tailored to your specific needs and save it for future use.
-                </p>
-                
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-orange-500/10 rounded-xl">
+                  <Plus className="w-5 h-5 text-orange-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-white">Create New</h2>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center relative z-10">
                 <button
-                  onClick={() => setShowSavedSetups(false)}
-                  className="w-full p-6 border-2 border-dashed border-gray-600 rounded-xl hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowSavedSetups(false);
+                  }}
+                  className="w-full p-8 border-2 border-dashed border-dark-600 rounded-2xl hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group/btn"
                 >
-                  <div className="text-center">
-                    <Plus className="w-8 h-8 text-gray-500 group-hover:text-orange-400 mx-auto mb-3 transition-colors" />
-                    <h4 className="font-medium text-white group-hover:text-orange-400 transition-colors">
-                      Start Custom Setup
-                    </h4>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Configure mode, industry, role, and experience level
-                    </p>
-                  </div>
+                  <Plus className="w-12 h-12 text-gray-500 group-hover/btn:text-orange-400 mx-auto mb-4 transition-colors" />
+                  <h3 className="text-lg font-semibold text-white group-hover/btn:text-orange-400 transition-colors mb-2">
+                    Custom Setup
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Configure mode, industry, role, and experience level
+                  </p>
                 </button>
               </div>
             </motion.div>
           </div>
 
-          <div className="text-center mt-8">
+          <div className="text-center">
             <button
               onClick={onBack}
-              className="px-6 py-3 text-gray-400 hover:text-[#FF5722] transition-all duration-500 group flex items-center space-x-3 hover:bg-[#FF5722]/5 rounded-xl mx-auto"
+              className="inline-flex items-center gap-2 px-6 py-3 text-gray-400 hover:text-orange-500 transition-colors group"
             >
-              <span className="transform group-hover:-translate-x-2 transition-transform duration-500 text-xl">←</span>
-              <span className="font-medium">Back to Dashboard</span>
+              <span className="transform group-hover:-translate-x-1 transition-transform">←</span>
+              <span>Back to Dashboard</span>
             </button>
           </div>
         </div>
@@ -437,441 +459,497 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden pt-24">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#FF5722]/3 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#FF7043]/3 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-[#FF5722]/2 to-[#FF7043]/2 rounded-full blur-3xl animate-spin-slow"></div>
-        
-        {/* Floating particles */}
-        {[...Array(15)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-[#FF5722]/20 rounded-full animate-float"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`
-            }}
-          />
-        ))}
-      </div>
-      
-      <div className="w-full max-w-4xl relative z-10">
-        {/* Progress bar */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-sm font-medium text-gray-400">Setup Progress</span>
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-[#FF5722] rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-[#FF5722] bg-[#FF5722]/10 px-4 py-2 rounded-full border border-[#FF5722]/20">
-                {currentStep + 1} of {steps.length}
-              </span>
-            </div>
-          </div>
-          <div className="w-full bg-gray-900 rounded-full h-2 shadow-inner border border-gray-800">
-            <div 
-              className="bg-gradient-to-r from-[#FF5722] to-[#FF7043] h-2 rounded-full transition-all duration-700 ease-out shadow-lg relative overflow-hidden"
-              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-dark-900 pt-24 pb-16 px-4 relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-600/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
 
-        {/* Main card */}
-        <div className={`bg-gray-900/50 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-gray-800/50 relative overflow-hidden transition-all duration-500 ${isAnimating ? 'scale-95 opacity-50' : 'scale-100 opacity-100'}`}>
-          {/* Card glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#FF5722]/5 via-transparent to-[#FF7043]/5 rounded-3xl"></div>
-          <div className="absolute -inset-1 bg-gradient-to-r from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
-          
-          <div className="text-center mb-8 relative z-10">
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/20 rounded-3xl mb-6 relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#FF5722]/30 to-[#FF7043]/30 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-[#FF5722]/10 to-[#FF7043]/10 rounded-3xl animate-pulse"></div>
-              {StepIcon && <StepIcon className="w-12 h-12 text-[#FF5722] relative z-10 group-hover:scale-110 group-hover:rotate-12 transition-all duration-500" />}
-            </div>
-            <h2 className="text-5xl font-bold text-white mb-4 tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              {currentStepData?.title}
-            </h2>
-            <p className="text-gray-400 text-lg">
-              {currentStep === 0 
-                ? 'Choose your preferred interview experience'
-                : 'Choose the option that best describes your target role'
-              }
-            </p>
-          </div>
+      <div className="container max-w-4xl mx-auto relative z-10">
+        {/* Animated Step Indicator */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-12"
+        >
+          <div className="flex items-center justify-between mb-6">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = index === currentStep;
+              const isCompleted = index < currentStep;
 
-          {/* Other input form */}
-          {showOtherInput && (
-            <div className="relative z-10 mb-8">
-              <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                <div className="flex items-center space-x-3 mb-4">
-                  <Edit3 className="w-5 h-5 text-[#FF5722]" />
-                  <h3 className="text-white font-medium">Please specify your {currentStepData?.title.toLowerCase()}</h3>
-                </div>
-                <div className="flex space-x-4">
-                  <input
-                    type="text"
-                    value={otherValue}
-                    onChange={(e) => setOtherValue(e.target.value)}
-                    placeholder={`Enter your ${currentStepData?.title.toLowerCase()}...`}
-                    className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:border-[#FF5722] focus:outline-none transition-colors"
-                    autoFocus
-                    onKeyPress={(e) => e.key === 'Enter' && handleOtherSubmit()}
-                  />
-                  <button
-                    onClick={handleOtherSubmit}
-                    disabled={!otherValue.trim()}
-                    className="px-6 py-3 bg-[#FF5722] text-white rounded-xl hover:bg-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              return (
+                <React.Fragment key={index}>
+                  <motion.div
+                    className="flex flex-col items-center gap-2 relative"
+                    animate={{ scale: isActive ? 1 : 0.9 }}
                   >
-                    Continue
+                    <motion.div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center relative ${
+                        isCompleted
+                          ? 'bg-gradient-to-br from-green-500 to-emerald-500'
+                          : isActive
+                          ? 'bg-gradient-to-br from-orange-500 to-orange-600'
+                          : 'bg-dark-700'
+                      }`}
+                      animate={{
+                        boxShadow: isActive
+                          ? ['0 0 0 0 rgba(249, 115, 22, 0)', '0 0 0 10px rgba(249, 115, 22, 0)']
+                          : 'none'
+                      }}
+                      transition={{ duration: 1.5, repeat: isActive ? Infinity : 0 }}
+                    >
+                      {isCompleted ? (
+                        <Check className="w-5 h-5 text-white" />
+                      ) : (
+                        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-500'}`} />
+                      )}
+                    </motion.div>
+                    <span className={`text-xs font-medium hidden sm:block ${
+                      isActive ? 'text-orange-400' : isCompleted ? 'text-green-400' : 'text-gray-500'
+                    }`}>
+                      Step {index + 1}
+                    </span>
+                  </motion.div>
+
+                  {index < steps.length - 1 && (
+                    <div className="flex-1 h-0.5 mx-2 bg-dark-700 relative overflow-hidden">
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-600"
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: isCompleted ? 1 : 0 }}
+                        transition={{ duration: 0.5 }}
+                        style={{ transformOrigin: 'left' }}
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Main Content Card */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="bg-dark-800/40 backdrop-blur-xl rounded-3xl p-8 border border-dark-700/50 relative overflow-hidden"
+          >
+            {/* Card glow */}
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-transparent"></div>
+
+            {/* Header */}
+            <div className="text-center mb-8 relative z-10">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+                className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-2xl mb-6 relative"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/30 to-orange-600/30 rounded-2xl blur-xl"></div>
+                {currentStepData && <currentStepData.icon className="w-10 h-10 text-orange-400 relative z-10" />}
+              </motion.div>
+
+              <h2 className="text-4xl font-bold mb-3 bg-gradient-to-r from-white via-orange-100 to-white bg-clip-text text-transparent">
+                {currentStepData?.title}
+              </h2>
+              <p className="text-gray-400 text-lg">{currentStepData?.subtitle}</p>
+            </div>
+
+            {/* Other Input */}
+            {showOtherInput && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8"
+              >
+                <div className="bg-dark-700/30 rounded-2xl p-6 border border-dark-600/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Edit3 className="w-5 h-5 text-orange-400" />
+                    <h3 className="text-white font-medium">Specify your {currentStepData?.title.toLowerCase()}</h3>
+                  </div>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={otherValue}
+                      onChange={(e) => setOtherValue(e.target.value)}
+                      placeholder={`Enter your ${currentStepData?.title.toLowerCase()}...`}
+                      className="flex-1 px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none transition-colors"
+                      autoFocus
+                      onKeyPress={(e) => e.key === 'Enter' && handleOtherSubmit()}
+                    />
+                    <button
+                      onClick={handleOtherSubmit}
+                      disabled={!otherValue.trim()}
+                      className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowOtherInput(false)}
+                    className="mt-3 text-gray-400 hover:text-orange-400 transition-colors text-sm"
+                  >
+                    ← Back to options
                   </button>
                 </div>
-                <button
-                  onClick={handleBackFromOther}
-                  className="mt-4 text-gray-400 hover:text-[#FF5722] transition-colors text-sm"
-                >
-                  ← Back to options
-                </button>
-              </div>
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Special handling for interview mode selection */}
-          {!showOtherInput && currentStepData && currentStep === 0 && (
-            <div className="relative z-10">
+            {/* Step 0: Interview Mode */}
+            {!showOtherInput && currentStep === 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {interviewModes.map((mode, index) => {
                   const Icon = mode.icon;
                   const isSelected = setup.interviewMode === mode.id;
                   const isDisabled = mode.id === 'voice' && !hasAPIKey;
-                  
+
                   return (
-                    <button
+                    <motion.button
                       key={mode.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
                       onClick={() => !isDisabled && handleSelection(mode.id)}
                       disabled={isDisabled}
                       onMouseEnter={() => setHoveredOption(mode.id)}
                       onMouseLeave={() => setHoveredOption(null)}
-                      className={`group relative p-6 border-2 rounded-2xl transition-all duration-500 text-left overflow-hidden transform hover:scale-[1.02] hover:shadow-2xl ${
-                        isSelected 
-                          ? 'border-[#FF5722] bg-gradient-to-r from-[#FF5722]/10 to-[#FF7043]/10' 
+                      className={`group relative p-6 border-2 rounded-2xl text-left transition-all ${
+                        isSelected
+                          ? 'border-orange-500 bg-gradient-to-br from-orange-500/10 to-orange-600/5'
                           : isDisabled
-                          ? 'border-gray-700 bg-gray-800/30 opacity-50 cursor-not-allowed'
-                          : 'border-gray-800/50 hover:border-[#FF5722]/50 hover:bg-gradient-to-r hover:from-[#FF5722]/5 hover:to-[#FF7043]/5'
+                          ? 'border-dark-600 bg-dark-700/20 opacity-50 cursor-not-allowed'
+                          : 'border-dark-600 hover:border-orange-500/50 hover:bg-gradient-to-br hover:from-orange-500/5 hover:to-transparent'
                       }`}
-                      style={{
-                        animationDelay: `${index * 100}ms`,
-                        animation: 'fadeInUp 0.6s ease-out forwards'
-                      }}
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FF5722]/10 to-[#FF7043]/10 rounded-2xl opacity-0 transition-all duration-500 ${
-                        hoveredOption === mode.id || isSelected ? 'opacity-100' : ''
-                      }`}></div>
-                      
-                      <div className="relative z-10">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`p-3 rounded-xl transition-all duration-300 ${
-                            isSelected 
-                              ? 'bg-[#FF5722] text-white' 
-                              : isDisabled
-                              ? 'bg-gray-700 text-gray-500'
-                              : 'bg-gray-700 text-gray-400 group-hover:bg-[#FF5722] group-hover:text-white'
-                          }`}>
-                            <Icon className="w-6 h-6" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className={`text-xl font-semibold transition-colors ${
-                                isSelected 
-                                  ? 'text-[#FF5722]' 
-                                  : isDisabled
-                                  ? 'text-gray-500'
-                                  : 'text-white group-hover:text-[#FF5722]'
-                              }`}>
-                                {mode.title}
-                              </h3>
-                              {mode.recommended && (
-                                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full border border-green-500/30">
-                                  Recommended
-                                </span>
-                              )}
-                              {isDisabled && (
-                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full border border-yellow-500/30">
-                                  Requires API Key
-                                </span>
-                              )}
-                            </div>
-                            <p className={`text-sm transition-colors ${
-                              isDisabled ? 'text-gray-500' : 'text-gray-400'
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className={`p-3 rounded-xl transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white'
+                            : isDisabled
+                            ? 'bg-dark-600 text-gray-500'
+                            : 'bg-dark-600 text-gray-400 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-orange-600 group-hover:text-white'
+                        }`}>
+                          <Icon className="w-6 h-6" />
+                        </div>
+
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className={`text-xl font-semibold transition-colors ${
+                              isSelected ? 'text-orange-400' : isDisabled ? 'text-gray-500' : 'text-white'
                             }`}>
-                              {mode.description}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2 mb-4">
-                          {mode.features.map((feature, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-sm">
-                              <div className={`w-1.5 h-1.5 rounded-full ${
-                                isDisabled ? 'bg-gray-600' : 'bg-[#FF5722]'
-                              }`}></div>
-                              <span className={isDisabled ? 'text-gray-500' : 'text-gray-300'}>
-                                {feature}
+                              {mode.title}
+                            </h3>
+                            {mode.recommended && !isDisabled && (
+                              <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full border border-green-500/30">
+                                Recommended
                               </span>
-                            </div>
-                          ))}
+                            )}
+                          </div>
+                          <p className={`text-sm ${isDisabled ? 'text-gray-500' : 'text-gray-400'}`}>
+                            {mode.description}
+                          </p>
                         </div>
-                        
-                        {mode.warning && (
-                          <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-yellow-400">{mode.warning}</p>
-                          </div>
-                        )}
-                        
-                        {isDisabled && (
-                          <div className="flex items-start gap-2 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
-                            <AlertTriangle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-gray-400">
-                              Voice mode requires API key configuration. Add VITE_OPENAI_API_KEY to enable voice features.
-                            </p>
-                          </div>
-                        )}
                       </div>
-                      
-                      <div className="absolute inset-0 rounded-2xl bg-[#FF5722]/20 scale-0 group-active:scale-100 transition-transform duration-300 opacity-50"></div>
-                    </button>
+
+                      <div className="space-y-2 mb-4">
+                        {mode.features.map((feature, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isDisabled ? 'bg-gray-600' : 'bg-orange-400'}`}></div>
+                            <span className={`text-sm ${isDisabled ? 'text-gray-500' : 'text-gray-300'}`}>{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {mode.warning && !isDisabled && (
+                        <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                          <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-yellow-400">{mode.warning}</p>
+                        </div>
+                      )}
+
+                      {isDisabled && (
+                        <div className="flex items-start gap-2 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                          <AlertTriangle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-gray-400">
+                            Voice mode requires API key configuration.
+                          </p>
+                        </div>
+                      )}
+                    </motion.button>
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Regular options grid for other steps */}
-          {!showOtherInput && currentStepData && currentStep > 0 && (
-            <div className="relative z-10">
-              {currentStepData.options.length <= 4 ? (
-                // 2x2 grid for 4 or fewer items
-                <div className="grid grid-cols-2 gap-4">
-                  {currentStepData.options.map((option, index) => (
-                    <button
-                      key={option}
-                      onClick={() => handleSelection(option)}
-                      onMouseEnter={() => setHoveredOption(option)}
+            {/* Step 1: Industry */}
+            {!showOtherInput && currentStep === 1 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {industries.map((industry, index) => {
+                  const Icon = industry.icon;
+                  const isSelected = setup.industry === industry.id;
+
+                  return (
+                    <motion.button
+                      key={industry.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => handleSelection(industry.id)}
+                      onMouseEnter={() => setHoveredOption(industry.id)}
                       onMouseLeave={() => setHoveredOption(null)}
-                      className="group flex items-center justify-between p-6 border border-gray-800/50 rounded-2xl hover:border-[#FF5722]/50 hover:bg-gradient-to-r hover:from-[#FF5722]/5 hover:to-[#FF7043]/5 transition-all duration-500 text-left relative overflow-hidden transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-[#FF5722]/10"
-                      style={{
-                        animationDelay: `${index * 100}ms`,
-                        animation: 'fadeInUp 0.6s ease-out forwards'
-                      }}
+                      className={`group relative p-5 rounded-2xl border-2 transition-all ${
+                        isSelected
+                          ? 'border-orange-500 bg-gradient-to-br from-orange-500/10 to-orange-600/5'
+                          : 'border-dark-600 hover:border-orange-500/50 hover:bg-dark-700/30'
+                      }`}
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FF5722]/10 to-[#FF7043]/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-500 ${hoveredOption === option ? 'opacity-100' : ''}`}></div>
-                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#FF5722]/20 to-[#FF7043]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm"></div>
-                      
-                      <span className="font-medium text-gray-100 group-hover:text-[#FF7043] transition-all duration-500 relative z-10 text-lg">
-                        {option}
-                      </span>
-                      <ChevronRight className="w-6 h-6 text-gray-500 group-hover:text-[#FF5722] transition-all duration-500 group-hover:translate-x-2 group-hover:scale-110 relative z-10" />
-                      
-                      <div className="absolute inset-0 rounded-2xl bg-[#FF5722]/20 scale-0 group-active:scale-100 transition-transform duration-300 opacity-50"></div>
-                    </button>
-                  ))}
-                </div>
+                      <div className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center bg-gradient-to-br ${industry.color} ${
+                        isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+                      } transition-opacity`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <p className={`font-medium text-sm ${isSelected ? 'text-orange-400' : 'text-white'}`}>
+                        {industry.label}
+                      </p>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Step 2: Job Type */}
+            {!showOtherInput && currentStep === 2 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {jobTypes.map((job, index) => {
+                  const Icon = job.icon;
+                  const isSelected = setup.jobType === job.id;
+
+                  return (
+                    <motion.button
+                      key={job.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => handleSelection(job.id)}
+                      className={`group relative p-5 rounded-2xl border-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-orange-500 bg-gradient-to-br from-orange-500/10 to-orange-600/5'
+                          : 'border-dark-600 hover:border-orange-500/50 hover:bg-dark-700/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-xl transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-br from-orange-500 to-orange-600'
+                            : 'bg-dark-600 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-orange-600'
+                        }`}>
+                          <Icon className="w-4 h-4 text-white" />
+                        </div>
+                        <p className={`font-medium text-sm ${isSelected ? 'text-orange-400' : 'text-white'}`}>
+                          {job.label}
+                        </p>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Step 3: Experience Level */}
+            {!showOtherInput && currentStep === 3 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {experienceLevels.map((level, index) => {
+                  const Icon = level.icon;
+                  const isSelected = setup.experienceLevel === level.id;
+
+                  return (
+                    <motion.button
+                      key={level.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.1 }}
+                      onClick={() => handleSelection(level.id)}
+                      className={`group relative p-6 rounded-2xl border-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-orange-500 bg-gradient-to-br from-orange-500/10 to-orange-600/5'
+                          : 'border-dark-600 hover:border-orange-500/50 hover:bg-dark-700/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-xl transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-br from-orange-500 to-orange-600'
+                            : 'bg-dark-600 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-orange-600'
+                        }`}>
+                          <Icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className={`text-lg font-semibold mb-1 ${isSelected ? 'text-orange-400' : 'text-white'}`}>
+                            {level.label}
+                          </h3>
+                          <p className="text-sm text-gray-400">{level.sublabel}</p>
+                        </div>
+                        <ArrowRight className={`w-5 h-5 transition-all ${
+                          isSelected
+                            ? 'text-orange-400 translate-x-1'
+                            : 'text-gray-500 group-hover:text-orange-400 group-hover:translate-x-1'
+                        }`} />
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex justify-between mt-8 pt-6 border-t border-dark-700/50">
+              {currentStep > 0 && !showOtherInput ? (
+                <button
+                  onClick={() => setCurrentStep(currentStep - 1)}
+                  className="px-6 py-3 text-gray-400 hover:text-orange-400 transition-colors flex items-center gap-2 group"
+                >
+                  <span className="transform group-hover:-translate-x-1 transition-transform">←</span>
+                  <span>Back</span>
+                </button>
               ) : (
-                // 3x4 grid for more items
-                <div className="grid grid-cols-3 gap-4">
-                  {currentStepData.options.map((option, index) => (
-                    <button
-                      key={option}
-                      onClick={() => handleSelection(option)}
-                      onMouseEnter={() => setHoveredOption(option)}
-                      onMouseLeave={() => setHoveredOption(null)}
-                      className="group flex items-center justify-between p-4 border border-gray-800/50 rounded-2xl hover:border-[#FF5722]/50 hover:bg-gradient-to-r hover:from-[#FF5722]/5 hover:to-[#FF7043]/5 transition-all duration-500 text-left relative overflow-hidden transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-[#FF5722]/10"
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animation: 'fadeInUp 0.6s ease-out forwards'
-                      }}
-                    >
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FF5722]/10 to-[#FF7043]/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-500 ${hoveredOption === option ? 'opacity-100' : ''}`}></div>
-                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#FF5722]/20 to-[#FF7043]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm"></div>
-                      
-                      <span className="font-medium text-gray-100 group-hover:text-[#FF7043] transition-all duration-500 relative z-10 text-base">
-                        {option}
-                      </span>
-                      <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-[#FF5722] transition-all duration-500 group-hover:translate-x-2 group-hover:scale-110 relative z-10" />
-                      
-                      <div className="absolute inset-0 rounded-2xl bg-[#FF5722]/20 scale-0 group-active:scale-100 transition-transform duration-300 opacity-50"></div>
-                    </button>
-                  ))}
-                </div>
+                <button
+                  onClick={() => setShowSavedSetups(true)}
+                  className="px-6 py-3 text-gray-400 hover:text-orange-400 transition-colors flex items-center gap-2 group"
+                >
+                  <span className="transform group-hover:-translate-x-1 transition-transform">←</span>
+                  <span>Back to Setups</span>
+                </button>
               )}
             </div>
-          )}
-
-          {/* Back button */}
-          <div className="flex justify-between mt-8">
-            {currentStep > 0 && !showOtherInput ? (
-              <button
-                onClick={() => setCurrentStep(currentStep - 1)}
-                className="px-6 py-3 text-gray-400 hover:text-[#FF5722] transition-all duration-500 relative z-10 group flex items-center space-x-3 hover:bg-[#FF5722]/5 rounded-xl"
-              >
-                <span className="transform group-hover:-translate-x-2 transition-transform duration-500 text-xl">←</span>
-                <span className="font-medium">Back</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowSavedSetups(true)}
-                className="px-6 py-3 text-gray-400 hover:text-[#FF5722] transition-all duration-500 relative z-10 group flex items-center space-x-3 hover:bg-[#FF5722]/5 rounded-xl"
-              >
-                <span className="transform group-hover:-translate-x-2 transition-transform duration-500 text-xl">←</span>
-                <span className="font-medium">Back to Setups</span>
-              </button>
-            )}
-          </div>
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Save Setup Dialog */}
+      {/* Save Dialog */}
       <AnimatePresence>
         {showSaveDialog && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-dark-800 rounded-2xl p-8 border border-dark-700 max-w-md w-full"
+              className="bg-dark-800/90 backdrop-blur-xl rounded-3xl p-8 border border-dark-700/50 max-w-md w-full relative overflow-hidden"
             >
-              <h3 className="text-2xl font-bold text-white mb-4">Save Interview Setup</h3>
-              <p className="text-gray-400 mb-6">
-                Save this setup to quickly reuse it for future interviews.
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-300">
-                      Setup Name
-                    </label>
-                    <button
-                      onClick={() => setUseAutoName(!useAutoName)}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                        useAutoName 
-                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' 
-                          : 'bg-gray-700 text-gray-400 border border-gray-600'
-                      }`}
-                    >
-                      <Wand2 className="w-3 h-3" />
-                      Auto-generate
-                    </button>
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-transparent"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2.5 bg-orange-500/10 rounded-xl">
+                    <Star className="w-6 h-6 text-orange-400" />
                   </div>
-                  <input
-                    type="text"
-                    value={setupName}
-                    onChange={(e) => {
-                      setSetupName(e.target.value);
-                      setUseAutoName(false);
-                    }}
-                    placeholder="e.g., Voice Senior Software Engineer - Tech"
-                    className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none transition-colors"
-                    autoFocus={!useAutoName}
-                  />
-                  {useAutoName && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Name automatically generated from your choices
-                    </p>
-                  )}
+                  <h3 className="text-2xl font-bold text-white">Save Setup?</h3>
                 </div>
-                
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="favorite"
-                    checked={saveAsFavorite}
-                    onChange={(e) => setSaveAsFavorite(e.target.checked)}
-                    className="w-4 h-4 text-orange-500 bg-dark-700 border-dark-600 rounded focus:ring-orange-500"
-                  />
-                  <label htmlFor="favorite" className="text-sm text-gray-300 flex items-center gap-2">
-                    <Heart className="w-4 h-4" />
-                    Mark as favorite
+
+                <p className="text-gray-400 mb-6">
+                  Save this configuration to quickly reuse it for future interviews.
+                </p>
+
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-gray-300">Setup Name</label>
+                      <button
+                        onClick={() => setUseAutoName(!useAutoName)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          useAutoName
+                            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                            : 'bg-dark-700 text-gray-400 border border-dark-600'
+                        }`}
+                      >
+                        <Wand2 className="w-3 h-3" />
+                        Auto-generate
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={setupName}
+                      onChange={(e) => {
+                        setSetupName(e.target.value);
+                        setUseAutoName(false);
+                      }}
+                      placeholder="e.g., Voice Senior SWE - Tech"
+                      className="w-full px-4 py-3 bg-dark-700/50 border border-dark-600 rounded-xl text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none transition-colors"
+                    />
+                    {useAutoName && (
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Auto-generated from your selections
+                      </p>
+                    )}
+                  </div>
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={saveAsFavorite}
+                      onChange={(e) => setSaveAsFavorite(e.target.checked)}
+                      className="w-4 h-4 text-orange-500 bg-dark-700 border-dark-600 rounded focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-gray-300 flex items-center gap-2 group-hover:text-white transition-colors">
+                      <Heart className="w-4 h-4" />
+                      Mark as favorite
+                    </span>
                   </label>
-                </div>
-                
-                <div className="bg-dark-700/50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-white mb-2">Setup Summary:</h4>
-                  <div className="text-sm text-gray-400 space-y-1">
-                    <p>• Mode: {setup.interviewMode === 'voice' ? 'Voice Interview' : 'Text Interview'}</p>
-                    <p>• Industry: {setup.industry}</p>
-                    <p>• Role: {setup.jobType}</p>
-                    <p>• Experience: {setup.experienceLevel}</p>
+
+                  <div className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/50">
+                    <h4 className="text-sm font-semibold text-white mb-3">Summary</h4>
+                    <div className="space-y-2 text-sm text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+                        <span>Mode: {setup.interviewMode === 'voice' ? 'Voice Interview' : 'Text Interview'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+                        <span>Industry: {setup.industry}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+                        <span>Role: {setup.jobType}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+                        <span>Experience: {setup.experienceLevel}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex gap-3 mt-8">
-                <button
-                  onClick={() => {
-                    setShowSaveDialog(false);
-                    onComplete(setup as InterviewSetup);
-                  }}
-                  className="flex-1 px-6 py-3 bg-dark-700 text-white rounded-xl hover:bg-dark-600 transition-colors"
-                >
-                  Skip & Continue
-                </button>
-                <button
-                  onClick={handleSaveSetup}
-                  disabled={!setupName.trim()}
-                  className="flex-1 px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Save & Continue
-                </button>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowSaveDialog(false);
+                      onComplete(setup as InterviewSetup);
+                    }}
+                    className="flex-1 px-6 py-3 bg-dark-700 text-white rounded-xl hover:bg-dark-600 transition-colors font-medium"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    onClick={handleSaveSetup}
+                    disabled={!setupName.trim()}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                  >
+                    Save & Start
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <style>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(180deg); }
-        }
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-        .animate-spin-slow {
-          animation: spin-slow 20s linear infinite;
-        }
-      `}</style>
     </div>
   );
 };

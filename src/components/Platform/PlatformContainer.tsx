@@ -13,46 +13,130 @@ import InterviewProcessing from './InterviewProcessing';
 import { InterviewSetup } from '../../types/interview';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import CustomDemoInterview from './CustomDemoInterview';
-// Temporary metric detail component
+// Enhanced metric detail component with debug logging
 const InterviewMetricDetail = ({ metric, sessionData, onBack }: { metric: string, sessionData: any, onBack: () => void }) => {
-  // Find relevant responses and scores for the metric
-  const responses = sessionData.responses || [];
-  const questions = sessionData.questions || [];
-  const transcript = sessionData.transcript || [];
+  console.log('=== InterviewMetricDetail RENDERED ===');
+  console.log('Metric:', metric);
+  console.log('SessionData:', sessionData);
+
+  const responses = sessionData?.responses || [];
+  const questions = sessionData?.questions || [];
+  const transcript = sessionData?.transcript || [];
+
+  console.log('Responses count:', responses.length);
+  console.log('Questions count:', questions.length);
+  console.log('Transcript count:', transcript.length);
+
+  // Filter responses that have this metric
+  const relevantResponses = responses.filter((r: any) => {
+    const hasMetric = r.analysis?.[metric] !== undefined;
+    console.log(`Response for Q${r.questionId} has ${metric}:`, hasMetric, r.analysis?.[metric]);
+    return hasMetric;
+  });
+
+  console.log('Relevant responses count:', relevantResponses.length);
+
   return (
-    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
-      <div className="container max-w-3xl mx-auto px-4">
-        <button className="mb-6 px-4 py-2 bg-gray-700 text-white rounded" onClick={onBack}>Back</button>
-        <h1 className="text-3xl font-bold text-white mb-4 capitalize">{metric.replace('_', ' ')} Details</h1>
-        <div className="space-y-6 mb-12">
-          {responses.map((r: any, idx: number) => {
-            const q = questions.find((q: any) => q.id === r.questionId);
-            const score = r.analysis?.[metric];
-            if (score === undefined) return null;
-            return (
-              <div key={r.questionId || idx} className="bg-dark-800 rounded p-4 border border-dark-700">
-                <div className="mb-2 text-orange-400 font-semibold">Q{idx + 1}: {q?.text || r.question}</div>
-                <div className="mb-1 text-white">Score: <span className="font-bold">{score}/10</span></div>
-                <div className="mb-1 text-gray-300">Your Response: {r.response}</div>
-                <div className="text-gray-400">AI Feedback: {r.analysis?.feedback}</div>
-              </div>
-            );
-          })}
-        </div>
-        {/* Full Transcript Section */}
-        <div className="bg-dark-800 rounded p-4 border border-dark-700">
-          <h2 className="text-2xl font-semibold text-white mb-4">Full Transcript</h2>
-          <div className="space-y-2">
-            {transcript.length === 0 && <div className="text-gray-400">No transcript available.</div>}
-            {transcript.map((chunk: any, idx: number) => (
-              <div key={chunk.id || idx} className="flex items-start gap-3">
-                <span className={`font-bold ${chunk.speaker === 'user' ? 'text-blue-400' : 'text-orange-400'}`}>{chunk.speaker === 'user' ? 'You' : 'AI'}:</span>
-                <span className="text-gray-200">{chunk.text}</span>
-                <span className="text-xs text-gray-500 ml-auto">{chunk.timestamp ? new Date(chunk.timestamp).toLocaleTimeString() : ''}</span>
-              </div>
-            ))}
+    <div className="min-h-screen bg-dark-900 pt-24 pb-16 px-4">
+      {/* BRIGHT DEBUG BANNER */}
+      <div className="fixed top-0 left-0 right-0 bg-red-500 text-white p-4 z-50 font-bold text-center">
+        DEBUG: Component is rendering! Metric={metric} | Total Responses={responses.length} | Relevant={relevantResponses.length}
+      </div>
+
+      <div className="container max-w-4xl mx-auto">
+        {/* Back button */}
+        <button
+          onClick={onBack}
+          className="mb-6 px-6 py-3 bg-dark-800 hover:bg-dark-700 text-white rounded-xl transition-all flex items-center gap-2 font-semibold"
+        >
+          ← Back to Results
+        </button>
+
+        {/* Header */}
+        <h1 className="text-5xl font-bold text-white mb-3 capitalize">
+          {metric.replace(/_/g, ' ')} Analysis
+        </h1>
+        <p className="text-gray-400 text-lg mb-12">
+          Deep dive into your {metric.replace(/_/g, ' ').toLowerCase()} performance across all questions.
+        </p>
+
+        {/* Question-by-question breakdown */}
+        {relevantResponses.length > 0 ? (
+          <div className="space-y-6 mb-12">
+            {relevantResponses.map((r: any, idx: number) => {
+              const q = questions.find((q: any) => q.id === r.questionId);
+              const score = r.analysis?.[metric];
+              const feedback = r.analysis?.feedback || 'No feedback available';
+
+              return (
+                <div
+                  key={r.questionId || idx}
+                  className="bg-dark-800/60 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 hover:border-orange-500/30 transition-all"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="text-orange-400 font-semibold text-sm mb-2">Question {idx + 1}</div>
+                      <div className="text-white text-lg font-medium mb-3">{q?.text || r.question}</div>
+                    </div>
+                    <div className="ml-4 flex flex-col items-center">
+                      <div className="text-3xl font-bold text-white mb-1">{score}</div>
+                      <div className="text-xs text-gray-500">/ 10</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                      <div className="text-blue-400 text-sm font-semibold mb-2">Your Response</div>
+                      <div className="text-gray-300">{r.response || 'No response recorded'}</div>
+                    </div>
+
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
+                      <div className="text-orange-400 text-sm font-semibold mb-2">AI Feedback</div>
+                      <div className="text-gray-300">{feedback}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        ) : (
+          <div className="bg-dark-800/50 rounded-2xl p-12 border border-dark-700/50 text-center mb-12">
+            <div className="text-6xl mb-4">📊</div>
+            <h3 className="text-2xl font-semibold text-white mb-3">No Data Available</h3>
+            <p className="text-gray-400 max-w-md mx-auto">
+              This metric wasn't tracked for your responses. Try starting a new interview with voice mode enabled for comprehensive analytics.
+            </p>
+          </div>
+        )}
+
+        {/* Full Transcript Section */}
+        {transcript.length > 0 && (
+          <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50">
+            <h2 className="text-2xl font-bold text-white mb-6">Full Transcript</h2>
+            <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
+              {transcript.map((chunk: any, idx: number) => (
+                <div
+                  key={chunk.id || idx}
+                  className={`flex items-start gap-3 p-3 rounded-lg ${
+                    chunk.speaker === 'user' ? 'bg-blue-500/10' : 'bg-orange-500/10'
+                  }`}
+                >
+                  <span className={`font-bold text-sm ${
+                    chunk.speaker === 'user' ? 'text-blue-400' : 'text-orange-400'
+                  }`}>
+                    {chunk.speaker === 'user' ? 'You' : 'AI'}:
+                  </span>
+                  <span className="text-gray-200 flex-1">{chunk.text}</span>
+                  {chunk.timestamp && (
+                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(chunk.timestamp).toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -74,12 +158,15 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
   const [focusedInterviewType, setFocusedInterviewType] = useState<string>('');
   const [isFocusedFlow, setIsFocusedFlow] = useState(false);
   const [viewingInterviewId, setViewingInterviewId] = useState<string>('');
-  
+
   // State for viewing interview results - moved to top level to avoid conditional hooks
   const [viewingSessionData, setViewingSessionData] = useState<any>(null);
-  
+
   // State for viewing metric details
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+
+  // Ref to store session data immediately (prevents race conditions)
+  const sessionDataRef = React.useRef<any>(null);
   
   // Helper function to scroll to top smoothly
   const scrollToTop = () => {
@@ -88,6 +175,11 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       behavior: 'smooth'
     });
   };
+
+  // Scroll to top on state changes
+  React.useEffect(() => {
+    scrollToTop();
+  }, [currentState]);
 
   // Notify parent about full-screen state changes
   React.useEffect(() => {
@@ -162,7 +254,18 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     setInterviewSetup(setup);
 
     if (isFocusedFlow) {
-      setCurrentState('focused-selection');
+      // If focused type is already selected (from dashboard), skip selection screen
+      if (focusedInterviewType) {
+        // Go directly to the interview based on mode
+        if (setup.interviewMode === 'voice') {
+          setCurrentState('realtime-focused-interview');
+        } else {
+          setCurrentState('focused-interview');
+        }
+      } else {
+        // No type selected yet, show selection screen
+        setCurrentState('focused-selection');
+      }
     } else {
       // For standard interviews, check interview mode
       if (setup.interviewMode === 'voice') {
@@ -174,11 +277,24 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     scrollToTop();
   };
 
-  const handleInterviewComplete = (data: any) => {
+  const handleInterviewComplete = React.useCallback((data: any) => {
+    if (!data) {
+      console.error('❌ handleInterviewComplete: Received null/undefined data');
+      return;
+    }
+
+    // Store session data in ref to ensure it's available immediately
+    sessionDataRef.current = data;
+
+    // Update React state - batched update
     setSessionData(data);
-    setCurrentState('processing');
-    scrollToTop();
-  };
+
+    // Use requestAnimationFrame to ensure DOM is ready before transition
+    requestAnimationFrame(() => {
+      setCurrentState('processing');
+      scrollToTop();
+    });
+  }, []);
 
   const handleFocusedTypeSelect = (type: string) => {
     setFocusedInterviewType(type);
@@ -340,9 +456,9 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
         />
       )}
       
-      {currentState === 'results' && sessionData && (
+      {currentState === 'results' && (sessionData || sessionDataRef.current) && (
         <InterviewResults
-          sessionData={sessionData}
+          sessionData={sessionData || sessionDataRef.current}
           onBackToDashboard={handleBackToDashboard}
           onStartNewInterview={handleStartNewInterview}
         />

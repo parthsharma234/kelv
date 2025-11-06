@@ -8,9 +8,9 @@ interface InterviewProcessingProps {
   processingTimeMs?: number;
 }
 
-const InterviewProcessing: React.FC<InterviewProcessingProps> = ({ 
-  onComplete, 
-  processingTimeMs = 3000 
+const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
+  onComplete,
+  processingTimeMs = 3000
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -42,35 +42,37 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
     const stepDuration = processingTimeMs / processingSteps.length;
     let stepTimer: NodeJS.Timeout;
     let progressTimer: NodeJS.Timeout;
+    let completionTimer: NodeJS.Timeout;
 
     const updateProgress = () => {
       setProgress(prev => {
-        if (prev >= 100) {
-          setTimeout(onComplete, 500); // Small delay before showing results
+        const newProgress = prev + (100 / (processingTimeMs / 50));
+
+        if (newProgress >= 100) {
+          clearInterval(progressTimer);
+          clearInterval(stepTimer);
+          // Call onComplete after a brief delay
+          completionTimer = setTimeout(onComplete, 300);
           return 100;
         }
-        return prev + (100 / (processingTimeMs / 50)); // Update every 50ms
+        return newProgress;
       });
     };
 
     const updateStep = () => {
       setCurrentStep(prev => {
-        if (prev < processingSteps.length - 1) {
-          return prev + 1;
-        }
-        return prev;
+        return prev < processingSteps.length - 1 ? prev + 1 : prev;
       });
     };
 
-    // Start progress animation
+    // Start animations
     progressTimer = setInterval(updateProgress, 50);
-
-    // Update steps
     stepTimer = setInterval(updateStep, stepDuration);
 
     return () => {
       clearInterval(stepTimer);
       clearInterval(progressTimer);
+      clearTimeout(completionTimer);
     };
   }, [onComplete, processingTimeMs, processingSteps.length]);
 

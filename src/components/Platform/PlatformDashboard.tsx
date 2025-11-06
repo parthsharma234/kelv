@@ -1,32 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Brain, 
-  Play, 
-  BarChart3, 
-  Clock, 
-  Target, 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Brain,
+  Target,
   TrendingUp,
-  Calendar,
   Award,
+  ArrowRight,
+  Sparkles,
+  Zap,
+  Activity,
+  MessageSquare,
+  BarChart3,
+  Circle,
+  CheckCircle2,
+  AlertCircle,
   ChevronRight,
   Plus,
-  CheckCircle,
-  AlertCircle,
-  GraduationCap,
-  Shield,
+  Clock,
+  Calendar,
+  Trophy,
+  Flame,
   Star,
-  MessageSquare
+  Rocket,
+  TrendingDown,
+  Command
 } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
 import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
-import { UniversityLogo, prestigiousUniversities } from '../UniversityLogos';
+import CommandPalette from './CommandPalette';
+import { generateRecommendations, calculateAchievements, calculateStreak, Recommendation, Achievement, StreakData } from '../../utils/recommendations';
 
-// Utility function to convert camelCase to readable text
 const formatInterviewType = (type: string): string => {
   if (!type) return 'Various';
-  
-  // Special case mappings for specific interview types
   const typeMap: { [key: string]: string } = {
     'salaryNegotiation': 'Salary Negotiation',
     'culturalFit': 'Cultural Fit',
@@ -35,86 +40,80 @@ const formatInterviewType = (type: string): string => {
     'caseStudy': 'Case Study',
     'leadershipAssessment': 'Leadership Assessment',
   };
-  
-  // If we have a specific mapping, use it
-  if (typeMap[type]) {
-    return typeMap[type];
-  }
-  
-  // Otherwise, convert camelCase to readable format
-  return type
-    // Insert space before uppercase letters
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    // Capitalize first letter of each word
-    .replace(/\b\w/g, letter => letter.toUpperCase());
+  if (typeMap[type]) return typeMap[type];
+  return type.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, letter => letter.toUpperCase());
 };
-
 
 interface PlatformDashboardProps {
   onStartRealtimeInterview: (type: 'standard' | 'focused', focusedType?: string) => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
+  onStartCustomDemoInterview?: () => void;
 }
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeInterview, onViewInterviewResults }) => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
+  onStartRealtimeInterview,
+  onViewInterviewResults
+}) => {
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([]);
-  const [showAllInterviews, setShowAllInterviews] = useState(false);
   const [stats, setStats] = useState({
     totalInterviews: 0,
     averageScore: 0,
     totalHours: 0,
     improvement: 0,
-    focusedInterviews: 0,
-    focusedAverageScore: 0,
-    mostPracticedType: ''
   });
   const [strengthsAndWeaknesses, setStrengthsAndWeaknesses] = useState({
     strengths: [] as string[],
     weaknesses: [] as string[],
-    categories: {} as { [key: string]: number }
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [interviewTypeFilter, setInterviewTypeFilter] = useState<string | null>(null);
+  const [selectedView, setSelectedView] = useState<'all' | 'dynamic' | 'focused'>('all');
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [streakData, setStreakData] = useState<StreakData>({
+    currentStreak: 0,
+    longestStreak: 0,
+    lastInterviewDate: null,
+    interviewDates: [],
+    streakCalendar: []
+  });
 
   useEffect(() => {
-    // Scroll to top when component mounts
     window.scrollTo({ top: 0, behavior: 'smooth' });
-      const loadData = async () => {
+    const loadData = async () => {
       try {
         const [history, statsData, swData] = await Promise.all([
           getInterviewHistory(),
           getInterviewStats(),
           getUserStrengthsAndWeaknesses()
         ]);
-        
-        console.log('Dashboard: Loaded interview history:', {
-          total: history.length,
-          histories: history.map(h => ({
-            id: h.id,
-            interviewType: h.interviewType,
-            date: h.date,
-            status: h.status,
-            overallScore: h.overallScore
-          }))
-        });
-        
         setInterviewHistory(history);
         setStats(statsData);
         setStrengthsAndWeaknesses(swData);
+
+        // Calculate recommendations, achievements, and streak
+        const calculatedStreak = calculateStreak(history);
+        setStreakData(calculatedStreak);
+
+        const recs = generateRecommendations(history, swData);
+        setRecommendations(recs);
+
+        const achs = calculateAchievements(history, calculatedStreak);
+        setAchievements(achs);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
     loadData();
   }, []);
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+      day: 'numeric'
     });
   };
 
@@ -123,754 +122,719 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ onStartRealtimeIn
     return `${minutes}m`;
   };
 
+  const focusedTypes = [
+    { id: 'technical', label: 'Technical', icon: Brain, gradient: 'from-blue-500 via-blue-600 to-cyan-600', duration: '5m', color: 'blue' },
+    { id: 'behavioral', label: 'Behavioral', icon: MessageSquare, gradient: 'from-purple-500 via-purple-600 to-pink-600', duration: '4m', color: 'purple' },
+    { id: 'situational', label: 'Situational', icon: Zap, gradient: 'from-amber-500 via-orange-500 to-red-500', duration: '4m', color: 'orange' },
+    { id: 'leadership', label: 'Leadership', icon: Award, gradient: 'from-emerald-500 via-teal-500 to-cyan-500', duration: '5m', color: 'emerald' },
+    { id: 'problemSolving', label: 'Problem Solving', icon: Activity, gradient: 'from-indigo-500 via-violet-500 to-purple-600', duration: '5m', color: 'indigo' },
+    { id: 'communication', label: 'Communication', icon: Sparkles, gradient: 'from-rose-500 via-pink-500 to-purple-500', duration: '4m', color: 'rose' },
+  ];
+
+  const dynamicInterviews = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
+  const focusedInterviews = interviewHistory.filter(i => i.interviewType && i.interviewType !== 'dynamic' && i.interviewType !== 'general');
+  const filteredInterviews = selectedView === 'dynamic' ? dynamicInterviews :
+                            selectedView === 'focused' ? focusedInterviews :
+                            interviewHistory;
+
+  // Use real streak from calculated data
+  const currentStreak = streakData.currentStreak;
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K or Ctrl+K for command palette
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
+        return;
+      }
+
+      // Don't trigger shortcuts if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Don't trigger if command palette is open
+      if (isCommandPaletteOpen) {
+        return;
+      }
+
+      // D for Dynamic interview
+      if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        onStartRealtimeInterview('standard');
+      }
+
+      // Number keys for focused interviews
+      if (e.key >= '1' && e.key <= '6') {
+        e.preventDefault();
+        const index = parseInt(e.key) - 1;
+        if (focusedTypes[index]) {
+          onStartRealtimeInterview('focused', focusedTypes[index].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCommandPaletteOpen, onStartRealtimeInterview]);
+
   return (
-    <div className="min-h-screen bg-dark-900 pt-24 pb-16">
-      <div className="container max-w-7xl mx-auto px-4">
-        {/* Header */}
+    <div className="min-h-screen bg-dark-900 pt-20 pb-16">
+      <div className="container max-w-[1600px] mx-auto px-6">
+
+        {/* Hero Section with Stats */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          transition={{ duration: 0.3 }}
+          className="mb-10"
         >
-          <h1 className="text-4xl font-bold gradient-text mb-4">Interview Platform</h1>
-          <p className="text-gray-400 text-lg">Practice with dynamic interviews that adapt to your responses in real-time.</p>
-        </motion.div>
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-4 mb-8">
-          <button
-            className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'focused' ? 'bg-blue-600 text-white border-blue-700' : 'bg-dark-800 text-blue-400 border-blue-700 hover:bg-blue-900/40'}`}
-            onClick={() => setInterviewTypeFilter('focused')}
-          >
-            View Focused Practice
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg font-semibold border transition-colors ${interviewTypeFilter === 'dynamic' ? 'bg-orange-600 text-white border-orange-700' : 'bg-dark-800 text-orange-400 border-orange-700 hover:bg-orange-900/40'}`}
-            onClick={() => setInterviewTypeFilter('dynamic')}
-          >
-            View Dynamic Interviews
-          </button>
-          {interviewTypeFilter && (
-            <button
-              className="px-4 py-2 rounded-lg font-semibold border bg-gray-700 text-gray-200 border-gray-600 hover:bg-gray-800 transition-colors"
-              onClick={() => setInterviewTypeFilter(null)}
-            >
-              Clear Filter
-            </button>
-          )}
-        </div>
-        {/* Recent Interviews - moved to top */}
-        <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700 mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-orange-400" />
-              Recent Interviews
-            </h3>
-            {interviewHistory.length > 5 && (
-              <button 
-                onClick={() => setShowAllInterviews(!showAllInterviews)}
-                className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors"
-              >
-                {showAllInterviews ? 'Show Recent' : 'View All'}
-              </button>
-            )}
-          </div>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading interview history...</p>
-            </div>
-          ) : interviewHistory.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Plus className="w-8 h-8 text-gray-500" />
-              </div>
-              <h4 className="text-lg font-medium text-gray-400 mb-2">No interviews yet</h4>
-              <p className="text-gray-500 text-sm">Start your first interview to see your progress here</p>
-            </div>
-          ) : (
-            <div className={`space-y-4 ${showAllInterviews ? 'max-h-96 overflow-y-auto pr-2 custom-scrollbar' : ''}`}>
-              {(showAllInterviews ? interviewHistory : interviewHistory.slice(0, 5))
-                .filter(interview => {
-                  if (!interviewTypeFilter) return true;
-                  if (interviewTypeFilter === 'focused') return interview.interviewType && interview.interviewType !== 'dynamic';
-                  if (interviewTypeFilter === 'dynamic') return !interview.interviewType || interview.interviewType === 'general' || interview.interviewType === 'dynamic';
-                  return true;
-                })
-                .map((interview) => {
-                  const isFocusedInterview = interview.interviewType !== null && interview.interviewType !== undefined;
-                  
-                  console.log('Dashboard: Rendering interview:', {
-                    id: interview.id,
-                    interviewType: interview.interviewType,
-                    isFocused: isFocusedInterview,
-                    date: interview.date,
-                    status: interview.status
-                  });
-                  
-                  return (
-                    <div
-                      key={interview.id}
-                      className={`flex items-center justify-between p-4 rounded-xl hover:bg-dark-700/50 transition-colors cursor-pointer border ${
-                        isFocusedInterview
-                          ? 'bg-gradient-to-r from-blue-900/70 to-cyan-900/40 border-blue-500/50 shadow-blue-500/20'
-                          : 'bg-dark-700/30 border-dark-700'
-                      }`}
-                      onClick={() => onViewInterviewResults(interview.id, interview.interviewType)}
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <h1 className="text-5xl font-bold text-white tracking-tight">
+                  Dashboard
+                </h1>
+                {currentStreak > 0 && (
+                  <div className="relative group">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3, delay: 0.1 }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full cursor-pointer"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${
-                          isFocusedInterview ? 'bg-blue-500/30' : 'bg-orange-500/20'
-                        }`}>
-                          <Calendar className={`w-4 h-4 ${
-                            isFocusedInterview ? 'text-blue-300' : 'text-orange-400'
-                          }`} />
-                        </div>                          <div>                            <h4 className="font-medium text-white flex items-center gap-2">
-                              {`${interview.setup.jobType} - ${interview.setup.industry}`}
-                              {isFocusedInterview && (
-                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 text-blue-200 border border-blue-400/50" title="Targeted (Focused) Interview">Focused</span>
-                              )}
-                            </h4>
-                            <p className="text-sm text-gray-400">
-                              {formatDate(interview.date)} • {formatDuration(interview.duration)} • {interview.questionsAnswered} questions
-                            </p>
-                          </div>
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm font-semibold text-orange-300">{currentStreak} day streak</span>
+                    </motion.div>
+
+                    {/* Streak Calendar Tooltip */}
+                    <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 shadow-2xl min-w-[280px]">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-semibold text-white">Last 30 Days</span>
+                          <span className="text-xs text-gray-500">Longest: {streakData.longestStreak} days</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            interview.overallScore >= 80
-                              ? 'bg-green-500/20 text-green-400'
-                              : interview.overallScore >= 60
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {interview.overallScore}%
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                        <div className="grid grid-cols-10 gap-1">
+                          {streakData.streakCalendar.map((day, idx) => (
+                            <div
+                              key={idx}
+                              className={`w-5 h-5 rounded ${
+                                day.hasInterview
+                                  ? 'bg-orange-500'
+                                  : 'bg-dark-700'
+                              }`}
+                              title={day.date.toLocaleDateString()}
+                            />
+                          ))}
                         </div>
                       </div>
-                    );
-                  })}
-            </div>
-          )}
-        </div>
-        {/* Stats Grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
-        >
-          <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-orange-500/20 rounded-lg">
-                <Target className="w-5 h-5 text-orange-400" />
+                    </div>
+                  </div>
+                )}
               </div>
-              <span className="text-gray-400 text-sm">Total Interviews</span>
-            </div>
-            <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : stats.totalInterviews}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? `${Math.round(stats.totalHours * 60)} minutes practiced` : 'Ready to start your journey!'}
-            </div>
-          </div>
+              <div className="flex items-center gap-4">
+                <p className="text-base text-gray-400">Ready to practice your next interview?</p>
 
-          <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <Award className="w-5 h-5 text-green-400" />
+                {/* Command Palette Button */}
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                  onClick={() => setIsCommandPaletteOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-dark-800/40 border border-dark-700/50 rounded-lg hover:border-dark-600 transition-all group"
+                >
+                  <Command className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition-colors" />
+                  <span className="text-sm text-gray-400 group-hover:text-white transition-colors">Quick Actions</span>
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 bg-dark-700/50 rounded text-xs text-gray-500 font-mono">
+                    <Command className="w-3 h-3" />
+                    K
+                  </div>
+                </motion.button>
               </div>
-              <span className="text-gray-400 text-sm">Average Score</span>
             </div>
-            <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : stats.totalInterviews > 0 ? `${stats.averageScore}%` : '--'}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? 
-                (stats.averageScore >= 80 ? 'Excellent performance!' : 
-                 stats.averageScore >= 60 ? 'Good progress, keep practicing!' : 
-                 'Keep practicing to improve') : 
-                'Your first interview awaits'}
-            </div>
-          </div>
 
-          <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Clock className="w-5 h-5 text-blue-400" />
-              </div>
-              <span className="text-gray-400 text-sm">Practice Hours</span>
-            </div>
-            <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : stats.totalInterviews > 0 ? `${stats.totalHours}h` : '0h'}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? 
-                (stats.totalHours > 10 ? 'Dedicated practice time!' : 
-                 stats.totalHours > 5 ? 'Building momentum' : 
-                 'Consistent practice pays off') : 
-                'Begin your practice today'}
-            </div>
-          </div>
+            {/* Quick Stats Grid */}
+            {!isLoading && stats.totalInterviews > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                className="grid grid-cols-3 gap-3"
+              >
+                <div className="bg-dark-800/40 border border-dark-700/50 rounded-xl px-4 py-3 min-w-[130px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Trophy className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs text-gray-500">Sessions</span>
+                  </div>
+                  <div className="text-2xl font-bold text-white">{stats.totalInterviews}</div>
+                </div>
 
-          <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-purple-400" />
-              </div>
-              <span className="text-gray-400 text-sm">Improvement</span>
-            </div>
-            <div className="text-3xl font-bold text-white">
-              {isLoading ? '...' : stats.totalInterviews > 0 ? `${stats.improvement > 0 ? '+' : ''}${stats.improvement}%` : '--'}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {isLoading ? 'Loading...' : stats.totalInterviews > 0 ? 
-                (stats.improvement > 10 ? 'Outstanding growth!' : 
-                 stats.improvement > 0 ? 'Steady improvement' : 
-                 'Focus on consistent practice') : 
-                'Start practicing to see growth'}
-            </div>
+                <div className="bg-dark-800/40 border border-dark-700/50 rounded-xl px-4 py-3 min-w-[130px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Star className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-gray-500">Avg Score</span>
+                  </div>
+                  <div className="text-2xl font-bold text-white">{stats.averageScore}%</div>
+                </div>
+
+                <div className="bg-dark-800/40 border border-dark-700/50 rounded-xl px-4 py-3 min-w-[130px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    {stats.improvement >= 0 ? (
+                      <TrendingUp className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-red-400" />
+                    )}
+                    <span className="text-xs text-gray-500">Trend</span>
+                  </div>
+                  <div className={`text-2xl font-bold ${stats.improvement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {stats.improvement >= 0 ? '+' : ''}{stats.improvement}%
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </div>
         </motion.div>
 
-        {/* Dynamic Interviews Performance bar - now below stats grid */}
-        {interviewHistory && (
-          <div className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-orange-500/20 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-orange-400" />
-              </div>
-              <h2 className="text-xl font-semibold text-white">Dynamic Interviews Performance</h2>
-              <div className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-medium rounded-full border border-orange-500/30">
-                Dynamic
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {/* Sessions Card */}
-              <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-orange-500/30 rounded-lg">
-                    <BarChart3 className="w-5 h-5 text-orange-300" />
-                  </div>
-                  <span className="text-orange-200 text-sm font-medium">Dynamic Sessions</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic').length}
-                </div>
-                <div className="text-xs text-orange-300 mt-2">
-                  Adaptive interviews completed
-                </div>
-              </div>
-              {/* Overall Score Card */}
-              <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-orange-500/30 rounded-lg">
-                    <Award className="w-5 h-5 text-orange-300" />
-                  </div>
-                  <span className="text-orange-200 text-sm font-medium">Overall Score</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {(() => {
-                    const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                    if (dynamic.length === 0) return '--';
-                    return Math.round(dynamic.reduce((sum, i) => sum + i.overallScore, 0) / dynamic.length) + '%';
-                  })()}
-                </div>
-                <div className="text-xs text-orange-300 mt-2">
-                  Average dynamic interview score
-                </div>
-              </div>
-            </div>
-            {/* 2x2 grid for metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Problem Solving Card */}
-                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <Target className="w-5 h-5 text-orange-300" />
-                    </div>
-                    <span className="text-orange-200 text-sm font-medium">Problem Solving</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.problem_solving ? [(i as any).metrics.problem_solving] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
-                  </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. problem solving score
-                  </div>
-                </div>
-                {/* Communication Card */}
-                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <MessageSquare className="w-5 h-5 text-orange-300" />
-                    </div>
-                    <span className="text-orange-200 text-sm font-medium">Communication</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.communication ? [(i as any).metrics.communication] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
-                  </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. communication score
-                  </div>
-                </div>
-                {/* Depth Card */}
-                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <Brain className="w-5 h-5 text-orange-300" />
-                    </div>
-                    <span className="text-orange-200 text-sm font-medium">Depth</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.depth ? [(i as any).metrics.depth] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
-                  </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. depth score
-                  </div>
-                </div>
-                {/* Relevance Card */}
-                <div className="bg-gradient-to-br from-orange-900/70 to-amber-900/40 rounded-2xl p-6 border border-orange-500/30 hover:border-orange-400/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-500/30 rounded-lg">
-                      <CheckCircle className="w-5 h-5 text-orange-300" />
-                    </div>
-                    <span className="text-orange-200 text-sm font-medium">Relevance</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white">
-                    {(() => {
-                      const dynamic = interviewHistory.filter(i => !i.interviewType || i.interviewType === 'general' || i.interviewType === 'dynamic');
-                      const scores = dynamic.flatMap(i => (i as any).metrics?.relevance ? [(i as any).metrics.relevance] : []);
-                      if (scores.length === 0) return '--';
-                      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) + '/10';
-                    })()}
-                  </div>
-                  <div className="text-xs text-orange-300 mt-2">
-                    Avg. relevance score
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Focused Interview Stats - Only show when user has completed focused interviews */}
-        {stats.focusedInterviews > 0 && (
+        {/* For You - Personalized Recommendations */}
+        {!isLoading && recommendations.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="mb-12"
+            transition={{ delay: 0.15, duration: 0.3 }}
+            className="mb-6"
           >
-            {/* Focused Stats Header */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Target className="w-5 h-5 text-blue-400" />
-              </div>
-              <h2 className="text-xl font-semibold text-white">Focused Practice Stats</h2>
-              <div className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full border border-blue-500/30">
-                Focused
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-orange-400" />
+                For You
+              </h2>
+              <span className="text-sm text-gray-500">AI-powered suggestions</span>
             </div>
 
-            {/* Focused Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gradient-to-br from-blue-900/70 to-cyan-900/40 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-500/30 rounded-lg">
-                    <Target className="w-5 h-5 text-blue-300" />
-                  </div>
-                  <span className="text-blue-200 text-sm font-medium">Focused Sessions</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {stats.focusedInterviews}
-                </div>
-                <div className="text-xs text-blue-300 mt-2">
-                  Targeted practice completed
-                </div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {recommendations.map((rec, index) => (
+                <motion.div
+                  key={rec.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 + index * 0.05, duration: 0.3 }}
+                  onClick={() => {
+                    if (rec.action.interviewType === 'focused' && rec.action.focusedType) {
+                      onStartRealtimeInterview('focused', rec.action.focusedType);
+                    } else {
+                      onStartRealtimeInterview('standard');
+                    }
+                  }}
+                  className="group relative cursor-pointer"
+                >
+                  {/* Subtle Glow - Keep but reduce */}
+                  <div className={`absolute -inset-0.5 bg-gradient-to-r ${rec.gradient} rounded-xl blur opacity-0 group-hover:opacity-30 transition-all duration-300`}></div>
 
-              <div className="bg-gradient-to-br from-blue-900/70 to-cyan-900/40 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-500/30 rounded-lg">
-                    <Award className="w-5 h-5 text-blue-300" />
+                  {/* Card */}
+                  <div className="relative bg-dark-800/40 border border-dark-700/50 rounded-xl p-5 group-hover:border-dark-600 transition-all h-full">
+                    <div className="flex items-start gap-4">
+                      <div className="text-4xl">{rec.icon}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-base font-semibold text-white">{rec.title}</h3>
+                          {rec.priority >= 4 && (
+                            <span className="px-2 py-0.5 bg-orange-500/20 border border-orange-500/30 rounded text-xs text-orange-300 font-medium">
+                              Recommended
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400 mb-3">{rec.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <ArrowRight className="w-3 h-3" />
+                          <span>Start practice</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-blue-200 text-sm font-medium">Focused Score</span>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {stats.focusedAverageScore}%
-                </div>
-                <div className="text-xs text-blue-300 mt-2">
-                  Average focused practice score
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-blue-900/70 to-cyan-900/40 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-500/30 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-blue-300" />
-                  </div>
-                  <span className="text-blue-200 text-sm font-medium">Most Practiced</span>
-                </div>                <div className="text-3xl font-bold text-white">
-                  {formatInterviewType(stats.mostPracticedType)}
-                </div>
-                <div className="text-xs text-blue-300 mt-2">
-                  Your preferred practice type
-                </div>
-              </div>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         )}
 
-
-        {/* Strengths and Weaknesses */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12"
-        >
-          {/* Strengths */}
-          <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-2xl p-6 border border-green-500/20">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Your Strengths</h3>
-            </div>
-            {isLoading ? (
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-700/50 rounded animate-pulse"></div>
-                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-3/4"></div>
-                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-1/2"></div>
-              </div>
-            ) : strengthsAndWeaknesses.strengths.length > 0 ? (
-              <div className="space-y-3">
-                {strengthsAndWeaknesses.strengths.map((strength, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300 text-sm">{strength}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400 text-sm">Complete more interviews to see your strengths</p>
-            )}
-          </div>
-
-          {/* Areas for Improvement */}
-          <div className="bg-gradient-to-br from-orange-500/10 to-red-500/5 rounded-2xl p-6 border border-orange-500/20">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-orange-500/20 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-orange-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Areas for Improvement</h3>
-            </div>
-            {isLoading ? (
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-700/50 rounded animate-pulse"></div>
-                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-3/4"></div>
-                <div className="h-4 bg-gray-700/50 rounded animate-pulse w-1/2"></div>
-              </div>
-            ) : strengthsAndWeaknesses.weaknesses.length > 0 ? (
-              <div className="space-y-3">
-                {strengthsAndWeaknesses.weaknesses.map((weakness, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300 text-sm">{weakness}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400 text-sm">Great job! Keep practicing to maintain your skills</p>
-            )}
-          </div>
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Start Interview Section */}
+        {/* Achievements Showcase */}
+        {!isLoading && achievements.some(a => a.unlocked) && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="lg:col-span-2"
+            transition={{ delay: 0.2, duration: 0.3 }}
+            className="mb-6"
           >
-            <div className="bg-gradient-to-br from-orange-500/10 to-orange-400/5 rounded-2xl p-8 border border-orange-500/20 mb-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-400 rounded-2xl">
-                  <Brain className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Dynamic Interview</h2>
-                  <p className="text-gray-300">Experience adaptive voice questioning powered by advanced AI technology</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-dark-800/30 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2">🎙️ Voice Interaction</h4>
-                  <p className="text-sm text-gray-400">Natural voice conversation with AI interviewer</p>
-                </div>
-                <div className="bg-dark-800/30 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2">⚡ Real-time Response</h4>
-                  <p className="text-sm text-gray-400">Instant AI reactions and adaptive follow-ups</p>
-                </div>
-                <div className="bg-dark-800/30 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2">📝 Live Transcript</h4>
-                  <p className="text-sm text-gray-400">See conversation in real-time with speaker labels</p>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => onStartRealtimeInterview('standard')}
-                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-3 group"
-              >
-                <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Start Interview
-                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-400" />
+                Recent Achievements
+              </h2>
+              <span className="text-sm text-gray-500">
+                {achievements.filter(a => a.unlocked).length} / {achievements.length} unlocked
+              </span>
             </div>
 
-            {/* Focused Practice Section */}
-            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-2xl p-8 border border-blue-500/20 mb-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl">
-                  <Target className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Focused Practice</h2>
-                  <p className="text-gray-300">Quick voice sessions targeting specific interview skills</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl mb-2">💻</div>
-                  <h4 className="font-medium text-white mb-1">Technical</h4>
-                  <p className="text-xs text-gray-400">5 min</p>
-                </div>
-                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl mb-2">🎯</div>
-                  <h4 className="font-medium text-white mb-1">Behavioral</h4>
-                  <p className="text-xs text-gray-400">4 min</p>
-                </div>
-                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl mb-2">🧩</div>
-                  <h4 className="font-medium text-white mb-1">Situational</h4>
-                  <p className="text-xs text-gray-400">4 min</p>
-                </div>
-                <div className="bg-dark-800/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl mb-2">👑</div>
-                  <h4 className="font-medium text-white mb-1">Leadership</h4>
-                  <p className="text-xs text-gray-400">5 min</p>
-                </div>
-              </div>
-                <button
-                onClick={() => onStartRealtimeInterview('focused')}
-                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-400 hover:to-cyan-400 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-3 group"
-              >
-                <Target className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Start Focused Practice
-                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {achievements.filter(a => a.unlocked).slice(0, 6).map((achievement, index) => (
+                <motion.div
+                  key={achievement.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.25 + index * 0.03, duration: 0.3 }}
+                  className="group relative"
+                >
+                  {/* Subtle Glow for rare achievements */}
+                  {achievement.rarity !== 'common' && (
+                    <div className={`absolute -inset-0.5 bg-gradient-to-r ${achievement.gradient} rounded-xl blur opacity-0 group-hover:opacity-25 transition-all duration-300`}></div>
+                  )}
 
-            {/* Quick Tips & Performance */}
+                  {/* Achievement Card */}
+                  <div className="relative bg-dark-800/40 border border-dark-700/50 rounded-xl p-4 group-hover:border-dark-600 transition-all text-center">
+                    <div className="text-3xl mb-2">{achievement.icon}</div>
+                    <div className="text-xs font-semibold text-white mb-1 line-clamp-2">{achievement.title}</div>
+                    <div className="text-xs text-gray-500">
+                      {achievement.rarity === 'legendary' && 'Legendary'}
+                      {achievement.rarity === 'epic' && 'Epic'}
+                      {achievement.rarity === 'rare' && 'Rare'}
+                      {achievement.rarity === 'common' && 'Common'}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Main Interview Actions - Bento Grid Style */}
+        <div className="grid grid-cols-12 gap-4 mb-6">
+
+          {/* Dynamic Interview - Takes 8 columns */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="col-span-12 lg:col-span-8"
+          >
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="space-y-6"
+              onClick={() => onStartRealtimeInterview('standard')}
+              onHoverStart={() => setHoveredCard('dynamic')}
+              onHoverEnd={() => setHoveredCard(null)}
+              className="group cursor-pointer h-full relative"
             >
-              {/* Features */}
-              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-orange-400" />
-                  Platform Features
-                </h3>
-                <div className="space-y-4">
-                  <div className="p-4 bg-dark-700/30 rounded-lg">
-                    <h4 className="font-medium text-white mb-2">Dynamic Questions</h4>
-                    <p className="text-sm text-gray-400">Questions generated based on your responses and adapt difficulty in real-time.</p>
-                  </div>
-                  <div className="p-4 bg-dark-700/30 rounded-lg">
-                    <h4 className="font-medium text-white mb-2">Smart Follow-ups</h4>
-                    <p className="text-sm text-gray-400">Get follow-up questions that dig deeper into your answers, just like real interviews.</p>
-                  </div>
-                  <div className="p-4 bg-dark-700/30 rounded-lg">
-                    <h4 className="font-medium text-white mb-2">Natural Conclusion</h4>
-                    <p className="text-sm text-gray-400">The system knows when to end the interview at an appropriate time based on your performance.</p>
-                  </div>
-                </div>
-              </div>
+              {/* Subtle Glow Effect */}
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl blur opacity-0 group-hover:opacity-20 transition-all duration-300"></div>
 
-              {/* Performance Insights */}
-              {stats.totalInterviews > 0 && (
-                <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-orange-400" />
-                    Your Progress
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-400">Overall Performance</span>
-                        <span className="text-white font-medium">{stats.averageScore}%</span>
+              {/* Card */}
+              <div className="relative bg-dark-800/40 border border-dark-700/50 rounded-2xl p-8 hover:border-orange-500/30 transition-all h-full">
+
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-5">
+                  <div className="absolute inset-0" style={{
+                    backgroundImage: 'radial-gradient(circle at 2px 2px, rgb(255, 255, 255) 1px, transparent 0)',
+                    backgroundSize: '32px 32px'
+                  }}></div>
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-xl">
+                        <Brain className="w-7 h-7 text-orange-400" />
                       </div>
-                      <div className="w-full bg-dark-700 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${stats.averageScore}%` }}
-                        />
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-2xl font-bold text-white">Dynamic Interview</h3>
+                          <kbd className="px-2 py-1 bg-dark-900/60 border border-dark-700 rounded text-xs text-gray-400 font-mono">D</kbd>
+                        </div>
+                        <p className="text-gray-400 text-sm">Full 20-minute adaptive session</p>
                       </div>
                     </div>
-                    
-                    {stats.improvement !== 0 && (
-                      <div className={`p-3 rounded-lg border ${
-                        stats.improvement > 0 
-                          ? 'bg-green-500/10 border-green-500/20' 
-                          : 'bg-red-500/10 border-red-500/20'
-                      }`}>
-                        <p className={`text-sm ${
-                          stats.improvement > 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {stats.improvement > 0 ? '📈' : '📉'} You've {stats.improvement > 0 ? 'improved' : 'declined'} by {Math.abs(stats.improvement)}% over your recent interviews
-                        </p>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                      <Clock className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm font-medium text-orange-300">20min</span>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Interview Tips */}
-              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-orange-400" />
-                  Pro Tips
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300">Start with confidence - the system begins with small talk to help you warm up</p>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-4 gap-3 mb-6">
+                    <div className="bg-dark-900/40 border border-dark-700/50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1">Completed</div>
+                      <div className="text-xl font-bold text-white">{dynamicInterviews.length}</div>
+                    </div>
+                    <div className="bg-dark-900/40 border border-dark-700/50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1">Avg Score</div>
+                      <div className="text-xl font-bold text-white">
+                        {dynamicInterviews.length > 0
+                          ? Math.round(dynamicInterviews.reduce((sum, i) => sum + i.overallScore, 0) / dynamicInterviews.length) + '%'
+                          : '--'}
+                      </div>
+                    </div>
+                    <div className="bg-dark-900/40 border border-dark-700/50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1">Total Time</div>
+                      <div className="text-xl font-bold text-white">
+                        {dynamicInterviews.length > 0
+                          ? Math.round(dynamicInterviews.reduce((sum, i) => sum + (i.duration / 60), 0)) + 'm'
+                          : '--'}
+                      </div>
+                    </div>
+                    <div className="bg-dark-900/40 border border-dark-700/50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1">Best Score</div>
+                      <div className="text-xl font-bold text-white">
+                        {dynamicInterviews.length > 0
+                          ? Math.max(...dynamicInterviews.map(i => i.overallScore)) + '%'
+                          : '--'}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300">Use specific examples - the system recognizes and rewards concrete details</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-gray-300">Don't worry about mistakes - the system adapts and helps you improve</p>
+
+                  {/* CTA */}
+                  <div className="flex items-center justify-between pt-4 border-t border-dark-700/50">
+                    <span className="text-orange-300 font-semibold text-sm">Start Interview</span>
+                    <motion.div
+                      animate={{
+                        x: hoveredCard === 'dynamic' ? 4 : 0
+                      }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ArrowRight className="w-5 h-5 text-orange-400" />
+                    </motion.div>
                   </div>
                 </div>
               </div>
             </motion.div>
           </motion.div>
 
-          {/* Quick Tips & Performance */}
+          {/* Performance Card - Takes 4 columns */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="space-y-6"
+            transition={{ delay: 0.12, duration: 0.3 }}
+            className="col-span-12 lg:col-span-4"
           >
-            {/* Features */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Brain className="w-5 h-5 text-orange-400" />
-                Platform Features
-              </h3>
-              <div className="space-y-4">
-                <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Dynamic Questions</h4>
-                  <p className="text-sm text-gray-400">Questions generated based on your responses and adapt difficulty in real-time.</p>
+            <div className="bg-dark-800/40 border border-dark-700/50 rounded-2xl p-6 h-full">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
                 </div>
-                <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Smart Follow-ups</h4>
-                  <p className="text-sm text-gray-400">Get follow-up questions that dig deeper into your answers, just like real interviews.</p>
-                </div>
-                <div className="p-4 bg-dark-700/30 rounded-lg">
-                  <h4 className="font-medium text-white mb-2">Natural Conclusion</h4>
-                  <p className="text-sm text-gray-400">The system knows when to end the interview at an appropriate time based on your performance.</p>
-                </div>
+                <h3 className="text-lg font-semibold text-white">Performance</h3>
               </div>
-            </div>
 
-            {/* Performance Insights */}
-            {stats.totalInterviews > 0 && (
-              <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-orange-400" />
-                  Your Progress
-                </h3>
-                <div className="space-y-4">
+              {isLoading ? (
+                <div className="space-y-3">
+                  <div className="h-4 bg-dark-700/50 rounded-lg animate-pulse"></div>
+                  <div className="h-4 bg-dark-700/50 rounded-lg animate-pulse w-3/4"></div>
+                </div>
+              ) : stats.totalInterviews > 0 ? (
+                <div className="space-y-6">
+                  {/* Big Score */}
                   <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-400">Overall Performance</span>
-                      <span className="text-white font-medium">{stats.averageScore}%</span>
+                    <div className="flex items-baseline gap-3 mb-3">
+                      <div className="text-5xl font-bold text-white">{stats.averageScore}</div>
+                      <div className="text-2xl text-gray-500">%</div>
+                      {stats.improvement !== 0 && (
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${
+                          stats.improvement > 0 ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                        }`}>
+                          {stats.improvement > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                          <span className="text-sm font-semibold">{Math.abs(stats.improvement)}%</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full bg-dark-700 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${stats.averageScore}%` }}
+                    <div className="relative h-2 bg-dark-900 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${stats.averageScore}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
                       />
                     </div>
                   </div>
-                  
-                  {stats.improvement !== 0 && (
-                    <div className={`p-3 rounded-lg border ${
-                      stats.improvement > 0 
-                        ? 'bg-green-500/10 border-green-500/20' 
-                        : 'bg-red-500/10 border-red-500/20'
-                    }`}>
-                      <p className={`text-sm ${
-                        stats.improvement > 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {stats.improvement > 0 ? '📈' : '📉'} You've {stats.improvement > 0 ? 'improved' : 'declined'} by {Math.abs(stats.improvement)}% over your recent interviews
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* Interview Tips */}
-            <div className="bg-dark-800/50 rounded-2xl p-6 border border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Target className="w-5 h-5 text-orange-400" />
-                Pro Tips
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p className="text-gray-300">Start with confidence - the system begins with small talk to help you warm up</p>
+                  {/* Quick Stats */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Sessions</span>
+                      <span className="font-semibold text-white">{stats.totalInterviews}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Practice Time</span>
+                      <span className="font-semibold text-white">{stats.totalHours.toFixed(1)}h</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">This Week</span>
+                      <span className="font-semibold text-white">{interviewHistory.filter(i => {
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return new Date(i.date) >= weekAgo;
+                      }).length}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p className="text-gray-300">Use specific examples - the system recognizes and rewards concrete details</p>
+              ) : (
+                <div className="text-center py-8">
+                  <Rocket className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">Start your first interview</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p className="text-gray-300">Don't worry about mistakes - the system adapts and helps you improve</p>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Focused Practice Grid - Sleek */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.3 }}
+          className="mb-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-white">Focused Practice</h2>
+            <div className="text-sm text-gray-500">{focusedInterviews.length} completed</div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {focusedTypes.map((type, index) => {
+              const Icon = type.icon;
+              const completedCount = focusedInterviews.filter(i => i.interviewType === type.id).length;
+
+              return (
+                <motion.div
+                  key={type.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 + index * 0.03, duration: 0.3 }}
+                  onClick={() => onStartRealtimeInterview('focused', type.id)}
+                  onHoverStart={() => setHoveredCard(type.id)}
+                  onHoverEnd={() => setHoveredCard(null)}
+                  className="group cursor-pointer relative"
+                >
+                  {/* Subtle Glow */}
+                  <div className={`absolute -inset-0.5 bg-${type.color}-500 rounded-xl blur opacity-0 group-hover:opacity-20 transition-all duration-300`}></div>
+
+                  {/* Card */}
+                  <div className="relative bg-dark-800/40 border border-dark-700/50 rounded-xl p-4 group-hover:border-dark-600 transition-all h-full">
+                    <div className="flex flex-col h-full">
+                      {/* Icon with keyboard hint */}
+                      <div className="mb-3 flex items-start justify-between">
+                        <div className={`p-2.5 bg-${type.color}-500/10 rounded-lg inline-flex`}>
+                          <Icon className={`w-5 h-5 text-${type.color}-400`} />
+                        </div>
+                        <kbd className="px-1.5 py-0.5 bg-dark-900/60 border border-dark-700 rounded text-xs text-gray-500 font-mono">{index + 1}</kbd>
+                      </div>
+
+                      {/* Label */}
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-white mb-1 line-clamp-2">{type.label}</div>
+                        <div className="text-xs text-gray-500">{type.duration}</div>
+                      </div>
+
+                      {/* Progress */}
+                      {completedCount > 0 && (
+                        <div className="mt-3 pt-3 border-t border-dark-700/50">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">Completed</span>
+                            <span className="font-semibold text-white">{completedCount}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Insights & Activity - Side by Side */}
+        <div className="grid grid-cols-12 gap-4">
+
+          {/* Insights - 4 columns */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            className="col-span-12 lg:col-span-4 space-y-4"
+          >
+            {/* Strengths */}
+            <div className="bg-dark-800/40 border border-dark-700/50 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5 text-green-400" />
+                <h3 className="text-base font-semibold text-white">Strengths</h3>
+              </div>
+              {isLoading ? (
+                <div className="space-y-2">
+                  <div className="h-3 bg-dark-700/50 rounded animate-pulse"></div>
+                  <div className="h-3 bg-dark-700/50 rounded animate-pulse w-3/4"></div>
+                </div>
+              ) : strengthsAndWeaknesses.strengths.length > 0 ? (
+                <div className="space-y-3">
+                  {strengthsAndWeaknesses.strengths.slice(0, 3).map((strength, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <Circle className="w-1.5 h-1.5 text-green-400 mt-1.5 fill-current flex-shrink-0" />
+                      <p className="text-sm text-gray-300 leading-relaxed">{strength}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Complete interviews to discover your strengths</p>
+              )}
+            </div>
+
+            {/* Focus Areas */}
+            <div className="bg-dark-800/40 border border-dark-700/50 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertCircle className="w-5 h-5 text-orange-400" />
+                <h3 className="text-base font-semibold text-white">Focus Areas</h3>
+              </div>
+              {isLoading ? (
+                <div className="space-y-2">
+                  <div className="h-3 bg-dark-700/50 rounded animate-pulse"></div>
+                  <div className="h-3 bg-dark-700/50 rounded animate-pulse w-3/4"></div>
+                </div>
+              ) : strengthsAndWeaknesses.weaknesses.length > 0 ? (
+                <div className="space-y-3">
+                  {strengthsAndWeaknesses.weaknesses.slice(0, 3).map((weakness, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <Circle className="w-1.5 h-1.5 text-orange-400 mt-1.5 fill-current flex-shrink-0" />
+                      <p className="text-sm text-gray-300 leading-relaxed">{weakness}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">You're doing great! Keep practicing</p>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Activity Feed - 8 columns */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22, duration: 0.3 }}
+            className="col-span-12 lg:col-span-8"
+          >
+            <div className="bg-dark-800/40 border border-dark-700/50 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Recent Activity</h3>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-2">
+                  {(['all', 'dynamic', 'focused'] as const).map((view) => (
+                    <button
+                      key={view}
+                      onClick={() => setSelectedView(view)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        selectedView === view
+                          ? view === 'dynamic'
+                            ? 'bg-orange-500/10 text-orange-300 border border-orange-500/20'
+                            : view === 'focused'
+                            ? 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+                            : 'bg-white/10 text-white border border-white/20'
+                          : 'text-gray-400 hover:text-white hover:bg-dark-700/50 border border-transparent'
+                      }`}
+                    >
+                      {view.charAt(0).toUpperCase() + view.slice(1)}
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="w-8 h-8 border-2 border-dark-700 border-t-white rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-sm text-gray-500">Loading sessions...</p>
+                </div>
+              ) : filteredInterviews.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 bg-dark-700/30 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-gray-600" />
+                  </div>
+                  <h4 className="text-base font-semibold text-gray-400 mb-2">No sessions yet</h4>
+                  <p className="text-sm text-gray-600">Start your first interview to begin tracking progress</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredInterviews.slice(0, 6).map((interview) => {
+                    const isFocused = interview.interviewType && interview.interviewType !== 'dynamic' && interview.interviewType !== 'general';
+
+                    return (
+                      <motion.div
+                        key={interview.id}
+                        whileHover={{ scale: 1.005 }}
+                        onClick={() => onViewInterviewResults(interview.id, interview.interviewType)}
+                        className="group flex items-center gap-4 p-4 rounded-lg border border-dark-700/50 hover:border-dark-600 hover:bg-dark-700/30 transition-all cursor-pointer"
+                      >
+                        {/* Icon */}
+                        <div className={`p-2.5 rounded-lg ${
+                          isFocused ? 'bg-blue-500/10' : 'bg-orange-500/10'
+                        }`}>
+                          {isFocused ? (
+                            <Target className="w-5 h-5 text-blue-400" />
+                          ) : (
+                            <Brain className="w-5 h-5 text-orange-400" />
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-sm font-semibold text-white truncate">
+                              {interview.setup.jobType}
+                            </h4>
+                            <span className="text-xs text-gray-600">•</span>
+                            <span className="text-xs text-gray-500">{interview.setup.industry}</span>
+                            {isFocused && (
+                              <>
+                                <span className="text-xs text-gray-600">•</span>
+                                <span className="text-xs text-blue-400 truncate">{formatInterviewType(interview.interviewType || '')}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <span>{formatDate(interview.date)}</span>
+                            <span>•</span>
+                            <span>{formatDuration(interview.duration)}</span>
+                            <span>•</span>
+                            <span>{interview.questionsAnswered} questions</span>
+                          </div>
+                        </div>
+
+                        {/* Score Badge */}
+                        <div className={`px-3 py-1.5 rounded-lg text-sm font-bold ${
+                          interview.overallScore >= 80
+                            ? 'bg-green-500/10 text-green-400'
+                            : interview.overallScore >= 60
+                            ? 'bg-yellow-500/10 text-yellow-400'
+                            : 'bg-red-500/10 text-red-400'
+                        }`}>
+                          {interview.overallScore}%
+                        </div>
+
+                        {/* Arrow */}
+                        <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-gray-400 group-hover:translate-x-1 transition-all" />
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onStartDynamic={() => onStartRealtimeInterview('standard')}
+        onStartFocused={(type) => onStartRealtimeInterview('focused', type)}
+        onViewInterview={onViewInterviewResults}
+        recentInterviews={interviewHistory}
+      />
     </div>
   );
 };

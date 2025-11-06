@@ -91,6 +91,8 @@ export class OpenAIRealtimeClient extends EventEmitter {
   private isGeneratingResponse: boolean = false; // Add flag to prevent multiple responses
   private audioQueue: { delta: string, responseId: string }[] = [];
   private currentResponseId: string | null = null;
+  private audioWorkletNode: AudioWorkletNode | null = null;
+  private pendingAudioBuffer: Float32Array[] = []; // Buffer for smooth playback transitions
 
   constructor(apiKey: string, config: Partial<RealtimeConfig> = {}, mediaStream?: MediaStream) {
     super();
@@ -381,14 +383,30 @@ export class OpenAIRealtimeClient extends EventEmitter {
       if (!this.outputAudioContext) {
         this.outputAudioContext = new AudioContext({ sampleRate: 24000 });
         this.outputGainNode = this.outputAudioContext.createGain();
+        this.outputGainNode.gain.value = 1.0;
         this.outputGainNode.connect(this.outputAudioContext.destination);
       }
 
       const audioData = this.base64ToArrayBuffer(delta);
       const pcm16Data = new Int16Array(audioData);
       const float32Data = new Float32Array(pcm16Data.length);
+
+      // Convert PCM16 to float32 with proper normalization
       for (let i = 0; i < pcm16Data.length; i++) {
         float32Data[i] = pcm16Data[i] / 32768.0;
+      }
+
+      // Apply fade-in to first 50 samples to prevent pops
+      const fadeInSamples = Math.min(50, float32Data.length);
+      for (let i = 0; i < fadeInSamples; i++) {
+        float32Data[i] *= i / fadeInSamples;
+      }
+
+      // Apply fade-out to last 50 samples for smooth transitions
+      const fadeOutSamples = Math.min(50, float32Data.length);
+      for (let i = 0; i < fadeOutSamples; i++) {
+        const index = float32Data.length - fadeOutSamples + i;
+        float32Data[index] *= (fadeOutSamples - i) / fadeOutSamples;
       }
 
       const audioBuffer = this.outputAudioContext.createBuffer(1, float32Data.length, 24000);
@@ -397,16 +415,21 @@ export class OpenAIRealtimeClient extends EventEmitter {
       this.currentAudioSource = this.outputAudioContext.createBufferSource();
       this.currentAudioSource.buffer = audioBuffer;
       this.currentAudioSource.connect(this.outputGainNode!);
-      this.currentAudioSource.start();
+
+      // Schedule playback to start immediately or seamlessly after the current chunk
+      const startTime = this.outputAudioContext.currentTime;
+      this.currentAudioSource.start(startTime);
 
       this.currentAudioSource.onended = () => {
         this.currentAudioSource = null;
-        this.processAudioQueue(); // Process next chunk
+        // Small delay to ensure smooth transition
+        setTimeout(() => this.processAudioQueue(), 5);
       };
     } catch (error) {
+      console.error('Error processing audio queue:', error);
       this.isPlayingAudio = false;
       // Continue with the next item in the queue
-      this.processAudioQueue();
+      setTimeout(() => this.processAudioQueue(), 10);
     }
   }
 
@@ -479,7 +502,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
-            sampleRate: 24000,
+            // Let browser use native sample rate, we'll resample
             channelCount: 1
           }
         });
@@ -487,16 +510,16 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
       this.audioContext = new AudioContext({ sampleRate: 24000 });
       const source = this.audioContext.createMediaStreamSource(this.stream);
-      
-      // Create a script processor to capture audio data
-      const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-      
+
+      // Use smaller buffer size (2048) to reduce latency and prevent chunking artifacts
+      const processor = this.audioContext.createScriptProcessor(2048, 1, 1);
+
       processor.onaudioprocess = (event) => {
         if (this.isConnected && this.isRecording) {
           const inputBuffer = event.inputBuffer.getChannelData(0);
           const pcm16 = this.floatTo16BitPCM(inputBuffer);
           this.sendAudioData(pcm16);
-          
+
           // Store audio chunks locally for speech analysis
           this.audioChunks.push(pcm16.slice(0)); // Create a copy
           this.currentResponseAudioChunks.push(pcm16.slice(0));
@@ -539,8 +562,22 @@ export class OpenAIRealtimeClient extends EventEmitter {
     const view = new DataView(buffer);
     let offset = 0;
     for (let i = 0; i < float32Array.length; i++, offset += 2) {
-      let s = Math.max(-1, Math.min(1, float32Array[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      // Apply soft clipping to prevent harsh distortion
+      let s = float32Array[i];
+
+      // Soft clipping using tanh-like curve for values near ±1
+      if (s > 0.95) {
+        s = 0.95 + (s - 0.95) * 0.2; // Gentle compression above 0.95
+      } else if (s < -0.95) {
+        s = -0.95 + (s + 0.95) * 0.2; // Gentle compression below -0.95
+      }
+
+      // Hard limit to prevent overflow
+      s = Math.max(-1, Math.min(1, s));
+
+      // Convert to 16-bit PCM with proper rounding
+      const pcmValue = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7FFF);
+      view.setInt16(offset, pcmValue, true);
     }
     return buffer;
   }

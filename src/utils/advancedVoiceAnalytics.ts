@@ -921,6 +921,32 @@ export class AdvancedVoiceAnalyzer {
     return metrics.lowFreqEnergy || 0.5;
   }
 
+  private estimateSpeechRate(volume: number): number {
+    // Estimate speech rate based on volume and recent history
+    if (this.analysisHistory.length < 10) return 150; // Default WPM
+
+    const recentVolumes = this.analysisHistory.slice(-10).map(m => this.extractVolumeFromHistory(m));
+    const activeSpeechFrames = recentVolumes.filter(vol => vol > 0.15).length;
+
+    // Estimate WPM based on speech activity density
+    // Typical: 1 word per ~0.4 seconds, each frame is 0.1s
+    const estimatedWords = activeSpeechFrames * 0.1 / 0.4;
+    const timeSpan = 1; // 1 second window
+    return Math.min(200, Math.max(80, (estimatedWords / timeSpan) * 60));
+  }
+
+  private calculateFluency(zeroCrossingRate: number, volume: number): number {
+    // Fluency based on smoothness of speech and zero-crossing rate
+    // Higher zero-crossing rate indicates smoother transitions
+    const smoothness = Math.min(1, zeroCrossingRate / 0.5);
+
+    // Speech activity indicates confidence in speaking
+    const activity = Math.min(1, volume / 0.5);
+
+    // Combine factors
+    return (smoothness * 0.6 + activity * 0.4);
+  }
+
   private estimateCurrentPace(): number {
     // Estimate words per minute based on speech activity
     if (this.analysisHistory.length < 20) return 150;
