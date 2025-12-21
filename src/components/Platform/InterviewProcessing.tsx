@@ -1,86 +1,128 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, Mic, BarChart3, FileText, CheckCircle, Loader2 } from 'lucide-react';
+import { Brain, Mic, BarChart3, FileText, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import RedPandaLogo from '../RedPandaLogo';
+import { HumeBatchClient } from '../../utils/humeBatchClient';
+import { AnalyticsEngine } from '../../utils/analyticsEngine';
 
 interface InterviewProcessingProps {
-  onComplete: () => void;
-  processingTimeMs?: number;
+  sessionData: any; // Contains { transcript, duration, recordingBlob }
+  onComplete: (results: any) => void;
 }
 
 const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
-  onComplete,
-  processingTimeMs = 3000
+  sessionData,
+  onComplete
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
+  // Ref to prevent double-firing
+  const joyRef = useRef(false);
+
+  // Processing Steps (Visuals)
   const processingSteps = [
-    {
-      icon: FileText,
-      title: 'Analyzing Transcript',
-      description: 'Processing your responses and conversation flow'
-    },
-    {
-      icon: Mic,
-      title: 'Evaluating Voice Metrics',
-      description: 'Analyzing speech patterns, pace, and delivery'
-    },
-    {
-      icon: Brain,
-      title: 'Generating Insights',
-      description: 'Creating personalized feedback and recommendations'
-    },
-    {
-      icon: BarChart3,
-      title: 'Calculating Scores',
-      description: 'Compiling your performance metrics and results'
-    }
+    { icon: FileText, title: 'Uploading Interview', description: 'Securely sending data to analytics engine' },
+    { icon: Brain, title: 'Analyzing Biometrics', description: 'Processing facial expressions and prosody' },
+    { icon: Mic, title: 'Evaluating Content', description: 'Generating detailed feedback and scores' },
+    { icon: BarChart3, title: 'Finalizing Report', description: 'Compiling your personal dashboard' }
   ];
 
   useEffect(() => {
-    const stepDuration = processingTimeMs / processingSteps.length;
-    let stepTimer: NodeJS.Timeout;
-    let progressTimer: NodeJS.Timeout;
-    let completionTimer: NodeJS.Timeout;
+    if (joyRef.current) return;
+    joyRef.current = true;
 
-    const updateProgress = () => {
-      setProgress(prev => {
-        const newProgress = prev + (100 / (processingTimeMs / 50));
+    const processInterview = async () => {
+      try {
+        console.log('[Processing] Starting analysis pipeline...');
 
-        if (newProgress >= 100) {
-          clearInterval(progressTimer);
-          clearInterval(stepTimer);
-          // Call onComplete after a brief delay
-          completionTimer = setTimeout(onComplete, 300);
-          return 100;
+        // 1. Upload & Start Job
+        setCurrentStep(0);
+        setProgress(10);
+
+        const apiKey = import.meta.env.VITE_HUME_API_KEY;
+        if (!apiKey) throw new Error('Missing Hume API Key');
+
+        const client = new HumeBatchClient(apiKey);
+
+        if (!sessionData?.recordingBlob) {
+          // STRICT MODE: No recording = No Analysis.
+          console.error('[Processing] Critical: No recording blob found.');
+          throw new Error('No recording data captured. Cannot generate real metrics.');
         }
-        return newProgress;
-      });
+
+        const jobId = await client.startJob(sessionData.recordingBlob);
+        console.log('[Processing] Job started:', jobId);
+
+        // 2. Poll for Results
+        setCurrentStep(1);
+        setProgress(30);
+
+        // Poll with progress simulation
+        const pollInterval = setInterval(() => {
+          setProgress(prev => Math.min(prev + 1, 80));
+        }, 500);
+
+        const predictions = await client.waitForCompletion(jobId);
+        clearInterval(pollInterval);
+
+        // 3. Evaluation & Metrics
+        setCurrentStep(2);
+        setProgress(90);
+
+        const metrics = AnalyticsEngine.process(
+          predictions,
+          sessionData.duration || 60,
+          sessionData.transcript || []
+        );
+
+        // 4. Finalizing
+        setCurrentStep(3);
+        setProgress(100);
+
+        setTimeout(() => {
+          onComplete({
+            metrics,
+            transcript: sessionData.transcript,
+            duration: sessionData.duration
+          });
+        }, 800);
+
+      } catch (err) {
+        console.error('[Processing] Error:', err);
+        setError(err instanceof Error ? err.message : 'Analysis failed');
+      }
     };
 
-    const updateStep = () => {
-      setCurrentStep(prev => {
-        return prev < processingSteps.length - 1 ? prev + 1 : prev;
-      });
-    };
+    processInterview();
+  }, [sessionData, onComplete]);
 
-    // Start animations
-    progressTimer = setInterval(updateProgress, 50);
-    stepTimer = setInterval(updateStep, stepDuration);
-
-    return () => {
-      clearInterval(stepTimer);
-      clearInterval(progressTimer);
-      clearTimeout(completionTimer);
-    };
-  }, [onComplete, processingTimeMs, processingSteps.length]);
+  if (error) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-dark-800 border border-red-500/20 rounded-2xl p-8 text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">Processing Failed</h2>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <div className="flex gap-4 justify-center">
+            <button onClick={() => window.location.reload()} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors">
+              Retry Session
+            </button>
+            <button onClick={() => onComplete(null)} className="px-6 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors border border-red-500/30">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
       <div className="max-w-2xl w-full text-center">
         {/* Logo */}
-        <motion.div 
+        <motion.div
           className="flex justify-center mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -90,33 +132,33 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
         </motion.div>
 
         {/* Main Title */}
-        <motion.h1 
+        <motion.h1
           className="text-4xl font-bold text-white mb-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          Processing Your Interview
+          Analyzing Your Performance
         </motion.h1>
 
-        <motion.p 
+        <motion.p
           className="text-xl text-gray-400 mb-12"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          We're analyzing your performance and generating personalized feedback
+          Extracting emotional intelligence and vocal prosody...
         </motion.p>
 
         {/* Progress Bar */}
-        <motion.div 
-          className="w-full bg-dark-700 rounded-full h-3 mb-12"
+        <motion.div
+          className="w-full bg-dark-700 rounded-full h-3 mb-12 relative overflow-hidden"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.6 }}
         >
-          <motion.div 
-            className="bg-gradient-to-r from-orange-500 to-red-500 h-3 rounded-full transition-all duration-300 ease-out"
+          <motion.div
+            className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progress}%` }}
           />
         </motion.div>
@@ -127,46 +169,42 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
             const Icon = step.icon;
             const isActive = index === currentStep;
             const isCompleted = index < currentStep;
-            
+
             return (
               <motion.div
                 key={index}
-                className={`flex items-center p-6 rounded-xl border transition-all duration-500 ${
-                  isActive 
-                    ? 'bg-orange-500/10 border-orange-500/30 text-white' 
-                    : isCompleted
+                className={`flex items-center p-6 rounded-xl border transition-all duration-500 ${isActive
+                  ? 'bg-orange-500/10 border-orange-500/30 text-white scale-105 shadow-xl shadow-orange-500/10'
+                  : isCompleted
                     ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                    : 'bg-dark-800 border-dark-600 text-gray-500'
-                }`}
+                    : 'bg-dark-800 border-dark-600 text-gray-600 opacity-60'
+                  }`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.8 + (index * 0.1) }}
               >
-                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center mr-4 ${
-                  isActive 
-                    ? 'bg-orange-500/20' 
-                    : isCompleted
-                    ? 'bg-green-500/20'
-                    : 'bg-dark-700'
-                }`}>
+                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center mr-4 transition-all duration-500 ${isActive
+                  ? 'bg-orange-500/20 text-orange-400'
+                  : isCompleted
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-dark-700 text-gray-500'
+                  }`}>
                   {isCompleted ? (
-                    <CheckCircle className="w-6 h-6 text-green-400" />
+                    <CheckCircle className="w-6 h-6" />
                   ) : isActive ? (
-                    <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin" />
                   ) : (
                     <Icon className="w-6 h-6" />
                   )}
                 </div>
-                
+
                 <div className="text-left">
-                  <h3 className={`text-lg font-semibold mb-1 ${
-                    isActive ? 'text-white' : isCompleted ? 'text-green-400' : 'text-gray-500'
-                  }`}>
+                  <h3 className={`text-lg font-semibold mb-1 ${isActive ? 'text-white' : isCompleted ? 'text-green-400' : 'text-gray-500'
+                    }`}>
                     {step.title}
                   </h3>
-                  <p className={`text-sm ${
-                    isActive ? 'text-gray-300' : isCompleted ? 'text-green-300' : 'text-gray-600'
-                  }`}>
+                  <p className={`text-sm ${isActive ? 'text-gray-300' : isCompleted ? 'text-green-300' : 'text-gray-600'
+                    }`}>
                     {step.description}
                   </p>
                 </div>
@@ -174,42 +212,6 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
             );
           })}
         </div>
-
-        {/* Loading Animation */}
-        <motion.div 
-          className="mt-12 flex justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 1.2 }}
-        >
-          <div className="flex space-x-2">
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                className="w-3 h-3 bg-orange-500 rounded-full"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.5, 1, 0.5]
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  delay: i * 0.2
-                }}
-              />
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Progress Percentage */}
-        <motion.p 
-          className="text-gray-400 text-sm mt-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 1.4 }}
-        >
-          {Math.round(progress)}% Complete
-        </motion.p>
       </div>
     </div>
   );

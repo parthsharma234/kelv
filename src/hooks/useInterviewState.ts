@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { TranscriptChunk } from '../utils/openaiRealtime';
+import { TranscriptChunk } from '../utils/humeRealtime';
 
 // Generate a simple UUID v4
 const generateUUID = () => {
@@ -21,6 +21,10 @@ export interface RealtimeInterviewState {
   sessionId: string | null;
   duration: number;
   questionCount: number;
+  prosody: {
+    name: string;
+    score: number;
+  } | null;
 }
 
 export function useInterviewState() {
@@ -35,6 +39,7 @@ export function useInterviewState() {
     sessionId: null,
     duration: 0,
     questionCount: 0,
+    prosody: null,
   });
 
   const assistantTextBuffer = useRef<string>('');
@@ -67,6 +72,10 @@ export function useInterviewState() {
     } else {
       setState(prev => ({ ...prev, isUserSpeaking: isSpeaking }));
     }
+  }, []);
+
+  const setProsody = useCallback((prosody: { name: string; score: number } | null) => {
+    setState(prev => ({ ...prev, prosody }));
   }, []);
 
   const processTranscriptChunk = useCallback((chunk: TranscriptChunk) => {
@@ -161,6 +170,7 @@ export function useInterviewState() {
     setDuration,
     setRecording,
     setSpeakerStatus,
+    setProsody,
     processTranscriptChunk,
     handleAssistantResponse,
     handleUserTranscript,

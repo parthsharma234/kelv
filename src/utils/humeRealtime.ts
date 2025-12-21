@@ -1,6 +1,8 @@
 // Hume AI Empathic Voice Interface (EVI) Client
 // Based on Hume's WebSocket API for real-time voice conversations
 
+
+
 // Custom EventEmitter for browser compatibility
 class EventEmitter {
   private events: { [key: string]: Function[] } = {};
@@ -38,7 +40,7 @@ export interface HumeConfig {
   configId?: string; // EVI config ID from Hume platform
   voice?: string; // Voice name (e.g., "Kelv")
   instructions?: string; // System prompt
-  variables?: Record<string, string>; // Template variables for prompts
+  variables?: Record<string, string | number | boolean>; // Template variables for prompts
 }
 
 export interface TranscriptChunk {
@@ -60,13 +62,19 @@ export interface HumeEvents {
   'input_audio_buffer.speech_stopped': (event: any) => void;
   'response.audio.delta': (event: any) => void;
   'input_audio_buffer.committed': () => void;
+  'assistant_prosody': (event: any) => void;
 }
 
 export class HumeRealtimeClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private apiKey: string;
   private configId: string;
-  private variables: Record<string, string> | undefined;
+  private variables: Record<string, string | number | boolean> | undefined;
+
+  private debugLogging: boolean =
+    typeof import.meta !== 'undefined' &&
+    Boolean(import.meta.env?.VITE_LOG_HUME_SESSION_SETTINGS) &&
+    import.meta.env.VITE_LOG_HUME_SESSION_SETTINGS !== 'false';
   private isConnected: boolean = false;
   private sessionId: string | null = null;
   private audioContext: AudioContext | null = null;
@@ -74,12 +82,12 @@ export class HumeRealtimeClient extends EventEmitter {
   private isRecording: boolean = false;
   private outputAudioContext: AudioContext | null = null;
   private outputGainNode: GainNode | null = null;
-  private isPlayingAudio: boolean = false;
   private currentAudioSource: AudioBufferSourceNode | null = null;
   private audioChunks: ArrayBuffer[] = [];
   private currentResponseAudioChunks: ArrayBuffer[] = [];
   private audioQueue: ArrayBuffer[] = [];
   private processingAudio: boolean = false;
+  private isDisconnecting: boolean = false;
 
   constructor(apiKey: string, config: HumeConfig = {}, mediaStream?: MediaStream) {
     super();
@@ -87,8 +95,21 @@ export class HumeRealtimeClient extends EventEmitter {
     this.configId = config.configId || ''; // Will be set from platform
     this.variables = config.variables;
 
+
+    this.logDebug('Constructor variables snapshot', {
+      configVariables: config.variables,
+      assignedVariables: this.variables
+    });
+
     if (mediaStream) {
       this.stream = mediaStream;
+    }
+  }
+
+  private logDebug(...args: unknown[]): void {
+    if (this.debugLogging) {
+      // eslint-disable-next-line no-console
+      console.log('[Hume][SessionSettings]', ...args);
     }
   }
 
@@ -97,17 +118,20 @@ export class HumeRealtimeClient extends EventEmitter {
       return;
     }
 
-    try {
-      // Hume EVI WebSocket endpoint with API key, config, and variables in URL
-      let url = `wss://api.hume.ai/v0/evi/chat?api_key=${encodeURIComponent(this.apiKey)}&config_id=${encodeURIComponent(this.configId)}`;
+    // Reset disconnecting flag on new connection
+    this.isDisconnecting = false;
 
-      // Add variables as query parameters if provided
-      if (this.variables) {
-        const variableParams = Object.entries(this.variables)
-          .map(([key, value]) => `variables[${key}]=${encodeURIComponent(value)}`)
-          .join('&');
-        url += `&${variableParams}`;
+    try {
+      this.logDebug('Connecting to Hume EVI...');
+
+      // config_id MUST be in the URL for Hume to apply it
+      let url = `wss://api.hume.ai/v0/evi/chat?api_key=${encodeURIComponent(this.apiKey)}`;
+      
+      if (this.configId) {
+        url += `&config_id=${encodeURIComponent(this.configId)}`;
       }
+
+      this.logDebug('Connecting to Hume EVI...', { url: url.replace(this.apiKey, '***') });
 
       this.ws = new WebSocket(url);
 
@@ -122,23 +146,47 @@ export class HumeRealtimeClient extends EventEmitter {
   }
 
   private handleOpen(): void {
-    console.log('[Hume] WebSocket opened, session starting...');
-    // Connection established - Hume will send session_settings automatically
-    // Mark as connected when we receive the first message
+    this.logDebug('WebSocket opened');
+
+    // config_id is already in the URL
+    // Only send session_settings if we have variables to apply
+    if (this.variables && Object.keys(this.variables).length > 0) {
+      const message = {
+        type: 'session_settings',
+        variables: this.variables
+      };
+      
+      this.logDebug('Sending variables via SessionSettings', {
+        variables: this.variables
+      });
+      
+      this.ws?.send(JSON.stringify(message));
+    }
+
+    // Do NOT emit connection.opened here
+    // Wait for first valid message from Hume
   }
 
   private handleMessage(event: MessageEvent): void {
     try {
       const data = JSON.parse(event.data);
-      console.log('[Hume] Received:', data.type);
+      this.logDebug('Received message', data);
+
+      // Emit connection.opened ONCE when we receive first valid (non-error) message
+      if (!this.isConnected && data.type !== 'error') {
+        this.logDebug('First valid message received, connection is ready');
+        this.isConnected = true;
+        this.emit('connection.opened');
+      }
 
       // Handle different message types
       switch (data.type) {
         case 'session_settings':
-          // Session established
-          this.isConnected = true;
+          // Session settings confirmed by server (may or may not be sent)
           this.sessionId = data.session_id;
-          this.emit('connection.opened');
+          this.logDebug('Received session_settings from server', {
+            sessionId: this.sessionId
+          });
           break;
 
         case 'user_message':
@@ -171,9 +219,12 @@ export class HumeRealtimeClient extends EventEmitter {
           this.emit('response.done', data);
           break;
 
-        case 'error':
-          this.emit('error', new Error(data.message || 'Unknown error'));
+        case 'assistant_prosody':
+          // Prosody data for visualization
+          this.emit('assistant_prosody', data);
           break;
+
+        
       }
     } catch (error) {
       console.error('[Hume] Error parsing message:', error);
@@ -222,6 +273,12 @@ export class HumeRealtimeClient extends EventEmitter {
   }
 
   private async processAudioQueue(): Promise<void> {
+    // Exit immediately if disconnecting
+    if (this.isDisconnecting) {
+      this.processingAudio = false;
+      return;
+    }
+
     if (this.audioQueue.length === 0) {
       this.processingAudio = false;
       return;
@@ -247,14 +304,14 @@ export class HumeRealtimeClient extends EventEmitter {
         float32Data[i] = pcm16Data[i] / 32768.0;
       }
 
-      // Apply fade-in to first 50 samples to prevent pops
-      const fadeInSamples = Math.min(50, float32Data.length);
+      // Apply fade-in to first 100 samples to prevent pops
+      const fadeInSamples = Math.min(100, float32Data.length);
       for (let i = 0; i < fadeInSamples; i++) {
         float32Data[i] *= i / fadeInSamples;
       }
 
-      // Apply fade-out to last 50 samples for smooth transitions
-      const fadeOutSamples = Math.min(50, float32Data.length);
+      // Apply fade-out to last 100 samples for smooth transitions
+      const fadeOutSamples = Math.min(100, float32Data.length);
       for (let i = 0; i < fadeOutSamples; i++) {
         const index = float32Data.length - fadeOutSamples + i;
         float32Data[index] *= (fadeOutSamples - i) / fadeOutSamples;
@@ -272,7 +329,10 @@ export class HumeRealtimeClient extends EventEmitter {
 
       this.currentAudioSource.onended = () => {
         this.currentAudioSource = null;
-        setTimeout(() => this.processAudioQueue(), 5);
+        // Only continue processing if not disconnecting
+        if (!this.isDisconnecting) {
+          setTimeout(() => this.processAudioQueue(), 5);
+        }
       };
     } catch (error) {
       console.error('[Hume] Error processing audio:', error);
@@ -294,7 +354,7 @@ export class HumeRealtimeClient extends EventEmitter {
   private handleClose(event: CloseEvent): void {
     this.isConnected = false;
     this.emit('connection.closed');
-    console.log('[Hume] WebSocket closed:', event.code, event.reason);
+    this.logDebug('WebSocket closed', { code: event.code, reason: event.reason });
   }
 
   private handleError(error: Event): void {
@@ -306,11 +366,13 @@ export class HumeRealtimeClient extends EventEmitter {
   // Audio recording methods
   async startAudioRecording(): Promise<boolean> {
     if (this.isRecording) {
+      console.log('[Hume] Already recording');
       return true;
     }
 
     try {
       if (!this.stream) {
+        console.log('[Hume] No stream provided, requesting microphone...');
         this.stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
@@ -321,18 +383,48 @@ export class HumeRealtimeClient extends EventEmitter {
         });
       }
 
+      // Verify audio tracks exist
+      const audioTracks = this.stream.getAudioTracks();
+      console.log('[Hume] Audio tracks found:', audioTracks.length);
+      if (audioTracks.length === 0) {
+        console.error('[Hume] No audio tracks in stream!');
+        return false;
+      }
+      
+      console.log('[Hume] Audio track:', {
+        label: audioTracks[0].label,
+        enabled: audioTracks[0].enabled,
+        muted: audioTracks[0].muted,
+        readyState: audioTracks[0].readyState
+      });
+
       // Hume uses 48kHz sample rate
       this.audioContext = new AudioContext({ sampleRate: 48000 });
+      console.log('[Hume] AudioContext created, state:', this.audioContext.state);
+      
+      // Resume AudioContext if suspended (browser policy)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+        console.log('[Hume] AudioContext resumed');
+      }
+      
       const source = this.audioContext.createMediaStreamSource(this.stream);
 
       // Use smaller buffer size for lower latency
       const processor = this.audioContext.createScriptProcessor(2048, 1, 1);
 
+      let audioSendCount = 0;
       processor.onaudioprocess = (event) => {
         if (this.isConnected && this.isRecording) {
           const inputBuffer = event.inputBuffer.getChannelData(0);
           const pcm16 = this.floatTo16BitPCM(inputBuffer);
           this.sendAudioData(pcm16);
+
+          // Log periodically to confirm audio is being sent
+          audioSendCount++;
+          if (audioSendCount % 50 === 1) {
+            console.log('[Hume] Sending audio chunk #', audioSendCount);
+          }
 
           // Store audio chunks for analysis
           this.audioChunks.push(pcm16.slice(0));
@@ -344,6 +436,7 @@ export class HumeRealtimeClient extends EventEmitter {
       processor.connect(this.audioContext.destination);
 
       this.isRecording = true;
+      console.log('[Hume] Audio recording started successfully');
       return true;
     } catch (error) {
       console.error('[Hume] Error starting recording:', error);
@@ -398,17 +491,22 @@ export class HumeRealtimeClient extends EventEmitter {
   }
 
   private sendAudioData(audioData: ArrayBuffer): void {
-    if (!this.isConnected || !this.ws) return;
+    if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
-    // Send audio as base64 to Hume
-    const base64 = this.arrayBufferToBase64(audioData);
+    try {
+      // Send audio as base64 to Hume
+      const base64 = this.arrayBufferToBase64(audioData);
 
-    const message = {
-      type: 'audio_input',
-      data: base64,
-    };
+      const message = {
+        type: 'audio_input',
+        data: base64,
+      };
 
-    this.ws.send(JSON.stringify(message));
+      this.ws.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('[Hume] Error sending audio data:', error);
+      this.isConnected = false;
+    }
   }
 
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -436,7 +534,7 @@ export class HumeRealtimeClient extends EventEmitter {
   createResponse(instructions?: string): void {
     // Hume handles responses automatically based on turn detection
     // This method exists for API compatibility with OpenAI client
-    console.log('[Hume] Response will be generated automatically');
+    this.logDebug('Response will be generated automatically');
   }
 
   // Update system prompt mid-session
@@ -452,7 +550,11 @@ export class HumeRealtimeClient extends EventEmitter {
   }
 
   disconnect(): void {
+    // Set flag FIRST to prevent any callbacks from restarting audio
+    this.isDisconnecting = true;
+    
     this.stopAudioRecording();
+    this.stopPlayback();
 
     // Stop any playing audio
     if (this.currentAudioSource) {
@@ -479,12 +581,35 @@ export class HumeRealtimeClient extends EventEmitter {
   }
 
   public stopPlayback(): void {
-    if (this.currentAudioSource) {
-      this.currentAudioSource.stop();
-      this.currentAudioSource = null;
-    }
+    // Clear queue first to prevent any new audio from starting
     this.audioQueue = [];
     this.processingAudio = false;
+
+    // Then stop current audio with a fade out to prevent popping
+    if (this.currentAudioSource) {
+      try {
+        // Fade out over 50ms before stopping
+        if (this.outputGainNode && this.outputAudioContext) {
+          this.outputGainNode.gain.setValueAtTime(
+            this.outputGainNode.gain.value,
+            this.outputAudioContext.currentTime
+          );
+          this.outputGainNode.gain.linearRampToValueAtTime(
+            0,
+            this.outputAudioContext.currentTime + 0.05
+          );
+        }
+        setTimeout(() => {
+          if (this.currentAudioSource) {
+            this.currentAudioSource.stop();
+            this.currentAudioSource = null;
+          }
+        }, 60);
+      } catch (e) {
+        // If audio already stopped, ignore
+        this.currentAudioSource = null;
+      }
+    }
   }
 
   public getAllAudioChunks(): ArrayBuffer[] {
@@ -519,6 +644,8 @@ export class HumeRealtimeClient extends EventEmitter {
   isCurrentlyPlayingAudio(): boolean {
     return this.processingAudio;
   }
+
+
 }
 
 // Factory function to create a configured Hume client

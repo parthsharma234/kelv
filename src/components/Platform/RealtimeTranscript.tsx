@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MessageSquare, ChevronLeft, ChevronRight, User } from 'lucide-react';
-import { TranscriptChunk } from '../../utils/openaiRealtime';
+import { TranscriptChunk } from '../../utils/humeRealtime';
 import RedPandaLogo from '../RedPandaLogo';
 
 interface RealtimeTranscriptProps {

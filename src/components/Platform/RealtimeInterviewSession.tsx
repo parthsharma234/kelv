@@ -1,19 +1,28 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, ArrowLeft, ArrowRight, Phone, Mic, MicOff, Volume2, VolumeX, MessageSquare, Send, Brain, MessageCircle, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
-import { InterviewSetup, CollegeInterviewSetup } from '../../types/interview';
+import { InterviewSetup } from '../../types/interview';
 import { useRealtimeInterview } from '../../hooks/useRealtimeInterview';
 import RealtimeTranscript from './RealtimeTranscript';
-import AIInterviewer from '../AIInterviewer';
+import AIInterviewer from './AIInterviewer';
 
 interface RealtimeInterviewSessionProps {
-  setup: InterviewSetup | CollegeInterviewSetup;
+  setup: InterviewSetup;
   interviewType?: string;
   sessionId?: string;
   onComplete: (sessionData: any) => void;
   onProcessingStart?: () => void;
   onBack: () => void;
 }
+
+const DetailRow = ({ label, value }: { label: string; value?: string }) => (
+  <div className="flex items-center justify-between text-sm">
+    <span className="text-gray-400">{label}</span>
+    <span className="text-white font-semibold text-right max-w-[60%]">
+      {value || '—'}
+    </span>
+  </div>
+);
 
 function extractVoiceMetrics(sessionData: any) {
   if (!sessionData) return null;
@@ -144,7 +153,7 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   onProcessingStart,
   onBack
 }) => {
-  
+
   const [isTranscriptCollapsed, setIsTranscriptCollapsed] = useState(true);
   const [userMessage, setUserMessage] = useState('');
   const [isMuted, setIsMuted] = useState(false);
@@ -155,6 +164,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+
+  const hasHumeKeys = Boolean(import.meta.env.VITE_HUME_API_KEY && import.meta.env.VITE_HUME_CONFIG_ID);
 
   // Determine if this is a focused interview and what type
   const isFocusedInterview = interviewType && !['standard', 'college'].includes(interviewType);
@@ -174,20 +185,17 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
   const hookOptions = useMemo(() => {
     return {
       setup,
-      interviewType: actualInterviewType,
-      focusedType,
       mediaStream: stream,
       onComplete: handleComplete,
       onError: (error: string) => {
         console.error('Realtime interview error:', error);
         setCameraError(error);
-      },
-      provider: 'hume' as const
+      }
     };
-  }, [setup, actualInterviewType, focusedType, stream, handleComplete]);
+  }, [setup, stream, handleComplete]);
 
-  const { 
-    state, 
+  const {
+    state,
     client,
     maxDuration,
     startInterview,
@@ -288,8 +296,18 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
     if (typeof onProcessingStart === 'function') {
       onProcessingStart();
     }
+
+    // Stop camera and microphone immediately
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('[Interview] Stopped track:', track.kind, track.label);
+      });
+      setStream(null);
+    }
+
     await endInterview();
-  }, [endInterview, onProcessingStart]);
+  }, [endInterview, onProcessingStart, stream]);
 
   // Send text message
   const handleSendMessage = useCallback(() => {
@@ -338,156 +356,152 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
   // Full-screen start overlay
   if (!hasStarted) {
-    return (
-      <div className="min-h-screen bg-dark-900 flex flex-col relative overflow-hidden">
-        {/* Subtle background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-dark-900 via-dark-900 to-dark-800/50"></div>
+    const readableExperience =
+      'experienceLevel' in setup && setup.experienceLevel
+        ? setup.experienceLevel.split('(')[0].trim()
+        : undefined;
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-dark-800/30 backdrop-blur-sm border-b border-dark-700/30 relative z-20">
-          <div className="flex items-center space-x-3">
+    return (
+      <div className="min-h-screen bg-[#03040a] text-white flex flex-col">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-black/30 backdrop-blur">
+          <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-dark-700/30 rounded-lg transition-colors group"
+              className="p-2 rounded-full hover:bg-white/10 transition"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+              <ArrowLeft className="w-5 h-5 text-gray-300" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
-              <span className="text-white font-medium text-sm">
-                {isVoiceMode ? 'Voice' : 'Text'} Interview
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-sm text-gray-300">
+                {setup.jobType || 'Interview Room'}
               </span>
             </div>
           </div>
-        </div>
+          <div className="text-xs uppercase tracking-[0.35em] text-gray-400">
+            {isVoiceMode ? 'Voice mock' : 'Text mock'}
+          </div>
+        </header>
 
-        {/* Background content - blurred */}
-        <div className="flex-1 flex relative">
-          {/* Blurred background */}
-          <div className="absolute inset-0 filter blur-md opacity-30">
-            <div className="w-[28rem] bg-dark-800/95 backdrop-blur-sm border-r border-dark-700">
-              <div className="p-4 border-b border-dark-700">
-                <div className="flex items-center space-x-3">
-                  <MessageSquare className="w-5 h-5 text-orange-400" />
-                  <h3 className="text-white font-medium">Live Transcript</h3>
+        <div className="flex-1 w-full px-6 py-8 flex flex-col xl:flex-row gap-8 items-start">
+          <div className="flex-1 flex flex-col items-center gap-6 w-full">
+            <div className="relative w-full max-w-4xl aspect-video rounded-[32px] overflow-hidden border border-white/10 bg-black shadow-[0_40px_120px_rgba(0,0,0,0.6)]">
+              <video
+                ref={previewVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover transition-opacity duration-300 ${cameraError ? 'opacity-0' : 'opacity-100'}`}
+              />
+              {!cameraError && (
+                <div className="absolute bottom-4 right-4 px-4 py-2 rounded-full backdrop-blur bg-black/50 text-sm text-gray-200">
+                  Preview • {setup.jobType || 'Candidate'}
                 </div>
-              </div>
+              )}
+              {cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80">
+                  <MessageSquare className="w-8 h-8 text-orange-400" />
+                  <p className="text-sm text-gray-300 text-center px-6">
+                    {cameraError}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Check your browser permissions and reload.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="flex-1 relative bg-dark-900">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <AIInterviewer
-                  isActive={false}
-                  isSpeaking={false}
-                  isListening={false}
-                  isProcessing={false}
-                  size="xl"
-                  showStatus={false}
-                />
-              </div>
-              <div className="absolute bottom-6 right-6 w-64 h-48 bg-dark-800 rounded-2xl overflow-hidden border border-dark-700">
-                <video
-                  ref={previewVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
+
+            <div className="flex flex-wrap items-center justify-center">
+              <button
+                onClick={toggleMute}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full border transition ${isMuted
+                  ? 'border-red-500/50 bg-red-500/10 text-red-200 shadow-lg shadow-red-500/25'
+                  : 'border-white/15 bg-white/5 text-white hover:bg-white/10'
+                  }`}
+              >
+                {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                <span className="text-sm">
+                  {isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                </span>
+              </button>
             </div>
           </div>
 
-          {/* Full-screen start overlay */}
-          <div className="absolute inset-0 bg-dark-900/95 backdrop-blur-sm flex items-center justify-center z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="bg-dark-800/40 backdrop-blur-md rounded-2xl p-12 max-w-xl w-full mx-6 border border-dark-700/30 relative"
-            >
-              <div className="relative z-10">
-                {/* Icon and Title */}
-                <div className="text-center mb-10">
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
-                    className="inline-flex items-center justify-center w-14 h-14 bg-orange-500/10 rounded-xl mb-6"
-                  >
-                    <Brain className="w-7 h-7 text-orange-500" />
-                  </motion.div>
-                  <h2 className="text-2xl font-semibold mb-2 text-white">
-                    Ready to Begin
-                  </h2>
-                  <p className="text-gray-400 text-sm">
-                    Your AI interviewer is ready for an adaptive conversation
-                  </p>
-                </div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45 }}
+            className="w-full max-w-md space-y-6"
+          >
+            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 space-y-4">
+              <p className="text-xs uppercase tracking-[0.35em] text-gray-400">
+                Interview details
+              </p>
+              <div className="space-y-3">
+                <DetailRow label="Format" value={isVoiceMode ? 'Voice (live audio)' : 'Text chat'} />
+                <DetailRow label="Role" value={setup.jobType} />
+                <DetailRow label="Industry" value={setup.industry} />
+                <DetailRow label="Experience" value={readableExperience} />
+                <DetailRow label="Duration" value={`${maxDuration} min`} />
+              </div>
+            </div>
 
-                {/* Features list */}
-                <div className="space-y-3 mb-10">
-                  {[
-                    { icon: Brain, text: 'AI-powered interviewer' },
-                    { icon: MessageSquare, text: 'Real-time transcript' },
-                    { icon: isVoiceMode ? Mic : MessageCircle, text: isVoiceMode ? 'Voice-based interview' : 'Text-based interview' },
-                    { icon: TrendingUp, text: 'Adaptive difficulty' }
-                  ].map((feature, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.2, delay: 0.2 + index * 0.05 }}
-                      className="flex items-center gap-3 text-gray-300"
-                    >
-                      <div className="flex-shrink-0 w-8 h-8 bg-dark-700/50 rounded-lg flex items-center justify-center">
-                        <feature.icon className="w-4 h-4 text-gray-400" />
-                      </div>
-                      <span className="text-sm">{feature.text}</span>
-                    </motion.div>
-                  ))}
-                </div>
+            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
+              <p className="text-xs uppercase tracking-[0.35em] text-gray-400 mb-4">
+                Before you join
+              </p>
+              <ul className="space-y-3 text-sm text-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5" />
+                  Check your mic levels and sit centered in frame like a real call.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5" />
+                  Keep your notes nearby - Kelv may interrupt or ask for receipts.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5" />
+                  Join when you're ready; the timer starts only after you hit "Join interview".
+                </li>
+              </ul>
+            </div>
 
-                {/* Start button */}
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 0.4 }}
+            <div className="space-y-3">
+              {hasHumeKeys ? (
+                <button
                   onClick={handleStartInterview}
-                  disabled={state.status === 'connecting' || !!cameraError}
-                  className="w-full px-6 py-3.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                  disabled={state.status === 'connecting'}
+                  className="w-full px-6 py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white font-semibold shadow-lg shadow-orange-500/30 transition flex items-center justify-center gap-2"
                 >
                   {state.status === 'connecting' ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Connecting...</span>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Connecting...
                     </>
                   ) : (
-                    <>
-                      <span>Start Interview</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
+                    'Join interview'
                   )}
-                </motion.button>
-
-                {/* Error message */}
-                {cameraError && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl"
-                  >
-                    <p className="text-red-400 text-sm flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      {cameraError}
-                    </p>
-                  </motion.div>
-                )}
-              </div>
-            </motion.div>
-          </div>
+                </button>
+              ) : (
+                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm text-center">
+                  <p className="font-semibold mb-1">Configuration Error</p>
+                  <p>Missing Hume AI API keys. Please check your environment variables.</p>
+                </div>
+              )}
+              <button
+                onClick={onBack}
+                disabled={state.status === 'connecting'}
+                className="w-full px-6 py-4 rounded-2xl border border-white/10 text-sm text-gray-300 hover:text-white transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
         </div>
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col relative overflow-hidden">
@@ -529,9 +543,8 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
               {isVoiceMode && (
                 <button
                   onClick={toggleAudio}
-                  className={`p-2 rounded-xl transition-all ${
-                    audioEnabled ? 'bg-dark-700/50 hover:bg-dark-700' : 'bg-red-500 hover:bg-red-600'
-                  }`}
+                  className={`p-2 rounded-xl transition-all ${audioEnabled ? 'bg-dark-700/50 hover:bg-dark-700' : 'bg-red-500 hover:bg-red-600'
+                    }`}
                 >
                   {audioEnabled ? (
                     <Volume2 className="w-4 h-4 text-gray-400" />
@@ -613,12 +626,12 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
 
           {/* Main video area */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <AIInterviewer 
+            <AIInterviewer
               isActive={hasStarted}
               isSpeaking={state.isAISpeaking}
               isListening={state.isUserSpeaking}
               isProcessing={state.status === 'connecting'}
-              size="xl"
+              size="full"
               showStatus={true}
             />
           </div>
@@ -668,11 +681,10 @@ const RealtimeInterviewSession: React.FC<RealtimeInterviewSessionProps> = ({
             {isVoiceMode && (
               <button
                 onClick={toggleMute}
-                className={`group p-3 rounded-xl transition-all ${
-                  isMuted
-                    ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25'
-                    : 'bg-dark-700/50 hover:bg-dark-700'
-                }`}
+                className={`group p-3 rounded-xl transition-all ${isMuted
+                  ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25'
+                  : 'bg-dark-700/50 hover:bg-dark-700'
+                  }`}
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (
