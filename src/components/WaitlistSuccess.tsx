@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Sparkles, Brain, Target, ArrowRight, Mail, Bell, Star, Calendar, Users, Gift } from 'lucide-react';
+import { CheckCircle, Sparkles, Brain, ArrowRight, Mail, Calendar, Users, Star, Bell, Gift, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -16,24 +16,16 @@ const WaitlistSuccess: React.FC = () => {
     const fetchWaitlistStats = async () => {
       if (isSupabaseConfigured()) {
         try {
-          // Get total user count
           const { data: totalUsers, error: totalError } = await supabase
             .rpc('get_user_count');
-          
+
           if (!totalError && totalUsers) {
             setWaitlistCount(totalUsers);
-            
-            // Calculate estimated weekly growth based on total users
-            // Assume roughly 5-10% weekly growth for established waitlists
             const estimatedWeekly = Math.max(1, Math.floor(totalUsers * 0.07));
             setWeeklyGrowth(estimatedWeekly);
-          } else {
-            console.log('RPC call failed, using fallback count');
-            // Keep fallback numbers if RPC fails
           }
         } catch (error) {
           console.error('Error fetching waitlist stats:', error);
-          // Keep fallback numbers
         }
       }
       setIsLoading(false);
@@ -42,65 +34,7 @@ const WaitlistSuccess: React.FC = () => {
     fetchWaitlistStats();
   }, []);
 
-  const benefits = [
-    {
-      icon: Star,
-      title: "Early Access",
-      description: "Be among the first to experience Kelv AI when we launch"
-    },
-    {
-      icon: Target,
-      title: "Exclusive Features",
-      description: "Get access to premium features not available to regular users"
-    },
-    {
-      icon: Bell,
-      title: "Priority Support",
-      description: "Receive dedicated support and direct feedback channels"
-    },
-    {
-      icon: Gift,
-      title: "Special Pricing",
-      description: "Enjoy exclusive discounts and early-bird pricing"
-    }
-  ];
-
-  const waitlistStats = [
-    {
-      icon: Users,
-      label: "Waitlist Members",
-      value: isLoading ? "..." : waitlistCount.toLocaleString(),
-      change: isLoading ? "..." : `+${weeklyGrowth} this week`
-    },    {
-      icon: Calendar,
-      label: "Beta Launch",
-      value: "January, 2026",
-      change: "Coming soon"
-    }
-  ];
-
-  // Floating particles for background animation
-  const particles = Array.from({ length: 20 }, (_, i) => (
-    <motion.div
-      key={i}
-      className="absolute w-1 h-1 bg-orange-400/30 rounded-full"
-      initial={{
-        x: Math.random() * 800,
-        y: Math.random() * 600,
-      }}
-      animate={{
-        x: Math.random() * 800,
-        y: Math.random() * 600,
-      }}
-      transition={{
-        duration: Math.random() * 20 + 10,
-        repeat: Infinity,
-        ease: "linear"
-      }}
-    />
-  ));
-
-  const joinedDate = user?.user_metadata?.waitlist_joined_at 
+  const joinedDate = user?.user_metadata?.waitlist_joined_at
     ? new Date(user.user_metadata.waitlist_joined_at).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -114,223 +48,248 @@ const WaitlistSuccess: React.FC = () => {
       })
     : 'Recently';
 
+  const benefits = [
+    {
+      icon: Star,
+      title: 'Early access',
+      description: 'Get the product before the public launch and help shape it.'
+    },
+    {
+      icon: Target,
+      title: 'Role packs',
+      description: 'Role-specific drills and interviewer patterns as they ship.'
+    },
+    {
+      icon: Bell,
+      title: 'Priority updates',
+      description: 'Cohort invitations and product notes delivered directly.'
+    },
+    {
+      icon: Gift,
+      title: 'Founders pricing',
+      description: 'Launch pricing and perks reserved for the waitlist.'
+    }
+  ];
+
+  const waitlistStats = [
+    {
+      icon: Users,
+      label: 'Waitlist members',
+      value: isLoading ? '...' : waitlistCount.toLocaleString(),
+      change: isLoading ? '...' : `+${weeklyGrowth} this week`
+    },
+    {
+      icon: Calendar,
+      label: 'Beta launch',
+      value: 'January, 2026',
+      change: 'Cohorts open in waves'
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-400/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        {particles}
-      </div>
+    <div className="min-h-screen bg-[#030305] text-white relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 stripe-gradient-mesh opacity-40" />
+      <div className="absolute inset-0 grid-pattern opacity-30" />
+      <div className="absolute top-[-10%] right-[-5%] w-[520px] h-[520px] bg-orange-500/10 rounded-full blur-[140px]" />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[520px] h-[520px] bg-orange-400/10 rounded-full blur-[160px]" />
 
-      {/* Back to home link */}
-      <Link
-        to="/"
-        className="absolute top-8 left-8 flex items-center gap-3 text-gray-400 hover:text-orange-400 transition-all duration-300 z-10 group"
-      >
-        <RedPandaLogo size="md" animate={true} className="group-hover:scale-110 transition-transform" />
-        <span className="text-xl font-bold group-hover:text-orange-400 transition-colors">Kelv AI</span>
-      </Link>
-
-      {/* Main content */}
-      <div className="max-w-6xl mx-auto relative z-10">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="text-center mb-12"
-        >
-          {/* Success icon */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-            className="w-24 h-24 bg-gradient-to-br from-green-500 to-green-400 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-green-500/30"
+      <div className="relative z-10">
+        <header className="flex items-center justify-between px-6 lg:px-16 py-6">
+          <Link to="/" className="flex items-center gap-3">
+            <RedPandaLogo size="md" animate={true} />
+            <span className="text-xl font-semibold tracking-tight text-white">Kelv AI</span>
+          </Link>
+          <Link
+            to="/"
+            className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white"
           >
-            <CheckCircle className="w-12 h-12 text-white" />
-          </motion.div>
+            Back to home
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </header>
 
-          {/* Welcome message */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="text-5xl font-bold gradient-text mb-6"
-          >
-            Welcome to the Future!
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="text-xl text-gray-300 mb-4 max-w-2xl mx-auto"
-          >
-            {user?.user_metadata?.full_name ? `Hi ${user.user_metadata.full_name}! ` : ''}
-            You're now on the exclusive Kelv AI waitlist. Get ready to revolutionize your interview preparation with cutting-edge technology.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 text-gray-400 mb-8"
-          >
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-orange-500" />
-              <span>Joined on <strong className="text-white">{joinedDate}</strong></span>
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* Waitlist Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 max-w-4xl mx-auto"
-        >
-          {waitlistStats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9 + index * 0.1 }}
-                className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 text-center hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300"
-              >
-                <div className="flex items-center justify-center mb-4">
-                  <div className="p-3 bg-gradient-to-br from-orange-500/20 to-orange-400/10 rounded-xl">
-                    <Icon className="w-6 h-6 text-orange-400" />
-                  </div>
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-2">{stat.value}</h3>
-                <p className="text-gray-400 text-sm mb-1">{stat.label}</p>
-                <p className="text-orange-400 text-xs">{stat.change}</p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-
-        {/* Benefits grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"
-        >
-          {benefits.map((benefit, index) => {
-            const Icon = benefit.icon;
-            return (
-              <motion.div
-                key={benefit.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.2 + index * 0.1 }}
-                className="bg-dark-800/90 backdrop-blur-xl rounded-2xl p-6 border border-dark-700/50 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-gradient-to-br from-orange-500/20 to-orange-400/10 rounded-xl group-hover:from-orange-500/30 group-hover:to-orange-400/20 transition-all">
-                    <Icon className="w-6 h-6 text-orange-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
-                    <p className="text-gray-400">{benefit.description}</p>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-
-        {/* What's next section */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.6 }}
-          className="bg-gradient-to-r from-orange-500/10 to-orange-400/5 rounded-2xl p-8 border border-orange-500/20 text-center"
-        >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Brain className="w-8 h-8 text-orange-400" />
-            <h2 className="text-2xl font-bold text-white">What's Next?</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <span className="text-white text-sm font-bold">1</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-2">Development Updates</h4>
-                <p className="text-gray-300 text-sm">Get behind-the-scenes insights as we build the future of interview preparation</p>
-              </div>
-            </div>
-              <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <span className="text-white text-sm font-bold">2</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-2">Beta Access</h4>
-                <p className="text-gray-300 text-sm">Join our exclusive beta program launching July 3rd, 2025 - be the first to experience the future of interview prep</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <span className="text-white text-sm font-bold">3</span>
-              </div>              <div>
-                <h4 className="font-semibold text-white mb-2">Beta Launch</h4>
-                <p className="text-gray-300 text-sm">Get exclusive early access to our interview coaching platform starting July 3rd, 2025</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Call to action */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.8 }}
-          className="text-center mt-12"
-        >
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all shadow-lg shadow-orange-500/25 group"
+        <main className="max-w-6xl mx-auto px-6 lg:px-12 pb-16">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="space-y-8"
             >
-              <Sparkles className="w-5 h-5" />
-              <span>Explore More About Kelv AI</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            
-            {user && (
-              <Link
-                to="/platform"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-dark-800 border border-dark-700 text-white rounded-xl font-semibold hover:bg-dark-700 hover:border-orange-500/50 transition-all group"
-              >
-                <Brain className="w-5 h-5 text-orange-400" />
-                <span>Try Interview Platform</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            )}
+              <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.2em] text-gray-400">
+                <span className="h-2 w-2 rounded-full bg-orange-500" />
+                Waitlist confirmed
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center shadow-lg shadow-orange-500/30">
+                  <CheckCircle className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl sm:text-5xl font-semibold text-white">You're on the list.</h1>
+                  <p className="text-gray-400 text-lg mt-2">
+                    {user?.user_metadata?.full_name ? `Hi ${user.user_metadata.full_name}, ` : ''}
+                    your spot is secured. We'll invite cohorts in waves so the experience stays personal.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
+                  <Calendar className="h-4 w-4 text-orange-400" />
+                  Joined on <span className="text-white font-semibold">{joinedDate}</span>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
+                  <Users className="h-4 w-4 text-orange-400" />
+                  Community growing weekly
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-[#0b0b11]/80 p-7">
+                <div className="flex items-center gap-3 mb-6">
+                  <Brain className="h-6 w-6 text-orange-400" />
+                  <h2 className="text-xl font-semibold text-white">What happens next</h2>
+                </div>
+                <div className="grid md:grid-cols-3 gap-6">
+                  {[
+                    {
+                      title: 'Build notes',
+                      description: 'Short monthly updates with what shipped and what is next.'
+                    },
+                    {
+                      title: 'Invite window',
+                      description: 'We open cohorts in waves for a focused onboarding.'
+                    },
+                    {
+                      title: 'Beta access',
+                      description: 'Hands-on access plus feedback channels with the team.'
+                    }
+                  ].map((step, index) => (
+                    <div key={step.title} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                      <p className="text-xs uppercase tracking-[0.3em] text-orange-300/80">Step {index + 1}</p>
+                      <h3 className="mt-3 text-lg font-semibold text-white">{step.title}</h3>
+                      <p className="mt-2 text-sm text-gray-400">{step.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="rounded-3xl border border-white/10 bg-[#0b0b11]/90 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.4)]"
+            >
+              <h2 className="text-lg font-semibold text-white mb-4">Your status</h2>
+              <div className="space-y-4">
+                {waitlistStats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <div
+                      key={stat.label}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                          <Icon className="h-5 w-5 text-orange-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-400">{stat.label}</p>
+                          <p className="text-2xl font-semibold text-white">{stat.value}</p>
+                        </div>
+                      </div>
+                      <div className="text-xs text-orange-300/90">{stat.change}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Cohort readiness</p>
+                <div className="mt-4 h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                  <div className="h-full w-[35%] bg-gradient-to-r from-orange-500 to-orange-300" />
+                </div>
+                <p className="mt-3 text-xs text-gray-400">We are prepping onboarding flow and interview packs.</p>
+              </div>
+            </motion.div>
           </div>
-            <div className="mt-6 space-y-3">
-            <p className="text-gray-400 text-sm">
-              Share Kelv AI with friends and colleagues to help them prepare for success too!
-            </p>
-            <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
-              <Mail className="w-4 h-4 text-orange-400" />
-              <span>Questions? Reach out to us at</span>
-              <a 
-                href="mailto:team@kelvai.com" 
-                className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="mt-10 grid lg:grid-cols-[1.2fr_0.8fr] gap-8 items-start"
+          >
+            <div className="rounded-3xl border border-white/10 bg-[#0b0b11]/80 p-7">
+              <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Included with your invite</p>
+              <div className="mt-6 space-y-5">
+                {benefits.map((benefit) => {
+                  const Icon = benefit.icon;
+                  return (
+                    <div key={benefit.title} className="flex items-start gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-orange-400" />
+                      </div>
+                      <div className="flex-1 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
+                        <p className="text-base font-semibold text-white">{benefit.title}</p>
+                        <p className="mt-1 text-sm text-gray-400">{benefit.description}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <p className="text-sm text-gray-400">Ready when your invite lands</p>
+              <h3 className="mt-2 text-2xl font-semibold text-white">Keep the momentum going.</h3>
+              <p className="mt-3 text-sm text-gray-400">
+                Explore the product story or jump back into the platform if you are already set up.
+              </p>
+              <div className="mt-6 flex flex-col gap-3">
+                <Link
+                  to="/"
+                  className="inline-flex items-center justify-between gap-3 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold shadow-lg shadow-orange-500/25 hover:bg-orange-400 transition"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Explore Kelv AI
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+
+                {user && (
+                  <Link
+                    to="/platform"
+                    className="inline-flex items-center justify-between gap-3 px-6 py-3 rounded-full border border-white/10 bg-white/5 text-white font-semibold hover:border-white/20 transition"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-orange-400" />
+                      Try Interview Platform
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="mt-10 text-center text-sm text-gray-400">
+            <div className="flex items-center justify-center gap-2">
+              <Mail className="h-4 w-4 text-orange-400" />
+              <span>Questions? Reach us at</span>
+              <a
+                href="mailto:team@kelvai.com"
+                className="text-orange-300 hover:text-orange-200 transition-colors font-medium"
               >
                 team@kelvai.com
               </a>
             </div>
+            <p className="mt-2 text-xs text-gray-500">(c) 2026 Kelv AI. All rights reserved.</p>
           </div>
-        </motion.div>
+        </main>
       </div>
     </div>
   );

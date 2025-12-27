@@ -362,7 +362,7 @@ const LoginPage: React.FC = () => {
         </main>
 
         <footer className="px-6 lg:px-16 pb-8 text-xs text-gray-500">
-          (c) 2024 Kelv AI. All rights reserved.
+          (c) 2026 Kelv AI. All rights reserved.
         </footer>
       </div>
     </div>
@@ -370,3 +370,4 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
+
