@@ -24,8 +24,9 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
     chromeDots = true,
     animate = false,
 }) => {
+    const radiusClass = variant === 'laptop' ? 'rounded-[28px]' : 'rounded-2xl';
     const baseStyles = `
-    relative overflow-hidden rounded-2xl
+    relative overflow-hidden ${radiusClass}
     bg-[#0a0a0f] border border-white/10
     shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_20px_50px_-10px_rgba(0,0,0,0.5),0_30px_60px_-15px_rgba(0,0,0,0.3)]
   `;
@@ -61,16 +62,21 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
             )}
 
             {/* Screen Content */}
-            <div className="relative">
+            <div
+                className={`relative ${variant === 'laptop' ? 'min-h-[420px] sm:min-h-[480px] lg:min-h-[520px]' : ''}`}
+            >
                 {children}
             </div>
 
             {/* Bottom bar for laptop variant */}
             {variant === 'laptop' && (
-                <>
+                <div className="relative">
                     <div className="h-4 bg-gradient-to-b from-transparent to-[#0a0a0f]" />
-                    <div className="h-3 bg-[#1a1a25] rounded-b-xl" />
-                </>
+                    <div className="relative h-6 bg-[#1a1a25] rounded-b-[24px] border-t border-white/5">
+                        <div className="absolute top-1 left-1/2 -translate-x-1/2 w-16 h-1.5 rounded-full bg-[#2b2b36]" />
+                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-24 h-2 rounded-full bg-[#111119]" />
+                    </div>
+                </div>
             )}
         </div>
     );

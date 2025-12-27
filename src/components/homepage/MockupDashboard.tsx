@@ -22,7 +22,7 @@ const MockupDashboard: React.FC = () => {
     };
 
     return (
-        <div className="bg-[#030305] p-6 min-h-[400px]">
+        <div className="bg-[#030305] p-6 min-h-[420px] sm:min-h-[480px] lg:min-h-[520px]">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>

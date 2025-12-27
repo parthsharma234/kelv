@@ -83,8 +83,11 @@ const Navbar: React.FC = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-dark-900/95 backdrop-blur-md py-3 shadow-lg' : 'bg-transparent py-5'
-        }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? 'bg-[#050508]/90 backdrop-blur-xl border-b border-white/5 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)]'
+          : 'bg-transparent py-6'
+      }`}
     >
       <div className="container">
         <nav className="flex items-center justify-between">
@@ -94,16 +97,16 @@ const Navbar: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             <button
               onClick={() => handleNavClick('#features')}
-              className="text-gray-300 hover:text-orange-400 transition-colors duration-300 whitespace-nowrap"
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300 whitespace-nowrap"
             >
               Features
             </button>
             <button
               onClick={handlePlatformClick}
-              className="text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium whitespace-nowrap"
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300 whitespace-nowrap"
             >
               Platform
             </button>
@@ -112,12 +115,14 @@ const Navbar: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-dark-700 transition-colors bg-dark-800 border border-dark-700 whitespace-nowrap"
+                  className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:border-white/20 transition-colors whitespace-nowrap"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-400 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-sm font-medium whitespace-nowrap">{user.user_metadata?.full_name || user.email}</span>
+                  <span className="text-sm font-medium text-gray-200 whitespace-nowrap">
+                    {user.user_metadata?.full_name || user.email}
+                  </span>
                 </button>
 
                 <AnimatePresence>
@@ -127,15 +132,15 @@ const Navbar: React.FC = () => {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
                       transition={{ duration: 0.2 }}
-                      className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-dark-700 rounded-xl shadow-xl overflow-hidden"
+                      className="absolute right-0 top-full mt-3 w-56 bg-[#0a0a0f]/95 border border-white/10 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl"
                     >
-                      <div className="p-4 border-b border-dark-700">
-                        <p className="text-sm text-gray-400">Signed in as</p>
-                        <p className="font-medium truncate">{user.email}</p>
+                      <div className="p-4 border-b border-white/10">
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Signed in as</p>
+                        <p className="font-medium text-gray-200 truncate">{user.email}</p>
                       </div>
                       <Link
                         to="/waitlist-success"
-                        className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
+                        className="block px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-3 whitespace-nowrap"
                         onClick={() => setShowUserMenu(false)}
                       >
                         <RedPandaLogo size="sm" animate={false} />
@@ -144,7 +149,7 @@ const Navbar: React.FC = () => {
                       {isPlatformEnabled && (
                         <Link
                           to="/platform"
-                          className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
+                          className="block px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-3 whitespace-nowrap"
                           onClick={() => setShowUserMenu(false)}
                         >
                           <Brain className="w-4 h-4 text-orange-400" />
@@ -153,7 +158,7 @@ const Navbar: React.FC = () => {
                       )}
                       <button
                         onClick={handleSignOut}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 text-red-400"
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors flex items-center gap-3 text-red-400"
                         disabled={isSigningOut}
                       >
                         {isSigningOut ? (
@@ -171,13 +176,13 @@ const Navbar: React.FC = () => {
               <>
                 <Link
                   to="/login"
-                  className="text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium px-4 py-2 md:px-6 md:py-3 whitespace-nowrap"
+                  className="text-sm font-semibold text-gray-300 hover:text-white transition-colors duration-300 whitespace-nowrap border border-white/10 rounded-full px-4 py-2 hover:border-white/20"
                 >
                   Sign In
                 </Link>
                 <button
                   onClick={() => handleNavClick('#waitlist')}
-                  className="btn btn-primary whitespace-nowrap"
+                  className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-400 whitespace-nowrap"
                 >
                   Join Waitlist
                 </button>
@@ -187,7 +192,7 @@ const Navbar: React.FC = () => {
 
           {/* Mobile Navigation Toggle */}
           <button
-            className="md:hidden text-gray-300 hover:text-orange-400"
+            className="md:hidden text-gray-300 hover:text-white"
             onClick={() => setIsOpen(!isOpen)}
           >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -196,17 +201,17 @@ const Navbar: React.FC = () => {
 
         {/* Mobile Navigation Menu */}
         {isOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-dark-800 border-t border-dark-700 animate-slide-down">
+          <div className="md:hidden absolute top-full left-0 right-0 bg-[#070709]/95 border-t border-white/10 backdrop-blur-xl animate-slide-down">
             <div className="container py-4 flex flex-col space-y-4">
               <button
                 onClick={() => handleNavClick('#features')}
-                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
+                className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
               >
                 Features
               </button>
               <button
                 onClick={handlePlatformClick}
-                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
+                className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
               >
                 Platform
               </button>
@@ -215,7 +220,7 @@ const Navbar: React.FC = () => {
                 <>
                   <Link
                     to="/waitlist-success"
-                    className="text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
+                    className="text-gray-300 hover:text-white transition-colors py-2 duration-300"
                     onClick={() => setIsOpen(false)}
                   >
                     Waitlist Status
@@ -225,7 +230,7 @@ const Navbar: React.FC = () => {
                       handleSignOut();
                       setIsOpen(false);
                     }}
-                    className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
+                    className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
                     disabled={isSigningOut}
                   >
                     {isSigningOut ? (
@@ -240,14 +245,14 @@ const Navbar: React.FC = () => {
                 <>
                   <Link
                     to="/login"
-                    className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
+                    className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
                     onClick={() => setIsOpen(false)}
                   >
                     Sign In
                   </Link>
                   <button
                     onClick={() => handleNavClick('#waitlist')}
-                    className="btn btn-primary w-full"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-400"
                   >
                     Join Waitlist
                   </button>
