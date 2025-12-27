@@ -131,24 +131,24 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   return (
     <div className="min-h-screen bg-[#030305] text-white pt-24">
       <section className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,115,55,0.25),transparent_60%)]" />
-        <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '160px 160px' }} />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,115,55,0.18),transparent_65%)]" />
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '180px 180px' }} />
 
-        <div className="relative px-6 lg:px-10 py-16 max-w-[1500px] mx-auto grid gap-10 lg:grid-cols-[1.35fr,0.65fr] items-start">
+        <div className="relative px-6 lg:px-12 py-14 max-w-[1500px] mx-auto grid gap-12 lg:grid-cols-[1.35fr,0.65fr] items-start">
           <div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs uppercase tracking-[0.3em] text-orange-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] uppercase tracking-[0.32em] text-orange-300">
               Kelv Control Room
             </div>
-            <h1 className="text-4xl md:text-5xl font-semibold mt-6 mb-4 leading-tight">
-              Launch drills, review receipts, and stay in rhythm with Kelv.
+            <h1 className="text-4xl md:text-5xl font-semibold mt-5 mb-3 leading-tight">
+              Launch drills, review receipts, and stay in rhythm.
             </h1>
             <p className="text-gray-400 text-lg max-w-2xl">
-              This dashboard is wired to your live interviews. Start a mock, jump into a focus lab, or pull proof for your mentor — without leaving the page.
+              This dashboard is wired to your live interviews. Start a mock, jump into a focus lab, or pull proof for your mentor - without leaving the page.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <button
                 onClick={() => onStartRealtimeInterview('standard')}
-                className="px-8 py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-lg shadow-orange-500/30 inline-flex items-center gap-2"
+                className="px-7 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-lg shadow-orange-500/25 inline-flex items-center gap-2"
               >
                 Start live interview
                 <ArrowRight className="w-4 h-4" />
@@ -157,8 +157,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
             <div className="mt-10 grid sm:grid-cols-3 gap-4">
               {heroStats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                  <p className="text-xs uppercase tracking-[0.4em] text-gray-500">{stat.label}</p>
+                <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">{stat.label}</p>
                   <p className="text-3xl font-semibold mt-3">{stat.value}</p>
                   <p className="text-xs text-gray-500 mt-1">{stat.helper}</p>
                 </div>
@@ -170,7 +170,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="w-full rounded-3xl border border-white/10 bg-black/60 backdrop-blur-lg p-6 space-y-4"
+            className="w-full rounded-3xl border border-white/10 bg-white/5 backdrop-blur-lg p-6 space-y-4"
           >
             <p className="text-sm uppercase tracking-[0.3em] text-gray-400">Next session brief</p>
             {latestSession ? (
@@ -217,12 +217,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         </div>
       </section>
 
-      <div className="max-w-[1500px] mx-auto px-6 lg:px-10 py-16 space-y-16">
+      <div className="max-w-[1500px] mx-auto px-6 lg:px-12 py-14 space-y-14">
         <section className="grid gap-8 lg:grid-cols-[1.25fr,0.75fr] items-start">
-          <div className="border border-white/5 rounded-3xl p-6 bg-black/40">
+          <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <p className="text-sm text-gray-500 uppercase tracking-[0.3em]">Live timeline</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Live timeline</p>
                 <h3 className="text-2xl font-semibold mt-2">Latest sessions</h3>
               </div>
               <span className="text-xs text-gray-500">Auto-updates after every mock</span>
@@ -238,7 +238,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                     onClick={() => onViewInterviewResults(session.id, session.interviewType)}
-                    className="w-full text-left border border-white/5 rounded-2xl p-4 hover:border-orange-500/40 transition bg-black/20"
+                    className="w-full text-left border border-white/10 rounded-2xl p-4 hover:border-orange-500/40 transition bg-white/5"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -251,9 +251,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-400">
-                      <span className="px-3 py-1 rounded-full border border-white/10">{session.questionsAnswered} Qs</span>
-                      <span className="px-3 py-1 rounded-full border border-white/10">{Math.round(session.duration / 60)} min</span>
-                      <span className="px-3 py-1 rounded-full border border-white/10">{session.setup.industry}</span>
+                      <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">{session.questionsAnswered} Qs</span>
+                      <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">{Math.round(session.duration / 60)} min</span>
+                      <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">{session.setup.industry}</span>
                     </div>
                   </motion.button>
                 ))}
@@ -261,13 +261,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           </div>
 
           <div className="space-y-6">
-            <div className="border border-white/5 rounded-3xl p-6 bg-gradient-to-br from-orange-500/20 via-transparent to-transparent">
-              <p className="text-sm text-gray-500 uppercase tracking-[0.3em]">Streak</p>
+            <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
+              <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Streak</p>
               <h3 className="text-3xl font-semibold mt-3">{streakData.currentStreak} days</h3>
               <p className="text-gray-400 text-sm">Longest streak: {streakData.longestStreak} days</p>
               <div className="flex items-center gap-4 mt-6">
                 <div className="flex-1">
-                  <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">Last session</p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">Last session</p>
                   <p className="text-lg font-semibold">{streakData.lastInterviewDate ? new Date(streakData.lastInterviewDate).toLocaleDateString() : '-'}</p>
                 </div>
                 <div className="text-xs grid grid-cols-7 gap-1">
@@ -281,8 +281,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               </div>
             </div>
 
-            <div className="border border-white/5 rounded-3xl p-6 bg-black/35">
-              <p className="text-sm text-gray-500 uppercase tracking-[0.3em]">Strength scan</p>
+            <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
+              <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Strength scan</p>
               <div className="mt-4 grid grid-cols-1 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">What landed well</p>
@@ -315,7 +315,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 uppercase tracking-[0.3em]">Focused labs</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Focused labs</p>
                 <h3 className="text-2xl font-semibold mt-2">Dial in one behaviour at a time</h3>
               </div>
             </div>
@@ -324,12 +324,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                 <motion.div
                   key={mode.id}
                   whileHover={{ translateY: -6 }}
-                  className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#080a0f]"
+                  className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5"
                 >
-                  <div className={`absolute inset-0 opacity-35 bg-gradient-to-br ${mode.accent}`} />
+                  <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${mode.accent}`} />
                   <div className="relative p-6 space-y-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-black/40 text-white">
+                      <div className="p-3 rounded-2xl bg-black/30 text-white">
                         <mode.icon className="w-6 h-6" />
                       </div>
                       <div>
@@ -351,23 +351,23 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             </div>
           </div>
 
-          <div className="border border-white/5 rounded-3xl p-6 bg-black/35 space-y-4">
-            <p className="text-sm text-gray-500 uppercase tracking-[0.3em]">Velocity notes</p>
+          <div className="border border-white/10 rounded-3xl p-6 bg-white/5 space-y-4">
+            <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Velocity notes</p>
             <div className="space-y-3 text-sm text-gray-400">
-              <p>Kelv tracks how often you’re running mocks, which formats you lean on, and which interview types are still untouched.</p>
-              <p>Use this card as your personal coach log — if you see gaps here, schedule the drill before the week ends.</p>
+              <p>Kelv tracks how often you're running mocks, which formats you lean on, and which interview types are still untouched.</p>
+              <p>Use this card as your personal coach log - if you see gaps here, schedule the drill before the week ends.</p>
             </div>
           </div>
         </section>
 
         <section className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-          <div className="border border-white/5 rounded-3xl p-6 bg-black/35">
+          <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-2xl font-semibold">Next reps from Kelv</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {recommendations.slice(0, 4).map((rec) => (
-                <div key={rec.title} className="p-4 rounded-2xl border border-white/10 bg-[#0e1016]">
+                <div key={rec.title} className="p-4 rounded-2xl border border-white/10 bg-[#0f1117]">
                   <p className="text-sm text-orange-300 uppercase tracking-[0.3em]">{rec.category}</p>
                   <p className="text-lg font-semibold mt-2">{rec.title}</p>
                   <p className="text-sm text-gray-400 mt-1">{rec.description}</p>
@@ -378,7 +378,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             </div>
           </div>
 
-          <div className="border border-white/5 rounded-3xl p-6 bg-black/35">
+          <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
             <div className="flex items-center gap-3 mb-4">
               <Trophy className="w-5 h-5 text-orange-300" />
               <h3 className="text-xl font-semibold">Achievements</h3>

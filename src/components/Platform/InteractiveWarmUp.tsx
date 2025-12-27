@@ -414,9 +414,9 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
       };
 
       const getBreathingColor = () => {
-        if (breathingPhase === 'inhale') return 'from-blue-500 to-blue-600';
-        if (breathingPhase === 'exhale') return 'from-orange-500 to-orange-600';
-        return 'from-purple-500 to-purple-600';
+        if (breathingPhase === 'inhale') return 'from-orange-400 to-orange-500';
+        if (breathingPhase === 'exhale') return 'from-orange-500 to-amber-500';
+        return 'from-slate-500 to-slate-600';
       };
 
       return (
@@ -425,7 +425,7 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
             <motion.div
               animate={{ scale: getBreathingScale() }}
               transition={{ duration: 1 }}
-              className={`w-48 h-48 rounded-full bg-gradient-to-br ${getBreathingColor()} opacity-50 blur-xl`}
+              className={`w-48 h-48 rounded-full bg-gradient-to-br ${getBreathingColor()} opacity-40 blur-xl`}
             />
           </div>
 
@@ -463,44 +463,42 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
   };
 
   return (
-    <div className="min-h-screen bg-[#030305] text-white flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#030305] text-white flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute -top-40 -right-32 h-[420px] w-[420px] rounded-full bg-orange-500/10 blur-[140px]" />
+        <div className="absolute -bottom-48 -left-40 h-[520px] w-[520px] rounded-full bg-orange-500/10 blur-[160px]" />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-3xl w-full"
+        className="max-w-5xl w-full relative z-10"
       >
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold mb-2">Interactive Warm-Up</h1>
-          <p className="text-gray-400">Get physically and mentally ready for your interview</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-gray-500 mb-2">Warm-up</p>
+            <h1 className="text-3xl font-semibold">Get interview-ready in minutes</h1>
+            <p className="text-gray-400">A guided reset for posture, breathing, and vocal clarity.</p>
+          </div>
           <button
             onClick={onSkip}
-            className="mt-3 text-sm text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-sm text-gray-400 hover:text-white transition-colors border border-white/10 rounded-full px-4 py-2 bg-white/5"
           >
-            Skip Warm-Up
+            Skip warm-up
           </button>
         </div>
 
         {/* Stage Indicator */}
-        <div className="flex items-center justify-center gap-4 mb-6">
-          <div className={`px-4 py-2 rounded-full border ${exercise.stage === 'posture'
-            ? 'bg-blue-500/10 border-blue-500/50 text-blue-400'
-            : 'bg-white/5 border-white/10 text-gray-500'
-            }`}>
-            Posture
-          </div>
-          <div className={`px-4 py-2 rounded-full border ${exercise.stage === 'breathing'
-            ? 'bg-purple-500/10 border-purple-500/50 text-purple-400'
-            : 'bg-white/5 border-white/10 text-gray-500'
-            }`}>
-            Breathing
-          </div>
-          <div className={`px-4 py-2 rounded-full border ${exercise.stage === 'voice'
-            ? 'bg-orange-500/10 border-orange-500/50 text-orange-400'
-            : 'bg-white/5 border-white/10 text-gray-500'
-            }`}>
-            Voice
-          </div>
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {['posture', 'breathing', 'voice'].map((stage) => (
+            <div
+              key={stage}
+              className={`px-4 py-3 rounded-2xl border text-center text-sm font-medium capitalize tracking-wide ${exercise.stage === stage
+                ? 'bg-orange-500/10 border-orange-500/40 text-orange-200'
+                : 'bg-white/5 border-white/10 text-gray-500'
+                }`}
+            >
+              {stage}
+            </div>
+          ))}
         </div>
 
         {/* Progress */}
@@ -509,7 +507,7 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
             <span>Exercise {currentExercise + 1} of {WARM_UP_EXERCISES.length}</span>
             <span>{Math.round(progress)}% Complete</span>
           </div>
-          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-gradient-to-r from-orange-500 to-orange-600"
               initial={{ width: 0 }}
@@ -525,16 +523,16 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-[#0f0f12] border border-white/5 rounded-2xl p-6 space-y-6"
+            className="bg-[#0b0b11] border border-white/10 rounded-3xl p-8 space-y-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-orange-500/10 rounded-xl">
+                <div className="p-3 bg-orange-500/10 rounded-xl border border-orange-500/20">
                   <exercise.icon className="w-6 h-6 text-orange-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">{exercise.title}</h2>
+                  <h2 className="text-xl font-semibold">{exercise.title}</h2>
                   <p className="text-sm text-gray-500">{exercise.successCriteria}</p>
                 </div>
               </div>
@@ -544,7 +542,7 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
             </div>
 
             {/* Instructions */}
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
               <p className="text-sm text-gray-300 leading-relaxed">{exercise.instruction}</p>
             </div>
 
@@ -553,8 +551,8 @@ const InteractiveWarmUp: React.FC<InteractiveWarmUpProps> = ({ onComplete, onSki
 
             {/* Timer */}
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/5 border border-orange-500/20">
-                <span className="text-3xl font-bold">{timeRemaining}s</span>
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/30 border border-orange-500/30">
+                <span className="text-3xl font-semibold">{timeRemaining}s</span>
               </div>
             </div>
 

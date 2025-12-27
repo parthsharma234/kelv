@@ -4,7 +4,7 @@ import {
     Mic, MicOff, Video, VideoOff,
     FileText, ArrowLeft, Upload,
     PanelLeftClose, PanelLeftOpen,
-    Sparkles, Loader2, Dumbbell
+    Sparkles, Loader2, Dumbbell, Check
 } from 'lucide-react';
 import { useVapiInterview } from '../../hooks/useVapiInterview';
 import { useInterviewRecorder } from '../../hooks/useInterviewRecorder';
@@ -320,29 +320,126 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     // ===================
     if (previewPhase) {
         return (
-            <div className="min-h-screen bg-[#030305] text-white font-sans">
-                <header className="fixed top-0 inset-x-0 z-50 h-20 border-b border-white/5 bg-[#030305]/80 backdrop-blur-xl flex items-center justify-between px-8">
+            <div className="min-h-screen bg-[#030305] text-white font-sans relative overflow-hidden">
+                <div className="absolute -top-40 -right-32 h-[520px] w-[520px] rounded-full bg-orange-500/10 blur-[140px]" />
+                <div className="absolute -bottom-64 -left-40 h-[560px] w-[560px] rounded-full bg-orange-500/10 blur-[160px]" />
+
+                <header className="fixed top-0 inset-x-0 z-50 h-20 border-b border-white/10 bg-[#030305]/70 backdrop-blur-xl flex items-center justify-between px-10">
                     <div className="flex items-center gap-4">
                         <button onClick={() => { stopMedia(); onBack(); }} className="p-2 -ml-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                             <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <div>
-                            <h1 className="text-sm font-medium text-gray-400 uppercase tracking-[0.2em]">Setup</h1>
-                            <p className="text-lg font-semibold">Initial Configuration</p>
+                        <div className="space-y-0.5">
+                            <h1 className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.3em]">Setup</h1>
+                            <p className="text-lg font-semibold">Initial configuration</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs font-medium rounded-full uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                        <div className="px-3 py-1 bg-white/5 border border-white/10 text-gray-300 text-xs font-medium rounded-full uppercase tracking-wider">
                             System Check
+                        </div>
+                        <div className="px-3 py-1 bg-orange-500/15 border border-orange-500/30 text-orange-200 text-xs font-medium rounded-full uppercase tracking-wider">
+                            Warm-up Ready
                         </div>
                     </div>
                 </header>
 
-                <main className="pt-32 pb-12 px-8 max-w-[1600px] mx-auto">
-                    <div className="grid lg:grid-cols-[1fr,400px] gap-8">
-                        {/* Left Col: Preview & Checks */}
+                <main className="pt-32 pb-16 px-10 max-w-[1700px] mx-auto relative z-10">
+                    <div className="grid lg:grid-cols-[280px,1fr,380px] gap-10">
+                        {/* Left Rail */}
                         <div className="space-y-6">
-                            <div className="relative aspect-video bg-black/40 rounded-3xl border border-white/10 overflow-hidden group">
+                            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase">Steps</p>
+                                    <span className="text-xs text-gray-500">1/3</span>
+                                </div>
+                                <div className="space-y-3">
+                                    {[
+                                        { label: 'Devices', active: true },
+                                        { label: 'Warm-up', active: completedWarmUp },
+                                        { label: 'Context', active: !!tempJD.trim() && !!tempResume.trim() }
+                                    ].map((step) => (
+                                        <div key={step.label} className={`flex items-center justify-between px-3 py-2 rounded-xl border ${step.active ? 'border-orange-500/40 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${step.active ? 'bg-orange-500/20 text-orange-300' : 'bg-white/10 text-gray-500'}`}>
+                                                    <Check className="w-4 h-4" />
+                                                </div>
+                                                <span className={`text-sm ${step.active ? 'text-white' : 'text-gray-400'}`}>{step.label}</span>
+                                            </div>
+                                            <span className={`text-[10px] uppercase tracking-widest ${step.active ? 'text-orange-300' : 'text-gray-600'}`}>
+                                                {step.active ? 'Ready' : 'Next'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 space-y-5">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2.5 rounded-xl ${completedWarmUp ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                                            <Dumbbell className={`w-5 h-5 ${completedWarmUp ? 'text-green-400' : 'text-orange-400'}`} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-semibold">Pre-interview warm-up</h3>
+                                            <p className="text-xs text-gray-500">
+                                                {completedWarmUp ? 'Completed - Ready to go' : 'A quick reset for posture and voice'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[11px] text-gray-500 uppercase tracking-wider">2 min</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {[
+                                        { label: 'Posture alignment', time: '40s' },
+                                        { label: 'Breath pacing', time: '35s' },
+                                        { label: 'Voice warm-up', time: '45s' }
+                                    ].map((item) => (
+                                        <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0b0b11] border border-white/10">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] uppercase tracking-widest text-orange-300">Step</span>
+                                                <span className="text-sm text-gray-200">{item.label}</span>
+                                            </div>
+                                            <span className="text-xs text-gray-500">{item.time}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl px-4 py-3 text-xs text-orange-200">
+                                    {completedWarmUp ? 'You are cleared. Jump in when ready.' : 'Calm your breathing, then start the session with confidence.'}
+                                </div>
+
+                                <button
+                                    onClick={handleStartWarmUp}
+                                    className={`w-full py-2.5 rounded-xl text-sm font-medium transition-all ${completedWarmUp
+                                        ? 'bg-white/5 text-gray-300 hover:bg-white/10'
+                                        : 'bg-orange-500 text-white hover:bg-orange-400 shadow-lg shadow-orange-500/20'
+                                        }`}
+                                >
+                                    {completedWarmUp ? 'Redo warm-up' : 'Start warm-up'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Center: Preview */}
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase tracking-[0.3em]">Camera preview</p>
+                                    <h2 className="text-2xl font-semibold">Look interview-ready</h2>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300">
+                                        1280 x 720
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-full border text-xs ${cameraError ? 'border-red-500/40 text-red-300 bg-red-500/10' : 'border-green-500/40 text-green-300 bg-green-500/10'}`}>
+                                        {cameraError ? 'Camera blocked' : 'Camera live'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="relative aspect-video bg-[#0b0b11] rounded-[28px] border border-white/10 overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
                                 {stream && !isVideoOff ? (
                                     <video ref={previewVideoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                                 ) : (
@@ -359,7 +456,16 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                     </div>
                                 )}
 
-                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10">
+                                <div className="absolute top-6 left-6 flex items-center gap-2">
+                                    <div className="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-xs text-gray-200 backdrop-blur">
+                                        Center your face
+                                    </div>
+                                    <div className="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-xs text-gray-200 backdrop-blur">
+                                        Eye level
+                                    </div>
+                                </div>
+
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-3 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10">
                                     <button onClick={toggleMute} className={`p-3 rounded-xl transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
                                         {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                                     </button>
@@ -369,63 +475,55 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                 </div>
                             </div>
 
-                            {/* Warm-Up Section */}
-                            <div className="bg-black/40 border border-white/5 rounded-2xl p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${completedWarmUp ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
-                                            <Dumbbell className={`w-5 h-5 ${completedWarmUp ? 'text-green-400' : 'text-orange-400'}`} />
+                            <div className="grid md:grid-cols-3 gap-4">
+                                {[
+                                    { label: 'Mic check', value: isMuted ? 'Muted' : 'Active', icon: Mic },
+                                    { label: 'Video check', value: isVideoOff ? 'Off' : 'Active', icon: Video },
+                                    { label: 'Environment', value: 'Quiet zone', icon: Sparkles }
+                                ].map((item) => {
+                                    const Icon = item.icon;
+                                    return (
+                                        <div key={item.label} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs text-gray-500 uppercase tracking-[0.3em]">{item.label}</p>
+                                                <p className="text-sm font-semibold mt-1">{item.value}</p>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-300">
+                                                <Icon className="w-5 h-5" />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium">Pre-Interview Warm-Up</h3>
-                                            <p className="text-xs text-gray-500">
-                                                {completedWarmUp
-                                                    ? 'Completed - You\'re ready!'
-                                                    : 'Posture, breathing & voice exercises'
-                                                }
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={handleStartWarmUp}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${completedWarmUp
-                                                ? 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                                : 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20'
-                                            }`}
-                                    >
-                                        {completedWarmUp ? 'Redo' : 'Start Warm-Up'}
-                                    </button>
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        {/* Right Col: Configuration */}
+                        {/* Right: Context */}
                         <div className="space-y-6">
-                            <div className="bg-black/40 border border-white/5 rounded-3xl p-6 space-y-6">
+                            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-6">
                                 <div>
-                                    <h2 className="text-xl font-semibold mb-1">Session Context</h2>
-                                    <p className="text-sm text-gray-400">Configure parameters for your interview simulation.</p>
+                                    <h2 className="text-xl font-semibold mb-1">Session context</h2>
+                                    <p className="text-sm text-gray-400">Give Kelv the job details and your background.</p>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 block">Job Description</label>
+                                        <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Job description</label>
                                         <textarea
                                             value={tempJD}
                                             onChange={(e) => setTempJD(e.target.value)}
-                                            className="w-full h-32 bg-[#080a0f] border border-white/10 rounded-xl p-4 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
+                                            className="w-full h-32 bg-[#080a0f] border border-white/10 rounded-2xl p-4 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/40 transition-colors resize-none"
                                             placeholder="Paste target job description..."
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 block">Resume Data</label>
+                                        <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Resume data</label>
                                         <div
                                             onClick={() => fileInputRef.current?.click()}
                                             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                             onDragLeave={() => setIsDragging(false)}
                                             onDrop={handleDrop}
-                                            className={`border border-dashed rounded-xl p-6 transition-all cursor-pointer ${isDragging ? 'border-orange-500 bg-orange-500/5' : resumeFileName ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-white/20 bg-[#080a0f]'
+                                            className={`border border-dashed rounded-2xl p-6 transition-all cursor-pointer ${isDragging ? 'border-orange-500/70 bg-orange-500/5' : resumeFileName ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-white/20 bg-[#080a0f]'
                                                 }`}
                                         >
                                             <input ref={fileInputRef} type="file" accept=".pdf,.txt" onChange={(e) => e.target.files?.[0] && handleResumeFile(e.target.files[0])} className="hidden" />
@@ -458,11 +556,15 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                     </div>
                                 </div>
 
+                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 text-sm text-orange-100">
+                                    Strong context makes feedback sharper. You can paste an abbreviated role summary too.
+                                </div>
+
                                 <button
                                     onClick={handleStartInterview}
                                     disabled={!isReady || isInjectingContext}
-                                    className={`w-full py-4 rounded-xl font-medium text-sm transition-all ${isReady
-                                        ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20'
+                                    className={`w-full py-4 rounded-2xl font-medium text-sm transition-all ${isReady
+                                        ? 'bg-orange-500 text-white hover:bg-orange-400 shadow-lg shadow-orange-500/20'
                                         : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5'
                                         }`}
                                 >
@@ -598,3 +700,4 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 };
 
 export default VapiInterviewSession;
+
