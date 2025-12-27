@@ -1,174 +1,161 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import { Settings, Mic, BarChart3, Target } from 'lucide-react';
 
+/**
+ * How it works section - horizontal flow with mini mockups
+ */
 const HowItWorksSection: React.FC = () => {
     const steps = [
         {
-            number: "01",
-            title: "Choose your role & target",
-            description: "Tell Kelv the title you’re practicing for and who’s interviewing you.",
-            outcome: "We load the right rubrics, follow-ups, and question bank for that company.",
-            statLabel: "Setup",
-            statValue: "45s intake"
+            id: 1,
+            icon: Settings,
+            title: 'Set your target',
+            description: 'Choose your role, industry, and experience level. Kelv tailors questions and rubrics to match.',
+            mockupContent: <SetupMockup />,
         },
         {
-            number: "02",
-            title: "Set the industry lens",
-            description: "Pick the industry so prompts reference the problems and jargon you’ll actually get asked.",
-            outcome: "Kelv mirrors the business priorities and follow-up digs that team really cares about.",
-            statLabel: "Context",
-            statValue: "Live"
+            id: 2,
+            icon: Mic,
+            title: 'Run the interview',
+            description: 'Kelv asks real questions and pushes with follow-ups. Your video, voice, and answers are analyzed live.',
+            mockupContent: <InterviewMiniMockup />,
         },
         {
-            number: "03",
-            title: "Dial in seniority",
-            description: "Entry, mid, senior, or exec—Kelv adjusts depth, leadership digs, and pressure.",
-            outcome: "You rehearse at the exact altitude you’ll be judged on in the real loop.",
-            statLabel: "Tone",
-            statValue: "Adaptive"
+            id: 3,
+            icon: BarChart3,
+            title: 'Get your receipts',
+            description: 'See exactly what landed, what drifted, and where your confidence dropped—with timestamps.',
+            mockupContent: <ResultsMiniMockup />,
         },
         {
-            number: "04",
-            title: "Launch your format",
-            description: "Voice reps for confidence/pacing, or text mode when you want a quiet sandbox.",
-            outcome: "Every session logs receipts so mentors, recruiters, and future you can see the climb.",
-            statLabel: "Evidence",
-            statValue: "Session-by-session log"
-        }
+            id: 4,
+            icon: Target,
+            title: 'Run the drills',
+            description: 'Kelv queues focused reps on your weak spots until the gap closes.',
+            mockupContent: <DrillsMiniMockup />,
+        },
     ];
 
-    const totalSteps = steps.length;
-    const [activeStep, setActiveStep] = useState(0);
-    const [stepPaused, setStepPaused] = useState(false);
-    const stepProgress = totalSteps > 1 ? (activeStep / (totalSteps - 1)) * 100 : 0;
-
-    useEffect(() => {
-        if (stepPaused) {
-            const resumeTimer = setTimeout(() => setStepPaused(false), 7000);
-            return () => clearTimeout(resumeTimer);
-        }
-    }, [stepPaused]);
-
-    useEffect(() => {
-        if (stepPaused) return;
-        const interval = setInterval(() => {
-            setActiveStep(prev => (prev + 1) % totalSteps);
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [stepPaused, totalSteps]);
-
     return (
-        <section id="how-it-works" className="py-24 md:py-32 relative overflow-hidden bg-gradient-to-b from-dark-900 to-dark-800">
-            <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,120,60,0.12),transparent_60%)]" />
-                <div className="absolute inset-x-0 top-10 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            </div>
+        <section className="py-32 bg-gradient-to-b from-[#050508] to-[#030305] relative overflow-hidden">
+            {/* Background */}
+            <div className="absolute inset-0 dot-pattern opacity-20" />
 
-            <div className="container mx-auto px-4 relative z-10">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+                {/* Section header */}
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
+                    transition={{ duration: 0.7 }}
                     viewport={{ once: true }}
-                    className="text-center mb-16"
+                    className="text-center mb-20"
                 >
-                    <h2 className="text-4xl md:text-5xl font-semibold text-white mb-4">
-                        The Kelv challenge flow
+                    <span className="inline-block text-xs uppercase tracking-[0.3em] text-orange-400 mb-4">
+                        How it works
+                    </span>
+                    <h2 className="text-4xl lg:text-5xl font-semibold text-white">
+                        From setup to receipts in{' '}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-300">
+                            15 minutes
+                        </span>
                     </h2>
-                    <p className="text-xl text-gray-400 max-w-3xl mx-auto font-light">
-                        From panic to proof in under 15 minutes. Practice real interviews, get objective feedback, build evidence-based confidence.
-                    </p>
                 </motion.div>
 
-                <div className="relative max-w-5xl mx-auto">
-                    <div className="hidden md:block absolute left-8 top-0 bottom-0 pointer-events-none">
-                        <div className="w-px h-full bg-gradient-to-b from-orange-500/40 via-orange-500/5 to-transparent relative overflow-visible">
+                {/* Steps grid */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {steps.map((step, index) => {
+                        const Icon = step.icon;
+
+                        return (
                             <motion.div
-                                key={activeStep}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1, top: `${stepProgress}%` }}
-                                transition={{ duration: 0.5, ease: 'easeOut' }}
-                                style={{ top: `${stepProgress}%` }}
-                                className="absolute -left-[6px] w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.8)]"
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-10">
-                        {steps.map((step, index) => {
-                            const isActive = activeStep === index;
-                            return (
-                                <motion.div
-                                    key={step.number}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.1, duration: 0.5 }}
-                                    viewport={{ once: true }}
-                                    onMouseEnter={() => {
-                                        setActiveStep(index);
-                                        setStepPaused(true);
-                                    }}
-                                    className={`relative bg-dark-900/70 border rounded-3xl p-6 md:pl-20 shadow-[0_0_60px_rgba(0,0,0,0.35)] transition-all duration-300 ${isActive ? 'border-orange-500/60 bg-orange-500/5' : 'border-dark-700/60'
-                                        }`}
-                                >
-                                    <motion.div
-                                        layout
-                                        className={`hidden md:flex absolute left-6 top-8 z-10 w-10 h-10 rounded-full border flex items-center justify-center text-sm font-semibold transition-colors ${isActive
-                                                ? 'bg-orange-500 text-dark-900 border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.6)]'
-                                                : 'bg-dark-800 text-orange-300 border-orange-500/40'
-                                            }`}
-                                    >
-                                        {step.number}
-                                    </motion.div>
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: isActive ? '100%' : '0%' }}
-                                        transition={{ duration: 0.6, ease: 'easeOut' }}
-                                        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent rounded-t-3xl"
-                                    />
-                                    <div className="flex flex-col gap-6 md:flex-row md:items-center">
-                                        <div className="flex-1">
-                                            <p className="text-xs uppercase tracking-[0.4em] text-orange-400">Step {step.number}</p>
-                                            <h3 className="text-2xl font-semibold text-white mt-2">{step.title}</h3>
-                                            <p className="text-lg text-gray-400 mt-2 leading-relaxed">{step.description}</p>
+                                key={step.id}
+                                initial={{ opacity: 0, y: 40 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.6, delay: index * 0.1 }}
+                                viewport={{ once: true }}
+                                className="group"
+                            >
+                                {/* Card */}
+                                <div className="relative h-full bg-[#0a0a0f] border border-white/5 rounded-2xl p-5 hover:border-orange-500/30 transition-colors">
+                                    {/* Step number */}
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                                            <Icon className="w-5 h-5 text-orange-400" />
                                         </div>
-                                        <div className="md:w-60">
-                                            <div className={`bg-dark-800/80 border rounded-2xl p-4 transition-colors ${isActive ? 'border-orange-500/50' : 'border-dark-700'
-                                                }`}>
-                                                <p className="text-xs text-gray-500 uppercase tracking-wide">{step.statLabel}</p>
-                                                <p className="text-white text-xl font-semibold">{step.statValue}</p>
-                                                <p className="text-xs text-gray-500 uppercase tracking-wide mt-4">Outcome</p>
-                                                <p className="text-orange-400 text-sm mt-1 leading-relaxed">{step.outcome}</p>
-                                            </div>
-                                        </div>
+                                        <span className="text-5xl font-bold text-white/5 group-hover:text-orange-500/10 transition-colors">
+                                            {step.id}
+                                        </span>
                                     </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.6 }}
-                    viewport={{ once: true }}
-                    className="mt-16 text-center"
-                >
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                            const waitlist = document.getElementById('waitlist');
-                            waitlist?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="bg-orange-500 hover:bg-orange-600 text-white px-12 py-4 rounded-full font-semibold shadow-lg shadow-orange-500/30"
-                    >
-                        Book a beta spot
-                    </motion.button>
-                </motion.div>
+                                    {/* Content */}
+                                    <h3 className="text-lg font-semibold text-white mb-2">{step.title}</h3>
+                                    <p className="text-sm text-gray-500 mb-4 leading-relaxed">{step.description}</p>
+
+                                    {/* Mini mockup */}
+                                    <div className="mt-4 rounded-xl overflow-hidden border border-white/5 bg-[#050508]">
+                                        {step.mockupContent}
+                                    </div>
+                                </div>
+
+                                {/* Connector (except last) */}
+                                {index < steps.length - 1 && (
+                                    <div className="hidden lg:block absolute top-1/2 -right-3 w-6 h-0.5 bg-white/10" />
+                                )}
+                            </motion.div>
+                        );
+                    })}
+                </div>
             </div>
         </section>
     );
 };
+
+// Mini mockup components
+const SetupMockup: React.FC = () => (
+    <div className="p-3 space-y-2">
+        {['Product Manager', 'Technology', 'Mid Level'].map((item, i) => (
+            <div key={item} className={`text-[10px] py-1.5 px-3 rounded-lg ${i === 0 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-white/5 text-gray-500'
+                }`}>
+                {item}
+            </div>
+        ))}
+    </div>
+);
+
+const InterviewMiniMockup: React.FC = () => (
+    <div className="p-3 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-[10px] font-bold text-white">
+            K
+        </div>
+        <div className="flex-1 space-y-1">
+            <div className="h-1.5 bg-white/10 rounded-full w-full" />
+            <div className="h-1.5 bg-white/10 rounded-full w-2/3" />
+        </div>
+    </div>
+);
+
+const ResultsMiniMockup: React.FC = () => (
+    <div className="p-3 grid grid-cols-3 gap-2">
+        {[78, 85, 72].map((score, i) => (
+            <div key={i} className="text-center">
+                <p className="text-sm font-bold text-white">{score}</p>
+                <p className="text-[8px] text-gray-500 uppercase">{['Content', 'Voice', 'Presence'][i]}</p>
+            </div>
+        ))}
+    </div>
+);
+
+const DrillsMiniMockup: React.FC = () => (
+    <div className="p-3 space-y-2">
+        <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span className="text-[10px] text-orange-400">Interrupt Recovery</span>
+        </div>
+        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full w-1/3 bg-orange-500 rounded-full" />
+        </div>
+    </div>
+);
 
 export default HowItWorksSection;

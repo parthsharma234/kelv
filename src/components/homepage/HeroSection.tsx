@@ -1,135 +1,148 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import RedPandaLogo from '../RedPandaLogo';
+import DeviceMockup from './DeviceMockup';
+import MockupDashboard from './MockupDashboard';
 
 const HeroSection: React.FC = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center bg-dark-900 px-4 overflow-hidden">
-      {/* Animated particle/star background */}
-      <div className="absolute inset-0">
-        {[...Array(60)].map((_, i) => (
+    <section className="relative min-h-screen bg-[#030305] overflow-hidden">
+      {/* Stripe-style gradient mesh background */}
+      <div className="absolute inset-0 stripe-gradient-mesh" />
+
+      {/* Subtle grid pattern */}
+      <div className="absolute inset-0 grid-pattern opacity-50" />
+
+      {/* Animated gradient orb */}
+      <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] animated-gradient-orb opacity-40" />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10">
+        <div className="min-h-screen grid lg:grid-cols-[1.1fr,0.9fr] items-center gap-12 py-24">
+
+          {/* Left: Copy */}
+          <div className="space-y-8">
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs uppercase tracking-[0.2em] text-gray-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                AI Interview Coach
+              </span>
+            </motion.div>
+
+            {/* Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="text-5xl lg:text-6xl xl:text-7xl font-semibold text-white leading-[1.1] tracking-tight"
+            >
+              Stop guessing.
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-orange-300 to-amber-200">
+                Start proving.
+              </span>
+            </motion.h1>
+
+            {/* Subheadline */}
+            <motion.p
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="text-xl text-gray-400 max-w-lg leading-relaxed"
+            >
+              Kelv watches your mock interviews like a hiring manager and tells you,
+              word-for-word, what landed and what didn't.
+            </motion.p>
+
+            {/* CTA */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="flex flex-col sm:flex-row items-start gap-4"
+            >
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  const waitlist = document.getElementById('waitlist');
+                  waitlist?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-8 py-4 bg-orange-500 hover:bg-orange-400 text-white font-medium rounded-xl transition-colors shadow-lg shadow-orange-500/20"
+              >
+                Join the waitlist →
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  const features = document.getElementById('features');
+                  features?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-8 py-4 text-gray-400 hover:text-white font-medium transition-colors"
+              >
+                See how it works
+              </motion.button>
+            </motion.div>
+          </div>
+
+          {/* Right: Product Mockup */}
           <motion.div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              width: Math.random() > 0.7 ? '3px' : '2px',
-              height: Math.random() > 0.7 ? '3px' : '2px',
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              background: Math.random() > 0.5 ? 'rgba(255, 107, 53, 0.3)' : 'rgba(255, 255, 255, 0.2)',
-            }}
-            animate={{
-              y: [0, -30, 0],
-              opacity: [0.2, 0.8, 0.2],
-              scale: [1, 1.2, 1],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 4,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-              ease: "easeInOut"
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Floating gradient orbs */}
-      <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          className="absolute w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"
-          style={{ top: '10%', left: '10%' }}
-          animate={{
-            x: [0, 50, 0],
-            y: [0, 30, 0],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
-          style={{ bottom: '10%', right: '10%' }}
-          animate={{
-            x: [0, -50, 0],
-            y: [0, -30, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
-
-      <div className="max-w-5xl mx-auto text-center py-32 relative z-10">
-        {/* Logo + Brand */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="flex items-center justify-center gap-3 mb-8"
-        >
-          <RedPandaLogo size="lg" animate={false} />
-          <h1 className="text-5xl font-semibold gradient-text">Kelv AI</h1>
-        </motion.div>
-
-        {/* Main Headline */}
-        <motion.h2
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6, ease: "easeOut" }}
-          className="text-5xl md:text-7xl font-semibold text-white mb-6 leading-tight"
-        >
-          Ace your interviews<br />with AI coaching
-        </motion.h2>
-
-        {/* Subheadline */}
-        <motion.p
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.6, ease: "easeOut" }}
-          className="text-xl md:text-2xl text-gray-400 mb-10 max-w-3xl mx-auto font-light"
-        >
-          Real-time voice analysis and feedback to help you sound confident, clear, and professional.
-        </motion.p>
-
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.6, ease: "easeOut" }}
-          className="flex items-center justify-center gap-4"
-        >
-          <motion.button
-            onClick={() => {
-              const waitlistSection = document.getElementById('waitlist');
-              waitlistSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg text-base font-medium transition-colors duration-200 shadow-lg shadow-orange-500/20"
+            initial={{ opacity: 0, y: 60, rotateX: -10 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+            transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="relative"
+            style={{ perspective: '1200px' }}
           >
-            Join waitlist →
-          </motion.button>
-          <motion.button
-            onClick={() => {
-              const featuresSection = document.getElementById('features');
-              featuresSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-dark-800 hover:bg-dark-700 text-white px-8 py-4 rounded-lg text-base font-medium transition-colors duration-200 border border-dark-700"
-          >
-            Learn more
-          </motion.button>
-        </motion.div>
+            {/* Glow behind mockup */}
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-transparent to-blue-500/10 blur-3xl scale-110" />
 
-        {/* Launch Date */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8, duration: 0.5 }}
-          className="text-sm text-gray-500 mt-8"
-        >
-          Launching January 2026
-        </motion.p>
+            <DeviceMockup variant="laptop" showChrome animate>
+              <MockupDashboard />
+            </DeviceMockup>
+
+            {/* Floating stats cards */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.8, duration: 0.6 }}
+              className="absolute -left-8 top-1/4 bg-[#0a0a0f] border border-white/10 rounded-xl p-3 shadow-xl"
+            >
+              <p className="text-[9px] text-gray-500 uppercase">Confidence</p>
+              <p className="text-lg font-bold text-green-400">+34%</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1, duration: 0.6 }}
+              className="absolute -right-6 bottom-1/3 bg-[#0a0a0f] border border-white/10 rounded-xl p-3 shadow-xl"
+            >
+              <p className="text-[9px] text-gray-500 uppercase">Filler Words</p>
+              <p className="text-lg font-bold text-orange-400">-67%</p>
+            </motion.div>
+          </motion.div>
+        </div>
       </div>
+
+      {/* Scroll indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2"
+      >
+        <motion.div
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="w-6 h-10 rounded-full border border-white/20 flex items-start justify-center p-2"
+        >
+          <div className="w-1 h-2 bg-white/40 rounded-full" />
+        </motion.div>
+      </motion.div>
     </section>
   );
 };

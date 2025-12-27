@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Sparkles, Brain, Target, ArrowRight, Zap, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Sparkles, Target, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import RedPandaLogo from '../RedPandaLogo';
 
+/**
+ * Premium Kelv-branded login page
+ */
 const LoginPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -13,7 +16,6 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [focusedField, setFocusedField] = useState('');
 
   const { signUp, signIn, user, isConfigured } = useAuth();
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!isConfigured) {
       setError('Database connection not configured. Please contact support.');
       return;
@@ -39,11 +41,9 @@ const LoginPage: React.FC = () => {
       if (isSignUp) {
         const { error } = await signUp(email, password, fullName);
         if (error) throw error;
-        // User will be redirected by useEffect when user state updates
       } else {
         const { error } = await signIn(email, password);
         if (error) throw error;
-        // User will be redirected by useEffect when user state updates
       }
     } catch (err: any) {
       setError(err.message);
@@ -58,7 +58,6 @@ const LoginPage: React.FC = () => {
     setFullName('');
     setError('');
     setShowPassword(false);
-    setFocusedField('');
   };
 
   const toggleMode = () => {
@@ -66,326 +65,250 @@ const LoginPage: React.FC = () => {
     resetForm();
   };
 
-  // Floating particles for background animation
-  const particles = Array.from({ length: 15 }, (_, i) => (
-    <motion.div
-      key={i}
-      className="absolute w-1 h-1 bg-white/20 rounded-full"
-      initial={{
-        x: Math.random() * 400,
-        y: Math.random() * 600,
-      }}
-      animate={{
-        x: Math.random() * 400,
-        y: Math.random() * 600,
-      }}
-      transition={{
-        duration: Math.random() * 20 + 10,
-        repeat: Infinity,
-        ease: "linear"
-      }}
-    />
-  ));
+  const features = [
+    { icon: Sparkles, text: 'AI-powered feedback on every answer' },
+    { icon: Target, text: 'Practice with real interview scenarios' },
+    { icon: Zap, text: 'Track your progress over time' },
+  ];
 
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-400/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
+    <div className="min-h-screen bg-[#030305] flex relative overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute inset-0 grid-pattern opacity-20" />
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-orange-500/5 rounded-full blur-[150px]" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-orange-400/5 rounded-full blur-[120px]" />
+
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 relative z-10 flex-col justify-between p-12">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-3">
+          <RedPandaLogo size="lg" animate={true} />
+          <span className="text-2xl font-bold text-white">Kelv AI</span>
+        </Link>
+
+        {/* Main content */}
+        <div className="max-w-lg">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-5xl font-bold text-white leading-tight mb-6"
+          >
+            Interview prep that{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-300">
+              actually works.
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-xl text-gray-400 mb-12"
+          >
+            Join thousands preparing smarter with AI that watches, listens, and coaches you to interview success.
+          </motion.p>
+
+          {/* Features */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="space-y-4"
+          >
+            {features.map((feature, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.3 + i * 0.1 }}
+                className="flex items-center gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                  <feature.icon className="w-5 h-5 text-orange-400" />
+                </div>
+                <span className="text-gray-300">{feature.text}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Footer */}
+        <p className="text-gray-500 text-sm">
+          © 2024 Kelv AI. All rights reserved.
+        </p>
       </div>
 
-      {/* Back to home link */}
-      <Link
-        to="/"
-        className="absolute top-8 left-8 flex items-center gap-3 text-gray-400 hover:text-orange-400 transition-all duration-300 z-10 group"
-      >
-        <RedPandaLogo size="md" animate={true} className="group-hover:scale-110 transition-transform" />
-        <span className="text-xl font-bold group-hover:text-orange-400 transition-colors">Kelv AI</span>
-      </Link>
-
-      {/* Configuration warning */}
-      {!isConfigured && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-center gap-3 text-yellow-400 z-10">
-          <AlertCircle className="w-5 h-5" />
-          <span className="text-sm">Demo mode - Database not configured</span>
-        </div>
-      )}
-
-      {/* Main container */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="bg-dark-800/90 backdrop-blur-xl rounded-3xl shadow-2xl shadow-orange-500/10 overflow-hidden min-h-[650px] flex border border-dark-700/50 relative"
-      >
-        {/* Form Panel */}
-        <motion.div 
-          className="w-1/2 p-12 flex flex-col justify-center relative"
-          animate={{ 
-            x: isSignUp ? 0 : 0,
-          }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
+      {/* Right side - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-md"
         >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={isSignUp ? 'signup' : 'signin'}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.4, ease: "easeInOut" }}
-              className="w-full"
-            >
-              <div className="mb-8">
-                <motion.h1 
-                  className="text-4xl font-bold text-white mb-3"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  {isSignUp ? 'Join the Waitlist' : 'Welcome Back'}
-                </motion.h1>
-                <motion.p 
-                  className="text-gray-400"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  {isSignUp ? 'Get early access to AI-powered interview preparation' : 'Sign in to access your account'}
-                </motion.p>
-              </div>
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            <Link to="/" className="inline-flex items-center gap-3">
+              <RedPandaLogo size="lg" animate={true} />
+              <span className="text-2xl font-bold text-white">Kelv AI</span>
+            </Link>
+          </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <AnimatePresence mode="wait">
-                  {isSignUp && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0, y: -20 }}
-                      animate={{ opacity: 1, height: 'auto', y: 0 }}
-                      exit={{ opacity: 0, height: 0, y: -20 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="mb-6"
-                    >
-                      <div className="relative group">
+          {/* Form card */}
+          <div className="bg-dark-800/60 backdrop-blur-xl rounded-3xl border border-dark-700/50 p-8 shadow-2xl shadow-black/20">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={isSignUp ? 'signup' : 'signin'}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+              >
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-semibold text-white mb-2">
+                    {isSignUp ? 'Join the Waitlist' : 'Welcome back'}
+                  </h2>
+                  <p className="text-gray-400 text-sm">
+                    {isSignUp
+                      ? 'Get early access when we launch'
+                      : 'Sign in to check your status'
+                    }
+                  </p>
+                </div>
+
+                {/* Configuration warning */}
+                {!isConfigured && (
+                  <div className="mb-6 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-400 text-sm text-center">
+                    Demo mode
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Name field (sign up only) */}
+                  <AnimatePresence>
+                    {isSignUp && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Full Name
+                        </label>
                         <input
                           type="text"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
-                          onFocus={() => setFocusedField('fullName')}
-                          onBlur={() => setFocusedField('')}
-                          className="w-full px-6 py-4 bg-dark-700/50 border border-dark-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all duration-300"
-                          placeholder="Full Name"
+                          className="w-full px-4 py-3.5 bg-dark-900/80 border border-dark-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                          placeholder="Your name"
                           required
                         />
-                        <motion.div
-                          className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/20 to-orange-400/20 opacity-0 pointer-events-none"
-                          animate={{ opacity: focusedField === 'fullName' ? 1 : 0 }}
-                          transition={{ duration: 0.3 }}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                <motion.div
-                  className="relative group"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onFocus={() => setFocusedField('email')}
-                    onBlur={() => setFocusedField('')}
-                    className="w-full px-6 py-4 bg-dark-700/50 border border-dark-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all duration-300"
-                    placeholder="Email Address"
-                    required
-                  />
-                  <motion.div
-                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/20 to-orange-400/20 opacity-0 pointer-events-none"
-                    animate={{ opacity: focusedField === 'email' ? 1 : 0 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </motion.div>
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-dark-900/80 border border-dark-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                      placeholder="you@email.com"
+                      required
+                    />
+                  </div>
 
-                <motion.div
-                  className="relative group"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField('')}
-                    className="w-full px-6 py-4 pr-14 bg-dark-700/50 border border-dark-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all duration-300"
-                    placeholder="Password"
-                    required
-                  />
-                  <motion.div
-                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/20 to-orange-400/20 opacity-0 pointer-events-none"
-                    animate={{ opacity: focusedField === 'password' ? 1 : 0 }}
-                    transition={{ duration: 0.3 }}
-                  />
+                  {/* Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-4 py-3.5 pr-12 bg-dark-900/80 border border-dark-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                        placeholder={isSignUp ? 'Create a password' : 'Your password'}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {isSignUp && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        This will be your login password once approved.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Error */}
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm"
+                      >
+                        {error}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Submit button */}
                   <motion.button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-400 transition-colors z-10"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    type="submit"
+                    disabled={loading}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-400 hover:to-orange-300 text-white font-medium rounded-xl transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </motion.button>
-                </motion.div>
-
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.9 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.9 }}
-                      className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-2"
-                    >
-                      <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-xl font-semibold hover:from-orange-400 hover:to-orange-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/25 relative overflow-hidden group mt-8"
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
                     {loading ? (
-                      <>
-                        <motion.div 
-                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        />
-                        {isSignUp ? 'Joining Waitlist...' : 'Signing In...'}
-                      </>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
                         {isSignUp ? 'Join Waitlist' : 'Sign In'}
-                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className="w-4 h-4" />
                       </>
                     )}
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-300 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                </motion.button>
-              </form>
-            </motion.div>
-          </AnimatePresence>
-        </motion.div>
+                  </motion.button>
+                </form>
+              </motion.div>
+            </AnimatePresence>
 
-        {/* Welcome Panel */}
-        <motion.div
-          className="w-1/2 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-12 flex flex-col justify-center items-center text-white relative overflow-hidden"
-          animate={{ 
-            x: isSignUp ? 0 : 0,
-          }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
-        >
-          {/* Animated background elements */}
-          <div className="absolute inset-0">
-            {particles}
-            <div className="absolute top-10 left-10 w-32 h-32 border border-white/10 rounded-full animate-pulse"></div>
-            <div className="absolute bottom-20 right-10 w-24 h-24 border border-white/10 rounded-full animate-pulse delay-1000"></div>
-            <div className="absolute top-1/2 left-1/4 w-16 h-16 border border-white/10 rounded-full animate-pulse delay-500"></div>
+            {/* Toggle mode */}
+            <div className="mt-8 pt-6 border-t border-dark-700/50 text-center">
+              <p className="text-gray-400 text-sm">
+                {isSignUp ? 'Already on the waitlist?' : "Don't have an account?"}
+              </p>
+              <button
+                onClick={toggleMode}
+                className="mt-2 text-orange-400 hover:text-orange-300 font-medium transition-colors"
+              >
+                {isSignUp ? 'Sign in instead' : 'Join the waitlist'}
+              </button>
+            </div>
           </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={isSignUp ? 'welcome-signin' : 'welcome-signup'}
-              initial={{ opacity: 0, y: 30, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -30, scale: 0.9 }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-              className="text-center relative z-10 w-full max-w-sm"
-            >
-              <motion.div
-                className="mb-6"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-              >
-                <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                  {isSignUp ? (
-                    <Brain className="w-10 h-10 text-white" />
-                  ) : (
-                    <Sparkles className="w-10 h-10 text-white" />
-                  )}
-                </div>
-              </motion.div>
-
-              <motion.h2 
-                className="text-4xl font-bold mb-6"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                {isSignUp ? 'Welcome Back!' : 'Join the Revolution!'}
-              </motion.h2>
-              
-              <motion.p 
-                className="text-lg mb-8 opacity-90 leading-relaxed"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                {isSignUp 
-                  ? 'Ready to check your waitlist status and get the latest updates?'
-                  : 'Be among the first to experience the future of AI-powered interview preparation'
-                }
-              </motion.p>
-
-              {/* Feature highlights */}
-              <motion.div
-                className="mb-8 space-y-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <div className="flex items-center gap-3 text-sm opacity-80">
-                  <Target className="w-4 h-4" />
-                  <span>{isSignUp ? 'Waitlist Status Updates' : 'Early Access Benefits'}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm opacity-80">
-                  <Zap className="w-4 h-4" />
-                  <span>{isSignUp ? 'Member Dashboard' : 'Exclusive Member Pricing'}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm opacity-80">
-                  <Brain className="w-4 h-4" />
-                  <span>{isSignUp ? 'Latest News & Updates' : 'Priority Support & Updates'}</span>
-                </div>
-              </motion.div>
-              
-              <motion.button
-                onClick={toggleMode}
-                className="px-8 py-3 border-2 border-white/80 text-white rounded-full font-semibold hover:bg-white hover:text-orange-600 transition-all duration-300 backdrop-blur-sm"
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                {isSignUp ? 'SIGN IN' : 'JOIN WAITLIST'}
-              </motion.button>
-            </motion.div>
-          </AnimatePresence>
+          {/* Mobile footer */}
+          <p className="lg:hidden text-center text-gray-500 text-xs mt-6">
+            © 2024 Kelv AI. All rights reserved.
+          </p>
         </motion.div>
-      </motion.div>
+      </div>
     </div>
   );
 };

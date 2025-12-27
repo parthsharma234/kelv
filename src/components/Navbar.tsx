@@ -10,11 +10,11 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  
+
   const { user, signOut, isPlatformEnabled } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 10) {
@@ -23,7 +23,7 @@ const Navbar: React.FC = () => {
         setIsScrolled(false);
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -52,7 +52,7 @@ const Navbar: React.FC = () => {
 
   const handleNavClick = (href: string) => {
     setIsOpen(false);
-    
+
     // If we're on a different page, navigate to home first
     if (location.pathname !== '/') {
       navigate('/', { state: { scrollTo: href } });
@@ -64,7 +64,7 @@ const Navbar: React.FC = () => {
       }
     }
   };
-  
+
   // Add effect to handle scroll after navigation
   useEffect(() => {
     const state = location.state as { scrollTo?: string } | null;
@@ -80,12 +80,11 @@ const Navbar: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location]);
-  
+
   return (
-    <header 
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-dark-900/95 backdrop-blur-md py-3 shadow-lg' : 'bg-transparent py-5'
-      }`}
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-dark-900/95 backdrop-blur-md py-3 shadow-lg' : 'bg-transparent py-5'
+        }`}
     >
       <div className="container">
         <nav className="flex items-center justify-between">
@@ -93,29 +92,22 @@ const Navbar: React.FC = () => {
             <RedPandaLogo size="md" animate={true} />
             <span className="text-2xl font-bold gradient-text">Kelv AI</span>
           </Link>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <button 
+            <button
               onClick={() => handleNavClick('#features')}
               className="text-gray-300 hover:text-orange-400 transition-colors duration-300 whitespace-nowrap"
             >
               Features
             </button>
-            <button 
-              onClick={() => handleNavClick('#how-it-works')}
-              className="text-gray-300 hover:text-orange-400 transition-colors duration-300 whitespace-nowrap"
-            >
-              How It Works
-            </button>
             <button
               onClick={handlePlatformClick}
-              className="flex items-center gap-2 text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium whitespace-nowrap"
+              className="text-gray-300 hover:text-orange-400 transition-colors duration-300 font-medium whitespace-nowrap"
             >
-              <Brain className="w-4 h-4" />
               Platform
             </button>
-            
+
             {user ? (
               <div className="relative">
                 <button
@@ -127,52 +119,52 @@ const Navbar: React.FC = () => {
                   </div>
                   <span className="text-sm font-medium whitespace-nowrap">{user.user_metadata?.full_name || user.email}</span>
                 </button>
-                
+
                 <AnimatePresence>
-                {showUserMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-dark-700 rounded-xl shadow-xl overflow-hidden"
-                  >
-                    <div className="p-4 border-b border-dark-700">
-                      <p className="text-sm text-gray-400">Signed in as</p>
-                      <p className="font-medium truncate">{user.email}</p>
-                    </div>
-                    <Link
-                      to="/waitlist-success"
-                      className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
-                      onClick={() => setShowUserMenu(false)}
+                  {showUserMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-dark-700 rounded-xl shadow-xl overflow-hidden"
                     >
-                      <RedPandaLogo size="sm" animate={false} />
-                      Waitlist Status
-                    </Link>
-                    {isPlatformEnabled && (
+                      <div className="p-4 border-b border-dark-700">
+                        <p className="text-sm text-gray-400">Signed in as</p>
+                        <p className="font-medium truncate">{user.email}</p>
+                      </div>
                       <Link
-                        to="/platform"
+                        to="/waitlist-success"
                         className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
                         onClick={() => setShowUserMenu(false)}
                       >
-                        <Brain className="w-4 h-4 text-orange-400" />
-                        Interview Platform
+                        <RedPandaLogo size="sm" animate={false} />
+                        Waitlist Status
                       </Link>
-                    )}
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 text-red-400"
-                      disabled={isSigningOut}
-                    >
-                      {isSigningOut ? (
-                        <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-2" />
-                      ) : (
-                        <LogOut className="w-4 h-4" />
+                      {isPlatformEnabled && (
+                        <Link
+                          to="/platform"
+                          className="block px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 whitespace-nowrap"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <Brain className="w-4 h-4 text-orange-400" />
+                          Interview Platform
+                        </Link>
                       )}
-                      {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                    </button>
-                  </motion.div>
-                )}
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-dark-700 transition-colors flex items-center gap-3 text-red-400"
+                        disabled={isSigningOut}
+                      >
+                        {isSigningOut ? (
+                          <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-2" />
+                        ) : (
+                          <LogOut className="w-4 h-4" />
+                        )}
+                        {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                      </button>
+                    </motion.div>
+                  )}
                 </AnimatePresence>
               </div>
             ) : (
@@ -183,7 +175,7 @@ const Navbar: React.FC = () => {
                 >
                   Sign In
                 </Link>
-                <button 
+                <button
                   onClick={() => handleNavClick('#waitlist')}
                   className="btn btn-primary whitespace-nowrap"
                 >
@@ -192,40 +184,33 @@ const Navbar: React.FC = () => {
               </>
             )}
           </div>
-          
+
           {/* Mobile Navigation Toggle */}
-          <button 
+          <button
             className="md:hidden text-gray-300 hover:text-orange-400"
             onClick={() => setIsOpen(!isOpen)}
           >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </nav>
-        
+
         {/* Mobile Navigation Menu */}
         {isOpen && (
           <div className="md:hidden absolute top-full left-0 right-0 bg-dark-800 border-t border-dark-700 animate-slide-down">
             <div className="container py-4 flex flex-col space-y-4">
-              <button 
+              <button
                 onClick={() => handleNavClick('#features')}
                 className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
               >
                 Features
               </button>
-              <button 
-                onClick={() => handleNavClick('#how-it-works')}
-                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
-              >
-                How It Works
-              </button>
               <button
                 onClick={handlePlatformClick}
-                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300 flex items-center gap-2"
+                className="text-left text-gray-300 hover:text-orange-400 transition-colors py-2 duration-300"
               >
-                <Brain className="w-4 h-4" />
                 Platform
               </button>
-              
+
               {user ? (
                 <>
                   <Link
@@ -260,7 +245,7 @@ const Navbar: React.FC = () => {
                   >
                     Sign In
                   </Link>
-                  <button 
+                  <button
                     onClick={() => handleNavClick('#waitlist')}
                     className="btn btn-primary w-full"
                   >
