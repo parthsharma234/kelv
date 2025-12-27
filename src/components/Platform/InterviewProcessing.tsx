@@ -85,7 +85,8 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
           onComplete({
             metrics,
             transcript: sessionData.transcript,
-            duration: sessionData.duration
+            duration: sessionData.duration,
+            postureData: sessionData.postureData  // Pass through posture data
           });
         }, 800);
 

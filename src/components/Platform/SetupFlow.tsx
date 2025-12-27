@@ -14,6 +14,7 @@ import {
 interface SetupFlowProps {
   onComplete: (setup: InterviewSetup) => void;
   onBack: () => void;
+  initialSetup?: Partial<InterviewSetup>;
 }
 
 type StepId = 'industry' | 'jobType' | 'experienceLevel' | 'interviewMode';
@@ -107,9 +108,9 @@ const SummaryRow = ({ label, value }: { label: string; value?: string }) => (
   </div>
 );
 
-export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack }) => {
+export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initialSetup }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [setup, setSetup] = useState<Partial<InterviewSetup>>({ interviewMode: 'voice' });
+  const [setup, setSetup] = useState<Partial<InterviewSetup>>(initialSetup || { interviewMode: 'voice' });
   const [savedSetups, setSavedSetups] = useState<SavedInterviewSetup[]>([]);
   const [isLoadingSetups, setIsLoadingSetups] = useState(true);
   const [setupName, setSetupName] = useState('');

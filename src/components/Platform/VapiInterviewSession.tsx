@@ -4,11 +4,13 @@ import {
     Mic, MicOff, Video, VideoOff,
     FileText, ArrowLeft, Upload,
     PanelLeftClose, PanelLeftOpen,
-    Sparkles, Loader2
+    Sparkles, Loader2, Dumbbell
 } from 'lucide-react';
 import { useVapiInterview } from '../../hooks/useVapiInterview';
 import { useInterviewRecorder } from '../../hooks/useInterviewRecorder';
+import { usePoseTracking } from '../../hooks/usePoseTracking';
 import AIInterviewer from './AIInterviewer';
+import InteractiveWarmUp from './InteractiveWarmUp';
 import { extractTextFromPDF, isPDF, isTextFile } from '../../utils/pdfUtils';
 
 interface VapiInterviewSessionProps {
@@ -22,6 +24,8 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 }) => {
     // Pre-interview state
     const [previewPhase, setPreviewPhase] = useState(true);
+    const [showWarmUp, setShowWarmUp] = useState(false);
+    const [completedWarmUp, setCompletedWarmUp] = useState(false);
     const [tempJD, setTempJD] = useState('');
     const [tempResume, setTempResume] = useState('');
     const [resumeFileName, setResumeFileName] = useState<string | null>(null);
@@ -30,13 +34,16 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     const [isParsingResume, setIsParsingResume] = useState(false);
     const [resumeError, setResumeError] = useState<string | null>(null);
 
+    // Refs - must be declared before hooks that use them
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const previewVideoRef = useRef<HTMLVideoElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const transcriptEndRef = useRef<HTMLDivElement>(null);
+
     // Media state
     // REF ensures cleanup functions always interpret the latest stream, avoiding stale closures
     const streamRef = useRef<MediaStream | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
-
-    // Initialize Recorder
-    const { startRecording, stopRecording, recordedBlob } = useInterviewRecorder({ stream });
 
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
@@ -45,11 +52,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     // UI state
     const [showTranscript, setShowTranscript] = useState(true);
 
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const previewVideoRef = useRef<HTMLVideoElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const transcriptEndRef = useRef<HTMLDivElement>(null);
-
+    // Initialize Vapi Interview hook first (provides status needed by other hooks)
     const {
         status,
         isAISpeaking,
@@ -61,6 +64,16 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     } = useVapiInterview({
         onComplete,
         onError: (err) => setCameraError(err),
+    });
+
+    // Initialize Recorder
+    const { startRecording, stopRecording, recordedBlob } = useInterviewRecorder({ stream });
+
+    // Initialize Posture Tracking (samples every 10 seconds during interview)
+    const { aggregatedData: postureData, currentPosture, isInitialized: poseReady } = usePoseTracking({
+        videoRef,
+        enabled: status === 'interviewing' && !isVideoOff,
+        sampleIntervalMs: 10000
     });
 
     const formatTime = (seconds: number): string => {
@@ -240,7 +253,13 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
             const sessionData = {
                 transcript,
                 duration,
-                recordingBlob: recordedBlob
+                recordingBlob: recordedBlob,
+                postureData: postureData ? {
+                    shoulderAlignment: postureData.shoulderAlignment,
+                    headPosition: postureData.headPosition,
+                    overallScore: postureData.overallScore,
+                    timeInGoodPosture: postureData.timeInGoodPosture
+                } : undefined
             };
             onComplete(sessionData);
         } else if (status === 'completed' && !recordedBlob) {
@@ -248,7 +267,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
             console.log('[Session] Status completed, waiting for blob...');
             stopRecording();
         }
-    }, [status, recordedBlob, transcript, duration, onComplete, stopRecording]);
+    }, [status, recordedBlob, transcript, duration, postureData, onComplete, stopRecording]);
 
     const handleStartInterview = async () => {
         if (!tempJD.trim() || !tempResume.trim()) return;
@@ -269,6 +288,32 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     };
 
     const isReady = tempJD.trim().length > 0 && tempResume.trim().length > 0 && stream;
+
+    // Warm-up handlers
+    const handleStartWarmUp = () => {
+        setShowWarmUp(true);
+    };
+
+    const handleWarmUpComplete = () => {
+        setShowWarmUp(false);
+        setCompletedWarmUp(true);
+    };
+
+    const handleWarmUpSkip = () => {
+        setShowWarmUp(false);
+    };
+
+    // ===================
+    // WARM-UP SCREEN
+    // ===================
+    if (showWarmUp) {
+        return (
+            <InteractiveWarmUp
+                onComplete={handleWarmUpComplete}
+                onSkip={handleWarmUpSkip}
+            />
+        );
+    }
 
     // ===================
     // PRE-INTERVIEW LOBBY
@@ -320,6 +365,35 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                     </button>
                                     <button onClick={toggleVideo} className={`p-3 rounded-xl transition-all ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
                                         {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Warm-Up Section */}
+                            <div className="bg-black/40 border border-white/5 rounded-2xl p-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${completedWarmUp ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                                            <Dumbbell className={`w-5 h-5 ${completedWarmUp ? 'text-green-400' : 'text-orange-400'}`} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium">Pre-Interview Warm-Up</h3>
+                                            <p className="text-xs text-gray-500">
+                                                {completedWarmUp
+                                                    ? 'Completed - You\'re ready!'
+                                                    : 'Posture, breathing & voice exercises'
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleStartWarmUp}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${completedWarmUp
+                                                ? 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                                : 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20'
+                                            }`}
+                                    >
+                                        {completedWarmUp ? 'Redo' : 'Start Warm-Up'}
                                     </button>
                                 </div>
                             </div>
@@ -493,6 +567,14 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                         <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1 rounded-lg text-xs font-medium text-white/80 backdrop-blur-sm border border-white/5">
                             Candidate Feed
                         </div>
+                        {poseReady && currentPosture && (
+                            <div className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-xs font-medium backdrop-blur-sm border ${currentPosture.isGoodPosture
+                                    ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                                    : 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
+                                }`}>
+                                {currentPosture.isGoodPosture ? 'Good Posture' : 'Adjust Posture'}
+                            </div>
+                        )}
                     </div>
                 </main>
 
