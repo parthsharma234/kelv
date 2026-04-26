@@ -3,7 +3,7 @@ import { Menu, X, User, LogOut, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import RedPandaLogo from './RedPandaLogo';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,14 +16,7 @@ const Navbar: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 10) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
-    };
-
+    const handleScroll = () => setIsScrolled(window.scrollY > 8);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -38,7 +31,6 @@ const Navbar: React.FC = () => {
 
   const handlePlatformClick = () => {
     if (user) {
-      // If we're already on the platform page, scroll to top
       if (location.pathname === '/platform') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
@@ -52,216 +44,233 @@ const Navbar: React.FC = () => {
 
   const handleNavClick = (href: string) => {
     setIsOpen(false);
-
-    // If we're on a different page, navigate to home first
     if (location.pathname !== '/') {
       navigate('/', { state: { scrollTo: href } });
     } else {
-      // We're on the home page, just scroll
-      const element = document.querySelector(href);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
+      document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  // Add effect to handle scroll after navigation
   useEffect(() => {
     const state = location.state as { scrollTo?: string } | null;
     if (state?.scrollTo) {
-      // Wait for the page to render
       setTimeout(() => {
-        const element = document.querySelector(state.scrollTo!);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }
+        document.querySelector(state.scrollTo!)?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-      // Clear the state
       window.history.replaceState({}, document.title);
     }
   }, [location]);
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${
         isScrolled
-          ? 'bg-[#050508]/90 backdrop-blur-xl border-b border-white/5 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)]'
-          : 'bg-transparent py-6'
+          ? 'border-b border-[var(--border)] bg-[var(--bg)]/90 backdrop-blur-[20px]'
+          : 'border-b border-transparent bg-transparent'
       }`}
+      style={{ height: 'var(--header-h)' }}
     >
-      <div className="container">
-        <nav className="flex items-center justify-between">
-          <Link to="/" className="flex items-center space-x-3">
-            <RedPandaLogo size="md" animate={true} />
-            <span className="text-2xl font-bold gradient-text">Kelv AI</span>
-          </Link>
+      <div
+        className="flex items-center justify-between h-full"
+        style={{ maxWidth: 'calc(var(--page-max) + var(--page-outer) * 2)', margin: '0 auto', padding: '0 var(--page-outer)' }}
+      >
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2.5 no-underline">
+          <RedPandaLogo size="md" animate={true} />
+          <span style={{ fontSize: '15px', fontWeight: 'var(--fw-semi)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
+            Kelv
+          </span>
+        </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <button
-              onClick={() => handleNavClick('#features')}
-              className="text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300 whitespace-nowrap"
-            >
-              Features
-            </button>
-            <button
-              onClick={handlePlatformClick}
-              className="text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300 whitespace-nowrap"
-            >
-              Platform
-            </button>
+        {/* Desktop nav — flat links, no pill container */}
+        <nav className="hidden md:flex items-center gap-6">
+          <button
+            onClick={() => handleNavClick('#features')}
+            style={{ fontSize: '14px', fontWeight: 'var(--fw-regular)', color: 'var(--text-3)' }}
+            className="transition-colors duration-150 hover:text-[var(--text)] bg-none border-none cursor-pointer p-0"
+          >
+            Features
+          </button>
+          <button
+            onClick={handlePlatformClick}
+            style={{ fontSize: '14px', fontWeight: 'var(--fw-regular)', color: 'var(--text-3)' }}
+            className="transition-colors duration-150 hover:text-[var(--text)] bg-none border-none cursor-pointer p-0"
+          >
+            Platform
+          </button>
 
-            {user ? (
-              <div className="relative">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:border-white/20 transition-colors whitespace-nowrap"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-200 whitespace-nowrap">
-                    {user.user_metadata?.full_name || user.email}
-                  </span>
-                </button>
+          {user ? (
+            <div className="relative ml-2">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 transition-colors duration-150"
+                style={{ fontSize: '14px', color: 'var(--text-3)' }}
+              >
+                <div className="w-7 h-7 rounded-full bg-[var(--orange)] flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-white" />
+                </div>
+                <span style={{ color: 'var(--text-2)' }}>
+                  {user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0]}
+                </span>
+              </button>
 
-                <AnimatePresence>
-                  {showUserMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute right-0 top-full mt-3 w-56 bg-[#0a0a0f]/95 border border-white/10 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl"
+              <AnimatePresence>
+                {showUserMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-52 overflow-hidden"
+                    style={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: '11px', color: 'var(--text-4)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Signed in as</p>
+                      <p className="truncate mt-0.5" style={{ fontSize: '13px', color: 'var(--text-2)' }}>{user.email}</p>
+                    </div>
+                    <Link
+                      to="/waitlist-success"
+                      className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
+                      style={{ fontSize: '13px', color: 'var(--text-3)', textDecoration: 'none' }}
+                      onClick={() => setShowUserMenu(false)}
                     >
-                      <div className="p-4 border-b border-white/10">
-                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Signed in as</p>
-                        <p className="font-medium text-gray-200 truncate">{user.email}</p>
-                      </div>
+                      <RedPandaLogo size="sm" animate={false} />
+                      Waitlist Status
+                    </Link>
+                    {isPlatformEnabled && (
                       <Link
-                        to="/waitlist-success"
-                        className="block px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-3 whitespace-nowrap"
+                        to="/platform"
+                        className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
+                        style={{ fontSize: '13px', color: 'var(--text-3)', textDecoration: 'none' }}
                         onClick={() => setShowUserMenu(false)}
                       >
-                        <RedPandaLogo size="sm" animate={false} />
-                        Waitlist Status
+                        <Brain className="w-3.5 h-3.5" style={{ color: 'var(--orange)' }} />
+                        Interview Platform
                       </Link>
-                      {isPlatformEnabled && (
-                        <Link
-                          to="/platform"
-                          className="block px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-3 whitespace-nowrap"
-                          onClick={() => setShowUserMenu(false)}
-                        >
-                          <Brain className="w-4 h-4 text-orange-400" />
-                          Interview Platform
-                        </Link>
+                    )}
+                    <button
+                      onClick={handleSignOut}
+                      disabled={isSigningOut}
+                      className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
+                      style={{ fontSize: '13px', color: '#f87171', borderTop: '1px solid var(--border)' }}
+                    >
+                      {isSigningOut ? (
+                        <div className="w-3.5 h-3.5 border border-red-400/60 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <LogOut className="w-3.5 h-3.5" />
                       )}
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors flex items-center gap-3 text-red-400"
-                        disabled={isSigningOut}
-                      >
-                        {isSigningOut ? (
-                          <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-2" />
-                        ) : (
-                          <LogOut className="w-4 h-4" />
-                        )}
-                        {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="text-sm font-semibold text-gray-300 hover:text-white transition-colors duration-300 whitespace-nowrap border border-white/10 rounded-full px-4 py-2 hover:border-white/20"
-                >
-                  Sign In
-                </Link>
-                <button
-                  onClick={() => handleNavClick('#waitlist')}
-                  className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-400 whitespace-nowrap"
-                >
-                  Join Waitlist
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Mobile Navigation Toggle */}
-          <button
-            className="md:hidden text-gray-300 hover:text-white"
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+                      {isSigningOut ? 'Signing out…' : 'Sign out'}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="btn-ghost ml-2"
+              >
+                Log in
+              </Link>
+              <button
+                onClick={() => handleNavClick('#waitlist')}
+                className="btn-primary"
+                style={{ fontSize: '13px', padding: '8px 18px' }}
+              >
+                Request access
+              </button>
+            </>
+          )}
         </nav>
 
-        {/* Mobile Navigation Menu */}
+        {/* Mobile toggle */}
+        <button
+          className="md:hidden p-1 transition-colors"
+          style={{ color: 'var(--text-3)' }}
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* Mobile menu */}
+      <AnimatePresence>
         {isOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-[#070709]/95 border-t border-white/10 backdrop-blur-xl animate-slide-down">
-            <div className="container py-4 flex flex-col space-y-4">
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="md:hidden absolute top-full left-0 right-0"
+            style={{
+              background: 'var(--bg)',
+              borderBottom: '1px solid var(--border)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            <div className="flex flex-col py-4" style={{ padding: '16px var(--page-outer)' }}>
               <button
                 onClick={() => handleNavClick('#features')}
-                className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
+                className="text-left py-3 transition-colors"
+                style={{ fontSize: '14px', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)' }}
               >
                 Features
               </button>
               <button
                 onClick={handlePlatformClick}
-                className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
+                className="text-left py-3 transition-colors"
+                style={{ fontSize: '14px', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)' }}
               >
                 Platform
               </button>
-
               {user ? (
                 <>
                   <Link
                     to="/waitlist-success"
-                    className="text-gray-300 hover:text-white transition-colors py-2 duration-300"
+                    className="py-3 transition-colors"
+                    style={{ fontSize: '14px', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)', textDecoration: 'none' }}
                     onClick={() => setIsOpen(false)}
                   >
                     Waitlist Status
                   </Link>
                   <button
-                    onClick={() => {
-                      handleSignOut();
-                      setIsOpen(false);
-                    }}
-                    className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
+                    onClick={() => { handleSignOut(); setIsOpen(false); }}
                     disabled={isSigningOut}
+                    className="text-left py-3 transition-colors"
+                    style={{ fontSize: '14px', color: '#f87171' }}
                   >
-                    {isSigningOut ? (
-                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
-                    ) : (
-                      <LogOut className="w-4 h-4" />
-                    )}
-                    {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                    {isSigningOut ? 'Signing out…' : 'Sign out'}
                   </button>
                 </>
               ) : (
                 <>
                   <Link
                     to="/login"
-                    className="text-left text-gray-300 hover:text-white transition-colors py-2 duration-300"
+                    className="py-3 transition-colors"
+                    style={{ fontSize: '14px', color: 'var(--text-3)', textDecoration: 'none', borderBottom: '1px solid var(--border-soft)' }}
                     onClick={() => setIsOpen(false)}
                   >
-                    Sign In
+                    Log in
                   </Link>
-                  <button
-                    onClick={() => handleNavClick('#waitlist')}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-400"
-                  >
-                    Join Waitlist
-                  </button>
+                  <div className="pt-4">
+                    <button
+                      onClick={() => handleNavClick('#waitlist')}
+                      className="btn-primary w-full justify-center"
+                    >
+                      Request access
+                    </button>
+                  </div>
                 </>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </header>
   );
 };

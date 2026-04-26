@@ -1,8 +1,6 @@
-import { HumeJobPrediction } from './humeBatchClient';
-import { TranscriptMessage, StrengthWeakness } from './analyticsEngine';
 import { IdealAnswerComparator } from './idealAnswerComparison';
+import { InterviewMetrics, PostureAnalysisData, StrengthWeakness, TranscriptMessage } from './analyticsEngine';
 
-// --- TYPES ---
 export interface QuestionMetrics {
   questionId: string;
   questionNumber: number;
@@ -10,37 +8,25 @@ export interface QuestionMetrics {
   answerText: string;
   questionTimestamp: Date;
   answerTimestamp: Date;
-
-  // Scores (0-100)
   contentScore: number;
   deliveryScore: number;
   presenceScore: number;
   overallScore: number;
-
-  // Voice Metrics
   wpm: number;
   fillerWordCount: number;
   weakWordCount: number;
-  voiceConfidence: number; // 0-100
-  tonalVariety: number; // 0-100
-
-  // Content Quality
+  voiceConfidence: number;
+  tonalVariety: number;
   starKeywordCount: number;
   numberCount: number;
-  responseLength: number; // word count
-
-  // Face Metrics
-  faceConfidence: number; // 0-100
-  anxietyLevel: number; // 0-100
+  responseLength: number;
+  faceConfidence: number;
+  anxietyLevel: number;
   dominantExpression: string;
-
-  // Feedback
   strengths: StrengthWeakness[];
   weaknesses: StrengthWeakness[];
-
-  // For ideal answer comparison (Phase 1 Feature 2)
-  idealAnswerSimilarity?: number; // 0-100, added later
-  missingKeyPoints?: string[]; // added later
+  idealAnswerSimilarity?: number;
+  missingKeyPoints?: string[];
 }
 
 export interface PerQuestionAnalysis {
@@ -55,20 +41,25 @@ export interface PerQuestionAnalysis {
   };
 }
 
-// --- PER-QUESTION ANALYTICS ENGINE ---
+interface QuestionPair {
+  question: TranscriptMessage;
+  answer: TranscriptMessage;
+}
+
+interface PerQuestionOptions {
+  postureData?: PostureAnalysisData;
+  overallMetrics?: InterviewMetrics;
+}
+
 export class PerQuestionAnalytics {
   private static readonly FILLER_WORDS = ['um', 'uh', 'like', 'you know', 'basically', 'actually', 'so', 'well', 'literally', 'mean', 'right'];
   private static readonly WEAK_WORDS = ['maybe', 'i think', 'kind of', 'sort of', 'probably', 'perhaps', 'stuff', 'things'];
   private static readonly STAR_KEYWORDS = ['situation', 'task', 'action', 'result', 'outcome', 'challenge', 'solved', 'achieved', 'led'];
 
-  /**
-   * Main entry point: Process interview data and generate per-question metrics
-   */
   static process(
-    humeData: HumeJobPrediction[],
-    transcript: TranscriptMessage[]
+    transcript: TranscriptMessage[],
+    options: PerQuestionOptions = {}
   ): PerQuestionAnalysis {
-    // Step 1: Segment transcript into Q&A pairs
     const questionPairs = this.segmentTranscript(transcript);
 
     if (questionPairs.length === 0) {
@@ -80,127 +71,104 @@ export class PerQuestionAnalytics {
       };
     }
 
-    // Step 2: Extract Hume predictions
-    const predictions = humeData[0]?.results?.predictions[0]?.models;
-
-    // Step 3: Process each question
-    const questions: QuestionMetrics[] = questionPairs.map((pair, index) =>
-      this.processQuestion(pair, index + 1, predictions)
+    const questions = questionPairs.map((pair, index) =>
+      this.processQuestion(pair, index + 1, options)
     );
 
-    // Step 4: Identify strongest/weakest
     const sortedByScore = [...questions].sort((a, b) => b.overallScore - a.overallScore);
-    const strongestQuestion = sortedByScore[0] || null;
-    const weakestQuestion = sortedByScore[sortedByScore.length - 1] || null;
-
-    // Step 5: Calculate averages
-    const averageScores = this.calculateAverages(questions);
 
     return {
       questions,
-      strongestQuestion,
-      weakestQuestion,
-      averageScores
+      strongestQuestion: sortedByScore[0] || null,
+      weakestQuestion: sortedByScore[sortedByScore.length - 1] || null,
+      averageScores: this.calculateAverages(questions)
     };
   }
 
-  /**
-   * Segment transcript into question-answer pairs
-   */
-  private static segmentTranscript(transcript: TranscriptMessage[]): Array<{
-    question: TranscriptMessage;
-    answer: TranscriptMessage;
-  }> {
-    const pairs: Array<{ question: TranscriptMessage; answer: TranscriptMessage }> = [];
+  private static segmentTranscript(transcript: TranscriptMessage[]): QuestionPair[] {
+    const pairs: QuestionPair[] = [];
 
-    for (let i = 0; i < transcript.length - 1; i++) {
-      const current = transcript[i];
-      const next = transcript[i + 1];
+    for (let index = 0; index < transcript.length - 1; index += 1) {
+      const current = transcript[index];
+      const next = transcript[index + 1];
 
-      // Look for assistant (question) followed by user (answer)
       if (current.role === 'assistant' && next.role === 'user') {
-        pairs.push({
-          question: current,
-          answer: next
-        });
+        pairs.push({ question: current, answer: next });
       }
     }
 
     return pairs;
   }
 
-  /**
-   * Process a single question-answer pair
-   */
   private static processQuestion(
-    pair: { question: TranscriptMessage; answer: TranscriptMessage },
+    pair: QuestionPair,
     questionNumber: number,
-    predictions: any
+    options: PerQuestionOptions
   ): QuestionMetrics {
-    const { question, answer } = pair;
-
-    // Content Analysis
-    const content = answer.content || '';
-    const words = content.toLowerCase().split(/\s+/);
+    const content = pair.answer.content || '';
+    const words = this.getWords(content);
     const responseLength = words.length;
+    const responseLatencySec = Math.max(
+      1,
+      (new Date(pair.answer.timestamp).getTime() - new Date(pair.question.timestamp).getTime()) / 1000
+    );
 
-    // Filler words
-    let fillerCount = 0;
-    this.FILLER_WORDS.forEach(filler => {
-      const regex = new RegExp(`\\b${filler}\\b`, 'gi');
-      const matches = content.match(regex);
-      if (matches) fillerCount += matches.length;
+    const fillerCount = this.countMatches(content, this.FILLER_WORDS);
+    const weakWordCount = this.countPhraseMatches(content, this.WEAK_WORDS);
+    const starKeywordCount = this.countPhraseMatches(content, this.STAR_KEYWORDS);
+    const numberCount = /\d/.test(content) ? 1 : 0;
+
+    const wpm = Math.max(0, Math.min(220, Math.round((responseLength / responseLatencySec) * 60)));
+    const tonalVariety = this.estimateCadenceVariety({
+      content,
+      fillerCount,
+      responseLatencySec,
+      overallMetrics: options.overallMetrics
     });
 
-    // Weak words
-    let weakWordCount = 0;
-    this.WEAK_WORDS.forEach(word => {
-      if (content.toLowerCase().includes(word)) weakWordCount++;
+    const voiceConfidence = this.calculateVoiceConfidence({
+      responseLength,
+      responseLatencySec,
+      fillerCount,
+      weakWordCount,
+      tonalVariety
     });
 
-    // STAR keywords
-    let starKeywordCount = 0;
-    this.STAR_KEYWORDS.forEach(word => {
-      if (content.toLowerCase().includes(word)) starKeywordCount++;
+    const faceConfidence = this.calculateFaceConfidence({
+      postureData: options.postureData,
+      responseLatencySec,
+      overallMetrics: options.overallMetrics
     });
 
-    // Numbers/quantification
-    const numberCount = (/\d+/.test(content)) ? 1 : 0;
+    const hesitationLevel = Math.max(
+      0,
+      Math.min(100, Math.round(fillerCount * 10 + weakWordCount * 12 + Math.max(0, responseLatencySec - 8) * 4))
+    );
 
-    // WPM calculation
-    const answerTimestamp = new Date(answer.timestamp).getTime();
-    const questionTimestamp = new Date(question.timestamp).getTime();
-    const durationSec = Math.max(1, (answerTimestamp - questionTimestamp) / 1000);
-    const wpm = Math.round((responseLength / durationSec) * 60);
-
-    // Get Hume predictions for this specific time range
-    const humeMetrics = this.getHumeMetricsForTimeRange(predictions);
-
-    // Calculate Scores
-    const contentScore = this.calculateContentScore(
+    const contentScore = this.calculateContentScore({
       responseLength,
       starKeywordCount,
       numberCount,
       weakWordCount,
       fillerCount
-    );
+    });
 
-    const deliveryScore = this.calculateDeliveryScore(
-      humeMetrics.voiceConfidence,
+    const deliveryScore = this.calculateDeliveryScore({
+      voiceConfidence,
       wpm,
-      humeMetrics.tonalVariety
-    );
+      tonalVariety,
+      fillerCount,
+      responseLatencySec
+    });
 
-    const presenceScore = this.calculatePresenceScore(
-      humeMetrics.faceConfidence,
-      humeMetrics.anxietyLevel
-    );
+    const presenceScore = this.calculatePresenceScore({
+      faceConfidence,
+      hesitationLevel,
+      postureData: options.postureData
+    });
 
-    const overallScore = Math.round(
-      contentScore * 0.4 + deliveryScore * 0.3 + presenceScore * 0.3
-    );
+    const overallScore = Math.round(contentScore * 0.45 + deliveryScore * 0.35 + presenceScore * 0.2);
 
-    // Generate Feedback
     const { strengths, weaknesses } = this.generateFeedback({
       wpm,
       fillerCount,
@@ -208,28 +176,28 @@ export class PerQuestionAnalytics {
       starKeywordCount,
       numberCount,
       responseLength,
-      anxietyLevel: humeMetrics.anxietyLevel,
-      tonalVariety: humeMetrics.tonalVariety
+      hesitationLevel,
+      tonalVariety,
+      postureData: options.postureData
     });
 
-    // Ideal Answer Comparison
-    const idealAnswer = IdealAnswerComparator.findIdealAnswer(question.content);
+    const idealAnswer = IdealAnswerComparator.findIdealAnswer(pair.question.content);
     let idealAnswerSimilarity: number | undefined;
     let missingKeyPoints: string[] | undefined;
 
     if (idealAnswer) {
-      const comparison = IdealAnswerComparator.compareAnswer(answer.content, idealAnswer);
+      const comparison = IdealAnswerComparator.compareAnswer(pair.answer.content, idealAnswer);
       idealAnswerSimilarity = comparison.similarityScore;
       missingKeyPoints = comparison.missingKeyPoints;
     }
 
     return {
-      questionId: question.id,
+      questionId: pair.question.id,
       questionNumber,
-      questionText: question.content,
-      answerText: answer.content,
-      questionTimestamp: new Date(question.timestamp),
-      answerTimestamp: new Date(answer.timestamp),
+      questionText: pair.question.content,
+      answerText: pair.answer.content,
+      questionTimestamp: new Date(pair.question.timestamp),
+      answerTimestamp: new Date(pair.answer.timestamp),
       contentScore,
       deliveryScore,
       presenceScore,
@@ -237,14 +205,14 @@ export class PerQuestionAnalytics {
       wpm,
       fillerWordCount: fillerCount,
       weakWordCount,
-      voiceConfidence: humeMetrics.voiceConfidence,
-      tonalVariety: humeMetrics.tonalVariety,
+      voiceConfidence,
+      tonalVariety,
       starKeywordCount,
       numberCount,
       responseLength,
-      faceConfidence: humeMetrics.faceConfidence,
-      anxietyLevel: humeMetrics.anxietyLevel,
-      dominantExpression: humeMetrics.dominantExpression,
+      faceConfidence,
+      anxietyLevel: hesitationLevel,
+      dominantExpression: hesitationLevel > 45 ? 'Hesitant' : contentScore >= 75 ? 'Structured' : 'Developing',
       strengths,
       weaknesses,
       idealAnswerSimilarity,
@@ -252,160 +220,149 @@ export class PerQuestionAnalytics {
     };
   }
 
-  /**
-   * Extract Hume metrics for a specific time range
-   * Note: Currently analyzes all predictions; time-based filtering to be added
-   */
-  private static getHumeMetricsForTimeRange(
-    predictions: any
-  ): {
+  private static calculateContentScore({
+    responseLength,
+    starKeywordCount,
+    numberCount,
+    weakWordCount,
+    fillerCount
+  }: {
+    responseLength: number;
+    starKeywordCount: number;
+    numberCount: number;
+    weakWordCount: number;
+    fillerCount: number;
+  }): number {
+    let score = 62;
+
+    score += responseLength > 50 ? 15 : responseLength > 28 ? 8 : responseLength < 12 ? -18 : 0;
+    score += starKeywordCount * 3;
+    score += numberCount * 6;
+    score -= weakWordCount * 4;
+    score -= fillerCount * 2;
+
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  private static calculateDeliveryScore({
+    voiceConfidence,
+    wpm,
+    tonalVariety,
+    fillerCount,
+    responseLatencySec
+  }: {
     voiceConfidence: number;
-    faceConfidence: number;
-    anxietyLevel: number;
+    wpm: number;
     tonalVariety: number;
-    dominantExpression: string;
-  } {
-    if (!predictions) {
-      return {
-        voiceConfidence: 50,
-        faceConfidence: 50,
-        anxietyLevel: 0,
-        tonalVariety: 50,
-        dominantExpression: 'Neutral'
-      };
-    }
-
-    const voiceScores: number[] = [];
-    const faceScores: number[] = [];
-    let anxietySum = 0;
-    let anxietyCount = 0;
-    const tonalScores: number[] = [];
-    const expressionCounts: Record<string, number> = {};
-
-    // Process Face predictions
-    if (predictions.face?.grouped_predictions) {
-      predictions.face.grouped_predictions.forEach((group: any) => {
-        group.predictions.forEach((pred: any) => {
-          const emotions = this.mapEmotions(pred.emotions);
-
-          // Face confidence
-          const positive = (emotions['Joy'] || 0) + (emotions['Calmness'] || 0) + (emotions['Interest'] || 0);
-          const negative = (emotions['Anxiety'] || 0) + (emotions['Confusion'] || 0) + (emotions['Distress'] || 0);
-          faceScores.push(Math.max(0, Math.min(1, 0.5 + (positive - negative))));
-
-          // Anxiety
-          anxietySum += (emotions['Anxiety'] || 0) + (emotions['Fear'] || 0) + (emotions['Distress'] || 0);
-          anxietyCount++;
-
-          // Track dominant expression
-          const dominant = pred.emotions.sort((a: any, b: any) => b.score - a.score)[0];
-          if (dominant) {
-            expressionCounts[dominant.name] = (expressionCounts[dominant.name] || 0) + 1;
-          }
-        });
-      });
-    }
-
-    // Process Prosody predictions
-    if (predictions.prosody?.grouped_predictions) {
-      predictions.prosody.grouped_predictions.forEach((group: any) => {
-        group.predictions.forEach((pred: any) => {
-          const emotions = this.mapEmotions(pred.emotions);
-
-          // Voice confidence
-          const confidence = (emotions['Confidence'] || 0) + (emotions['Determination'] || 0);
-          const doubt = (emotions['Anxiety'] || 0) + (emotions['Awkwardness'] || 0);
-          voiceScores.push(Math.max(0, Math.min(1, 0.5 + (confidence - doubt))));
-
-          // Tonal variety
-          const tone = (emotions['Excitement'] || 0) + (emotions['Interest'] || 0) - (emotions['Boredom'] || 0);
-          tonalScores.push(tone);
-        });
-      });
-    }
-
-    // Find dominant expression
-    const dominantExpression = Object.entries(expressionCounts)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Neutral';
-
-    return {
-      voiceConfidence: Math.round(this.average(voiceScores) * 100),
-      faceConfidence: Math.round(this.average(faceScores) * 100),
-      anxietyLevel: Math.round((anxietyCount > 0 ? anxietySum / anxietyCount : 0) * 100),
-      tonalVariety: Math.round((this.average(tonalScores) + 1) * 50),
-      dominantExpression
-    };
-  }
-
-  /**
-   * Calculate content quality score
-   */
-  private static calculateContentScore(
-    responseLength: number,
-    starKeywordCount: number,
-    numberCount: number,
-    weakWordCount: number,
-    fillerCount: number
-  ): number {
-    let score = 70; // Base score
-
-    // Length penalty/bonus
-    if (responseLength > 40) score += 10;
-    else if (responseLength < 10) score -= 20;
-
-    // STAR structure
-    score += starKeywordCount * 2;
-
-    // Quantification
-    score += numberCount * 3;
-
-    // Weak language penalty
-    score -= weakWordCount * 2;
-
-    // Filler penalty
-    score -= fillerCount;
-
-    return Math.min(100, Math.max(0, Math.round(score)));
-  }
-
-  /**
-   * Calculate delivery score
-   */
-  private static calculateDeliveryScore(
-    voiceConfidence: number,
-    wpm: number,
-    tonalVariety: number
-  ): number {
+    fillerCount: number;
+    responseLatencySec: number;
+  }): number {
     let score = voiceConfidence;
 
-    // Pace penalty
-    if (wpm < 110 || wpm > 160) score -= 15;
+    if (wpm < 110 || wpm > 160) score -= 10;
+    if (tonalVariety > 70) score += 6;
+    if (tonalVariety < 45) score -= 8;
+    score -= fillerCount * 3;
+    score -= Math.max(0, responseLatencySec - 8) * 1.5;
 
-    // Tonal variety bonus/penalty
-    if (tonalVariety > 70) score += 10;
-    else if (tonalVariety < 40) score -= 10;
-
-    return Math.min(100, Math.max(0, Math.round(score)));
+    return Math.max(0, Math.min(100, Math.round(score)));
   }
 
-  /**
-   * Calculate presence score
-   */
-  private static calculatePresenceScore(
-    faceConfidence: number,
-    anxietyLevel: number
-  ): number {
-    let score = faceConfidence;
+  private static calculatePresenceScore({
+    faceConfidence,
+    hesitationLevel,
+    postureData
+  }: {
+    faceConfidence: number;
+    hesitationLevel: number;
+    postureData?: PostureAnalysisData;
+  }): number {
+    let score = faceConfidence - hesitationLevel * 0.25;
 
-    // Anxiety penalty
-    score -= anxietyLevel * 0.8;
+    if (postureData?.headPosition === 'centered') score += 4;
+    if (postureData?.headPosition === 'tilted') score -= 4;
 
-    return Math.min(100, Math.max(0, Math.round(score)));
+    return Math.max(0, Math.min(100, Math.round(score)));
   }
 
-  /**
-   * Generate strengths and weaknesses for a question
-   */
+  private static calculateVoiceConfidence({
+    responseLength,
+    responseLatencySec,
+    fillerCount,
+    weakWordCount,
+    tonalVariety
+  }: {
+    responseLength: number;
+    responseLatencySec: number;
+    fillerCount: number;
+    weakWordCount: number;
+    tonalVariety: number;
+  }): number {
+    let score = 65;
+
+    score += responseLength >= 30 ? 8 : responseLength < 12 ? -15 : 0;
+    score += responseLatencySec <= 4 ? 8 : responseLatencySec <= 8 ? 0 : -8;
+    score += tonalVariety > 65 ? 4 : tonalVariety < 45 ? -4 : 0;
+    score -= fillerCount * 4;
+    score -= weakWordCount * 3;
+
+    return Math.max(20, Math.min(95, Math.round(score)));
+  }
+
+  private static calculateFaceConfidence({
+    postureData,
+    responseLatencySec,
+    overallMetrics
+  }: {
+    postureData?: PostureAnalysisData;
+    responseLatencySec: number;
+    overallMetrics?: InterviewMetrics;
+  }): number {
+    if (postureData) {
+      const headPositionBonus = postureData.headPosition === 'centered' ? 6 : postureData.headPosition === 'forward' ? -3 : -6;
+      return Math.max(
+        25,
+        Math.min(
+          98,
+          Math.round(
+            postureData.overallScore * 0.55 +
+            postureData.timeInGoodPosture * 0.25 +
+            postureData.shoulderAlignment * 0.2 +
+            headPositionBonus -
+            Math.max(0, responseLatencySec - 8) * 1.2
+          )
+        )
+      );
+    }
+
+    const fallback = overallMetrics?.presenceScore ?? 62;
+    return Math.max(35, Math.min(85, Math.round(fallback - Math.max(0, responseLatencySec - 8) * 1.5)));
+  }
+
+  private static estimateCadenceVariety({
+    content,
+    fillerCount,
+    responseLatencySec,
+    overallMetrics
+  }: {
+    content: string;
+    fillerCount: number;
+    responseLatencySec: number;
+    overallMetrics?: InterviewMetrics;
+  }): number {
+    const sentenceCount = Math.max(1, content.split(/[.!?]+/).map((sentence) => sentence.trim()).filter(Boolean).length);
+    const avgSentenceLength = this.getWords(content).length / sentenceCount;
+    const sessionBaseline = overallMetrics?.tonalVariety ?? 58;
+
+    const score = sessionBaseline * 0.4 +
+      Math.min(25, avgSentenceLength * 0.7) +
+      Math.min(12, sentenceCount * 3) -
+      fillerCount * 2 -
+      Math.max(0, responseLatencySec - 8) * 1.2;
+
+    return Math.max(25, Math.min(95, Math.round(score)));
+  }
+
   private static generateFeedback(data: {
     wpm: number;
     fillerCount: number;
@@ -413,116 +370,123 @@ export class PerQuestionAnalytics {
     starKeywordCount: number;
     numberCount: number;
     responseLength: number;
-    anxietyLevel: number;
+    hesitationLevel: number;
     tonalVariety: number;
+    postureData?: PostureAnalysisData;
   }): { strengths: StrengthWeakness[]; weaknesses: StrengthWeakness[] } {
     const strengths: StrengthWeakness[] = [];
     const weaknesses: StrengthWeakness[] = [];
 
-    // Pace
     if (data.wpm >= 110 && data.wpm <= 160) {
       strengths.push({
         area: 'Pacing',
-        description: `Good speaking pace (${data.wpm} WPM)`,
+        description: `Answer pace stayed healthy at ${data.wpm} WPM.`,
         severity: 'info'
       });
     } else if (data.wpm > 160) {
       weaknesses.push({
-        area: 'Too Fast',
-        description: `${data.wpm} WPM - slow down for clarity`,
+        area: 'Pacing',
+        description: `${data.wpm} WPM felt rushed. Leave more room between points.`,
         severity: 'warning'
       });
     } else {
       weaknesses.push({
-        area: 'Too Slow',
-        description: `${data.wpm} WPM - increase energy`,
+        area: 'Pacing',
+        description: `${data.wpm} WPM felt too slow. Get to the point faster.`,
         severity: 'warning'
       });
     }
 
-    // Fillers
     if (data.fillerCount === 0) {
       strengths.push({
-        area: 'Clean Speech',
-        description: 'No filler words detected',
+        area: 'Speech Clarity',
+        description: 'No filler words showed up in this answer.',
         severity: 'info'
       });
-    } else if (data.fillerCount > 3) {
+    } else if (data.fillerCount > 2) {
       weaknesses.push({
         area: 'Filler Words',
-        description: `${data.fillerCount} fillers - use pauses instead`,
+        description: `${data.fillerCount} fillers weakened this answer's authority.`,
         severity: data.fillerCount > 5 ? 'critical' : 'warning'
       });
     }
 
-    // STAR method
     if (data.starKeywordCount > 0) {
       strengths.push({
         area: 'Structure',
-        description: 'Used STAR framework keywords',
+        description: 'You framed this answer like a real story, not a loose summary.',
         severity: 'info'
+      });
+    } else {
+      weaknesses.push({
+        area: 'Structure',
+        description: 'This answer needs a clearer setup, action, and result flow.',
+        severity: 'warning'
       });
     }
 
-    // Quantification
     if (data.numberCount > 0) {
       strengths.push({
-        area: 'Data-Driven',
-        description: 'Included specific metrics',
+        area: 'Specificity',
+        description: 'You backed the answer with concrete evidence or scope.',
         severity: 'info'
       });
     } else {
       weaknesses.push({
-        area: 'Quantification',
-        description: 'Add numbers to prove impact',
+        area: 'Specificity',
+        description: 'Add one metric or concrete outcome to make the answer more believable.',
         severity: 'warning'
       });
     }
 
-    // Weak words
     if (data.weakWordCount > 1) {
       weaknesses.push({
-        area: 'Weak Language',
-        description: `Avoid hedging ("I think", "maybe")`,
+        area: 'Hedging',
+        description: 'Too much soft language made this answer sound less certain than it should.',
         severity: 'warning'
       });
     }
 
-    // Response length
     if (data.responseLength < 10) {
       weaknesses.push({
-        area: 'Too Brief',
-        description: 'Expand your answer with examples',
+        area: 'Depth',
+        description: 'The answer was too brief to prove judgment or impact.',
         severity: 'critical'
       });
+    } else if (data.responseLength > 35) {
+      strengths.push({
+        area: 'Depth',
+        description: 'You gave yourself enough room to show context and action.',
+        severity: 'info'
+      });
     }
 
-    // Anxiety
-    if (data.anxietyLevel > 30) {
+    if (data.postureData?.overallScore && data.postureData.overallScore >= 75) {
+      strengths.push({
+        area: 'Presence',
+        description: 'Posture stayed steady enough to support the answer.',
+        severity: 'info'
+      });
+    }
+
+    if (data.hesitationLevel > 40) {
       weaknesses.push({
-        area: 'Visible Tension',
-        description: 'Facial analysis detected anxiety',
+        area: 'Hesitation',
+        description: 'The answer took too long to settle. Buy time with a framing sentence instead of silence.',
         severity: 'warning'
       });
-    } else {
-      strengths.push({
-        area: 'Calm Presence',
-        description: 'Maintained composure',
-        severity: 'info'
-      });
     }
 
-    // Tonal variety
     if (data.tonalVariety > 70) {
       strengths.push({
-        area: 'Dynamic Voice',
-        description: 'Good vocal variety',
+        area: 'Cadence',
+        description: 'The answer had enough variation to avoid sounding flat.',
         severity: 'info'
       });
-    } else if (data.tonalVariety < 40) {
+    } else if (data.tonalVariety < 45) {
       weaknesses.push({
-        area: 'Monotone',
-        description: 'Vary your pitch for emphasis',
+        area: 'Cadence',
+        description: 'The answer felt flat. Vary emphasis between setup, action, and result.',
         severity: 'warning'
       });
     }
@@ -530,25 +494,13 @@ export class PerQuestionAnalytics {
     return { strengths, weaknesses };
   }
 
-  /**
-   * Calculate average scores across all questions
-   */
-  private static calculateAverages(questions: QuestionMetrics[]): {
-    content: number;
-    delivery: number;
-    presence: number;
-    overall: number;
-  } {
-    if (questions.length === 0) {
-      return { content: 0, delivery: 0, presence: 0, overall: 0 };
-    }
-
-    const sum = questions.reduce(
-      (acc, q) => ({
-        content: acc.content + q.contentScore,
-        delivery: acc.delivery + q.deliveryScore,
-        presence: acc.presence + q.presenceScore,
-        overall: acc.overall + q.overallScore
+  private static calculateAverages(questions: QuestionMetrics[]) {
+    const totals = questions.reduce(
+      (acc, question) => ({
+        content: acc.content + question.contentScore,
+        delivery: acc.delivery + question.deliveryScore,
+        presence: acc.presence + question.presenceScore,
+        overall: acc.overall + question.overallScore
       }),
       { content: 0, delivery: 0, presence: 0, overall: 0 }
     );
@@ -556,23 +508,27 @@ export class PerQuestionAnalytics {
     const count = questions.length;
 
     return {
-      content: Math.round(sum.content / count),
-      delivery: Math.round(sum.delivery / count),
-      presence: Math.round(sum.presence / count),
-      overall: Math.round(sum.overall / count)
+      content: Math.round(totals.content / count),
+      delivery: Math.round(totals.delivery / count),
+      presence: Math.round(totals.presence / count),
+      overall: Math.round(totals.overall / count)
     };
   }
 
-  // --- UTILITY FUNCTIONS ---
-
-  private static mapEmotions(emotions: { name: string; score: number }[]): Record<string, number> {
-    const map: Record<string, number> = {};
-    emotions.forEach(e => { map[e.name] = e.score; });
-    return map;
+  private static getWords(content: string): string[] {
+    return (content || '').trim().split(/\s+/).filter(Boolean);
   }
 
-  private static average(arr: number[]): number {
-    if (arr.length === 0) return 0.5; // Default to neutral
-    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  private static countMatches(content: string, phrases: string[]): number {
+    return phrases.reduce((total, phrase) => {
+      const regex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      const matches = content.match(regex);
+      return total + (matches ? matches.length : 0);
+    }, 0);
+  }
+
+  private static countPhraseMatches(content: string, phrases: string[]): number {
+    const lowered = (content || '').toLowerCase();
+    return phrases.reduce((total, phrase) => total + (lowered.includes(phrase) ? 1 : 0), 0);
   }
 }

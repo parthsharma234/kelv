@@ -1,12 +1,24 @@
-import { HumeJobPrediction } from './humeBatchClient';
-
 // --- TYPES ---
 export interface TranscriptMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: Date | string; // Handle both serialization forms
+  timestamp: Date | string;
   isPartial?: boolean;
+}
+
+export interface PostureAnalysisData {
+  shoulderAlignment: number;
+  headPosition: 'centered' | 'forward' | 'tilted';
+  overallScore: number;
+  timeInGoodPosture: number;
+}
+
+export interface AnalyticsInput {
+  durationSecs: number;
+  transcript: TranscriptMessage[];
+  role?: string;
+  postureData?: PostureAnalysisData;
 }
 
 export interface TimeSeriesPoint {
@@ -25,347 +37,385 @@ export interface StrengthWeakness {
 }
 
 export interface InterviewMetrics {
-  // Core Scores (0-100, HONEST)
   overallScore: number;
   contentScore: number;
   deliveryScore: number;
   presenceScore: number;
 
-  // Voice Metrics
   avgVolume: number;
   volumeVariance: number;
   speechRate: 'too_slow' | 'optimal' | 'too_fast';
   wpm: number;
   fillerWordCount: number;
-  tonalVariety: number; // 0-100 (Monotone -> Dynamic)
-  pauseScore: number; // 0-100 (Bad -> Good)
-  articulationScore: number; // 0-100
+  tonalVariety: number;
+  pauseScore: number;
+  articulationScore: number;
   interruptions: number;
 
-  // Face Metrics
   dominantExpression: string;
   anxietyLevel: number;
   eyeContactEstimate: number;
 
-  // Timeline for charts
   timeline: TimeSeriesPoint[];
-
-  // Critical Feedback
   strengths: StrengthWeakness[];
   weaknesses: StrengthWeakness[];
-
-  // Raw data for deep dive
   expressionBreakdown: Record<string, number>;
+
+  benchmarks?: {
+    content: number;
+    delivery: number;
+    presence: number;
+    overall: number;
+    roleName: string;
+  };
+}
+
+interface QuestionPair {
+  question: TranscriptMessage;
+  answer: TranscriptMessage;
 }
 
 // --- ANALYTICS ENGINE ---
 export class AnalyticsEngine {
-  private static readonly BIN_SIZE = 5; // Granular 5-second bins
+  private static readonly BIN_SIZE = 5;
   private static readonly FILLER_WORDS = ['um', 'uh', 'like', 'you know', 'basically', 'actually', 'so', 'well', 'literally', 'mean', 'right'];
   private static readonly WEAK_WORDS = ['maybe', 'i think', 'kind of', 'sort of', 'probably', 'perhaps', 'stuff', 'things'];
   private static readonly STAR_KEYWORDS = ['situation', 'task', 'action', 'result', 'outcome', 'challenge', 'solved', 'achieved', 'led'];
 
-  static process(
-    data: HumeJobPrediction[],
-    durationSecs: number,
-    transcript: TranscriptMessage[]
-  ): InterviewMetrics {
-    const predictions = data[0]?.results?.predictions[0]?.models;
-    if (!predictions) return this.generateEmpty();
+  static process({
+    durationSecs,
+    transcript,
+    role,
+    postureData
+  }: AnalyticsInput): InterviewMetrics {
+    const cleanTranscript = (transcript || []).filter(
+      (message) => message && !message.isPartial && typeof message.content === 'string' && message.content.trim().length > 0
+    );
 
-    const bins = Math.max(1, Math.ceil(durationSecs / this.BIN_SIZE));
-    const timeline: TimeSeriesPoint[] = [];
-    const allFaceEmotions: Record<string, number[]> = {};
-    const allVoiceScores: number[] = [];
-    const allFaceScores: number[] = [];
-    const tonalScores: number[] = [];
+    const userMessages = cleanTranscript.filter((message) => message.role === 'user');
+    const questionPairs = this.segmentTranscript(cleanTranscript);
 
-    // --- FACE PROCESSING ---
-    let anxietySum = 0, anxietyCount = 0;
-    if (predictions.face?.grouped_predictions) {
-      predictions.face.grouped_predictions.forEach(group => {
-        group.predictions.forEach(pred => {
-          const emotions = this.mapEmotions(pred.emotions);
-
-          // Track all emotions
-          pred.emotions.forEach(e => {
-            if (!allFaceEmotions[e.name]) allFaceEmotions[e.name] = [];
-            allFaceEmotions[e.name].push(e.score);
-          });
-
-          // Anxiety tracking
-          anxietySum += (emotions['Anxiety'] || 0) + (emotions['Fear'] || 0) + (emotions['Distress'] || 0) + (emotions['Confusion'] || 0);
-          anxietyCount++;
-
-          // Face confidence: positive vs negative
-          const positive = (emotions['Joy'] || 0) + (emotions['Calmness'] || 0) + (emotions['Interest'] || 0) + (emotions['Determination'] || 0);
-          const negative = (emotions['Anxiety'] || 0) + (emotions['Confusion'] || 0) + (emotions['Distress'] || 0) + (emotions['Boredom'] || 0);
-          allFaceScores.push(Math.max(0, Math.min(1, 0.5 + (positive - negative))));
-        });
-      });
+    if (userMessages.length === 0) {
+      return this.generateEmpty(role);
     }
 
-    // --- PROSODY PROCESSING ---
-    let volumeSum = 0, volumeSq = 0, prosodyCount = 0;
-    if (predictions.prosody?.grouped_predictions) {
-      predictions.prosody.grouped_predictions.forEach(group => {
-        group.predictions.forEach(pred => {
-          const emotions = this.mapEmotions(pred.emotions);
-          const confidence = (emotions['Confidence'] || 0) + (emotions['Determination'] || 0);
-          const doubt = (emotions['Anxiety'] || 0) + (emotions['Awkwardness'] || 0) + (emotions['Embarrassment'] || 0);
-          const score = Math.max(0, Math.min(1, 0.5 + (confidence - doubt)));
-          allVoiceScores.push(score);
-
-          // Tonal Variety Proxy: Inverse of Boredom/Tiredness, plus Excitement
-          const tone = (emotions['Excitement'] || 0) + (emotions['Interest'] || 0) - (emotions['Boredom'] || 0);
-          tonalScores.push(tone);
-
-          // Volume proxy from emotional intensity (sum of top 3 emotions)
-          const sorted = pred.emotions.sort((a,b) => b.score - a.score);
-          const intensity = (sorted[0]?.score || 0) + (sorted[1]?.score || 0);
-          volumeSum += intensity;
-          volumeSq += intensity * intensity;
-          prosodyCount++;
-        });
-      });
-    }
-
-    // --- TRANSCRIPT ANALYSIS (Filler Words & Content) ---
     let fillerCount = 0;
-    let userWordCount = 0;
     let weakWordCount = 0;
     let starKeywordCount = 0;
-    let numberCount = 0; 
-    
-    // Pause Analysis
-    let pausesOver3s = 0;
-    let pausesOver5s = 0;
+    let quantifiedAnswerCount = 0;
+    let userWordCount = 0;
+    let totalSentences = 0;
 
-    const userMessages = transcript.filter(t => t.role === 'user');
-    
-    // Convert strings to dates for calculation
-    const userTimestamps = userMessages.map(m => new Date(m.timestamp).getTime());
+    const responseLengths: number[] = [];
+    const responseLatencies: number[] = [];
+    const perAnswerDeliveryScores: number[] = [];
+    const perAnswerPresenceScores: number[] = [];
 
-    for (let i = 0; i < userMessages.length; i++) {
-        const msg = userMessages[i];
-        const content = msg.content || '';
-        const words = content.toLowerCase().split(/\s+/);
-        userWordCount += words.length;
+    questionPairs.forEach((pair) => {
+      const content = pair.answer.content || '';
+      const words = this.getWords(content);
+      const responseLength = words.length;
+      const responseLatencySec = Math.max(
+        1,
+        (new Date(pair.answer.timestamp).getTime() - new Date(pair.question.timestamp).getTime()) / 1000
+      );
 
-        // Fillers
-        this.FILLER_WORDS.forEach(filler => {
-            const regex = new RegExp(`\\b${filler}\\b`, 'gi');
-            const matches = content.match(regex);
-            if (matches) fillerCount += matches.length;
-        });
+      responseLengths.push(responseLength);
+      responseLatencies.push(responseLatencySec);
+      userWordCount += responseLength;
+      totalSentences += this.countSentences(content);
 
-        // Weak words
-        this.WEAK_WORDS.forEach(word => {
-            if (content.toLowerCase().includes(word)) weakWordCount++;
-        });
+      fillerCount += this.countMatches(content, this.FILLER_WORDS);
+      weakWordCount += this.countPhraseMatches(content, this.WEAK_WORDS);
+      starKeywordCount += this.countPhraseMatches(content, this.STAR_KEYWORDS);
 
-        // STAR keywords
-        this.STAR_KEYWORDS.forEach(word => {
-            if (content.toLowerCase().includes(word)) starKeywordCount++;
-        });
-
-        // Quantification
-        if (/\d+/.test(content)) numberCount++;
-        
-         // Pause Check (Gap between previous message end estimate and this start)
-        if (i > 0) {
-            const prevTime = userTimestamps[i-1];
-            // Estimate duration of PREV msg: 150 WPM = 2.5 words/sec
-            const prevWords = userMessages[i-1].content.split(' ').length;
-            const prevDurationMs = (prevWords / 2.5) * 1000;
-            const gap = userTimestamps[i] - (prevTime + prevDurationMs);
-            
-            // Only count gaps that likely contain "thinking silence" (and not just AI speaking)
-            // This is tricky without AI timestamps. We will assume gaps > 5s are thinking pauses if AI response is short.
-            // Simplified: Just detect Long Pauses > 5s as potential "Blanking Out"
-            if (gap > 5000) pausesOver5s++;
-            else if (gap > 3000) pausesOver3s++;
-        }
-    }
-
-    // Accurate WPM Calculation using timestamps
-    let wpm = 0;
-    if (userMessages.length >= 2) {
-      const start = new Date(userMessages[0].timestamp).getTime();
-      const end = new Date(userMessages[userMessages.length - 1].timestamp).getTime();
-      const durationMin = (end - start) / 1000 / 60;
-      if (durationMin > 0.1) {
-        wpm = userWordCount / durationMin;
+      if (/\d/.test(content)) {
+        quantifiedAnswerCount += 1;
       }
-    } else {
-       wpm = (userWordCount / Math.max(1, durationSecs * 0.4)) * 60; 
+
+      perAnswerDeliveryScores.push(
+        this.scoreDeliveryProxy({
+          responseLength,
+          responseLatencySec,
+          fillerCount: this.countMatches(content, this.FILLER_WORDS),
+          weakWordCount: this.countPhraseMatches(content, this.WEAK_WORDS)
+        })
+      );
+
+      perAnswerPresenceScores.push(
+        this.scorePresenceProxy({
+          postureData,
+          responseLatencySec,
+          fillerCount: this.countMatches(content, this.FILLER_WORDS)
+        })
+      );
+    });
+
+    if (questionPairs.length === 0) {
+      userMessages.forEach((message) => {
+        const words = this.getWords(message.content || '');
+        userWordCount += words.length;
+        responseLengths.push(words.length);
+        fillerCount += this.countMatches(message.content, this.FILLER_WORDS);
+        weakWordCount += this.countPhraseMatches(message.content, this.WEAK_WORDS);
+        starKeywordCount += this.countPhraseMatches(message.content, this.STAR_KEYWORDS);
+        if (/\d/.test(message.content)) {
+          quantifiedAnswerCount += 1;
+        }
+      });
     }
-    wpm = Math.min(250, Math.max(0, Math.round(wpm)));
+
+    const totalUserWindowSeconds = responseLatencies.reduce((sum, value) => sum + value, 0);
+    const fallbackWindowSeconds = Math.max(durationSecs * 0.45, 1);
+    const wpmBaseSeconds = totalUserWindowSeconds > 0 ? totalUserWindowSeconds : fallbackWindowSeconds;
+    const wpm = Math.max(0, Math.min(220, Math.round((userWordCount / Math.max(1, wpmBaseSeconds)) * 60)));
 
     let speechRate: 'too_slow' | 'optimal' | 'too_fast' = 'optimal';
     if (wpm < 110) speechRate = 'too_slow';
-    else if (wpm > 160) speechRate = 'too_fast';
+    if (wpm > 160) speechRate = 'too_fast';
 
-    // --- BUILD TIMELINE (5s Bins) ---
-    for (let i = 0; i < bins; i++) {
-      const startTime = i * this.BIN_SIZE;
-      const minutes = Math.floor(startTime / 60);
-      const seconds = startTime % 60;
+    const pausesOver5s = responseLatencies.filter((seconds) => seconds > 5).length;
+    const pausesOver10s = responseLatencies.filter((seconds) => seconds > 10).length;
+    const avgResponseLength = responseLengths.length > 0 ? this.average(responseLengths) : 0;
+    const responseLengthVariance = this.variance(responseLengths);
+    const cadenceVariance = avgResponseLength > 0 ? Math.sqrt(responseLengthVariance) / avgResponseLength : 0;
 
-      const vStart = Math.floor((i / bins) * allVoiceScores.length);
-      const vEnd = Math.floor(((i + 1) / bins) * allVoiceScores.length);
-      const voiceConf = this.averageSlice(allVoiceScores, vStart, vEnd);
+    const tonalVariety = Math.max(
+      25,
+      Math.min(
+        95,
+        Math.round(
+          48 +
+          cadenceVariance * 35 +
+          Math.min(12, totalSentences) +
+          (speechRate === 'optimal' ? 8 : 0) -
+          Math.min(20, fillerCount * 1.5)
+        )
+      )
+    );
 
-      const fStart = Math.floor((i / bins) * allFaceScores.length);
-      const fEnd = Math.floor(((i + 1) / bins) * allFaceScores.length);
-      const faceConf = this.averageSlice(allFaceScores, fStart, fEnd);
+    const articulationScore = Math.max(20, Math.min(100, Math.round(92 - fillerCount * 4 - weakWordCount * 3)));
+    const pauseScore = Math.max(15, Math.min(100, Math.round(100 - pausesOver5s * 10 - pausesOver10s * 10)));
 
-      let dominantEmotion = 'Neutral';
-      let maxScore = 0;
-      Object.entries(allFaceEmotions).forEach(([emotion, scores]) => {
-         const eStart = Math.floor((i / bins) * scores.length);
-         const eEnd = Math.floor(((i + 1) / bins) * scores.length);
-         const avg = this.averageSlice(scores, eStart, eEnd);
-         if (avg > maxScore) {
-           maxScore = avg;
-           dominantEmotion = emotion;
-         }
-      });
+    let contentScoreRaw = 62;
+    contentScoreRaw += avgResponseLength > 55 ? 14 : avgResponseLength > 28 ? 8 : avgResponseLength < 12 ? -18 : 0;
+    contentScoreRaw += Math.min(14, starKeywordCount * 2);
+    contentScoreRaw += Math.min(15, quantifiedAnswerCount * 4);
+    contentScoreRaw -= weakWordCount * 3;
+    contentScoreRaw -= fillerCount * 1.5;
+    const contentScore = Math.max(0, Math.min(100, Math.round(contentScoreRaw)));
 
-      timeline.push({
-        timestamp: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-        voiceConfidence: voiceConf || 0.5,
-        faceConfidence: faceConf || 0.5,
-        dominantEmotion,
-        emotionIntensity: maxScore
-      });
+    let deliveryScoreRaw = this.average(perAnswerDeliveryScores);
+    deliveryScoreRaw += speechRate === 'optimal' ? 8 : -8;
+    deliveryScoreRaw += (tonalVariety - 50) * 0.18;
+    deliveryScoreRaw += (articulationScore - 60) * 0.2;
+    deliveryScoreRaw -= pausesOver10s * 6;
+    const deliveryScore = Math.max(0, Math.min(100, Math.round(deliveryScoreRaw)));
+
+    let presenceScoreRaw = this.average(perAnswerPresenceScores);
+    if (postureData) {
+      const headPositionBonus = postureData.headPosition === 'centered' ? 6 : postureData.headPosition === 'forward' ? -4 : -8;
+      presenceScoreRaw =
+        postureData.overallScore * 0.55 +
+        postureData.timeInGoodPosture * 0.3 +
+        postureData.shoulderAlignment * 0.15 +
+        headPositionBonus;
     }
+    const presenceScore = Math.max(0, Math.min(100, Math.round(presenceScoreRaw)));
 
-    // --- CALCULATE SCORES (HONEST) ---
-    const avgVoice = this.average(allVoiceScores);
-    const avgFace = this.average(allFaceScores);
-    const avgAnxiety = anxietyCount > 0 ? anxietySum / anxietyCount : 0;
-    const avgVolume = prosodyCount > 0 ? volumeSum / prosodyCount : 0.5;
-    const volumeVariance = prosodyCount > 1 ? (volumeSq / prosodyCount) - (avgVolume * avgVolume) : 0;
-    const avgTonalVariety = this.average(tonalScores); 
+    const hesitationLevel = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          fillerCount * 6 +
+          weakWordCount * 7 +
+          pausesOver10s * 12 +
+          Math.max(0, 120 - wpm) * 0.12
+        )
+      )
+    );
 
-    // Articulation (Proxy): Ratio of unique words vs fillers. 
-    // High filler count = Low articulation.
-    const articulationScore = Math.max(0, 100 - (fillerCount * 5) - (weakWordCount * 2));
-    
-    // Pause Score: Penalize for >5s freezes
-    const pauseScore = Math.max(0, 100 - (pausesOver5s * 20));
+    const eyeContactEstimate = postureData
+      ? Math.max(
+        25,
+        Math.min(
+          100,
+          Math.round(
+            postureData.overallScore * 0.45 +
+            postureData.timeInGoodPosture * 0.35 +
+            (postureData.headPosition === 'centered' ? 20 : postureData.headPosition === 'forward' ? 8 : 4)
+          )
+        )
+      )
+      : Math.max(45, Math.min(80, Math.round(60 - pausesOver10s * 3 + (speechRate === 'optimal' ? 6 : 0))));
 
-    // 1. Content Score
-    const avgResponseLength = userMessages.length > 0 ? userWordCount / userMessages.length : 0;
-    let contentScoreRaw = 70; 
-    contentScoreRaw += (avgResponseLength > 40 ? 10 : avgResponseLength < 10 ? -20 : 0); 
-    contentScoreRaw += (starKeywordCount * 2); 
-    contentScoreRaw += (numberCount * 3); 
-    contentScoreRaw -= (weakWordCount * 2); 
-    contentScoreRaw -= (fillerCount); 
-    const contentScore = Math.min(100, Math.max(0, Math.round(contentScoreRaw)));
+    const overallScore = Math.round(contentScore * 0.45 + deliveryScore * 0.35 + presenceScore * 0.2);
 
-    // 2. Delivery Score
-    let deliveryScoreRaw = avgVoice * 100;
-    deliveryScoreRaw -= (speechRate !== 'optimal' ? 15 : 0);
-    deliveryScoreRaw += (avgTonalVariety > 0 ? 10 : -10); 
-    deliveryScoreRaw -= (pausesOver5s * 10); // Penalty for blanking
-    const deliveryScore = Math.min(100, Math.max(0, Math.round(deliveryScoreRaw)));
-
-    // 3. Presence Score
-    let presenceScoreRaw = avgFace * 100;
-    presenceScoreRaw -= (avgAnxiety * 80); 
-    const presenceScore = Math.min(100, Math.max(0, Math.round(presenceScoreRaw)));
-
-    // Overall
-    const overallScore = Math.round(contentScore * 0.4 + deliveryScore * 0.3 + presenceScore * 0.3);
-
-    // --- EXPRESSION BREAKDOWN ---
-    const expressionBreakdown: Record<string, number> = {};
-    Object.entries(allFaceEmotions).forEach(([emotion, scores]) => {
-      expressionBreakdown[emotion] = scores.reduce((a, b) => a + b, 0) / scores.length * 100;
+    const timeline = this.buildTimeline({
+      durationSecs,
+      questionPairs,
+      postureData,
+      defaultVoiceConfidence: deliveryScore / 100,
+      defaultFaceConfidence: presenceScore / 100
     });
-    const sortedExpressions = Object.entries(expressionBreakdown).sort((a, b) => b[1] - a[1]);
-    const dominantExpression = sortedExpressions[0]?.[0] || 'Neutral';
 
-    // --- GENERATE DETAILED FEEDBACK ---
+    const expressionBreakdown = {
+      'Structured Answers': Math.min(100, Math.round((starKeywordCount / Math.max(1, questionPairs.length || userMessages.length)) * 24)),
+      'Quantified Impact': Math.min(100, Math.round((quantifiedAnswerCount / Math.max(1, questionPairs.length || userMessages.length)) * 100)),
+      'Clean Delivery': articulationScore,
+      'Steady Posture': postureData?.timeInGoodPosture ?? Math.max(35, presenceScore - 8),
+      'Fast Recovery': pauseScore,
+      'Hedging Language': Math.max(0, Math.min(100, weakWordCount * 12))
+    };
+
+    const dominantExpression = Object.entries(expressionBreakdown).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Structured Answers';
+
     const strengths: StrengthWeakness[] = [];
     const weaknesses: StrengthWeakness[] = [];
 
-    // Voice & Delivery
-    if (speechRate === 'too_fast') weaknesses.push({ area: 'Speaking Pace', description: `Fast pace (${wpm} WPM). Slow down to give your points impact.`, severity: 'warning' });
-    else if (speechRate === 'too_slow') weaknesses.push({ area: 'Speaking Pace', description: `Slow pace (${wpm} WPM). Increase energy to maintain engagement.`, severity: 'warning' });
-    else strengths.push({ area: 'Speaking Pace', description: `Great cadence (${wpm} WPM). Clear and easy to follow.`, severity: 'info' });
-
-    if (fillerCount > 0) {
-        const severity = fillerCount > 6 ? 'critical' : 'warning';
-        weaknesses.push({ area: 'Filler Words', description: `Detected ${fillerCount} fillers ("um", "like"). Pause silently instead to sound more executive.`, severity });
+    if (speechRate === 'optimal') {
+      strengths.push({
+        area: 'Speaking Pace',
+        description: `Pacing stayed in a strong range at ${wpm} WPM.`,
+        severity: 'info'
+      });
+    } else if (speechRate === 'too_fast') {
+      weaknesses.push({
+        area: 'Speaking Pace',
+        description: `Pace ran fast at ${wpm} WPM. Slow down enough for key points to land.`,
+        severity: 'warning'
+      });
     } else {
-        strengths.push({ area: 'Clean Speech', description: 'Zero filler words detected. Highly professional polish.', severity: 'info' });
+      weaknesses.push({
+        area: 'Speaking Pace',
+        description: `Pace landed slow at ${wpm} WPM. Answer with more forward energy.`,
+        severity: 'warning'
+      });
     }
-    
-    // Pause Feedback
-    if (pausesOver5s > 0) weaknesses.push({ area: 'Dead Air', description: `Detected ${pausesOver5s} long pauses (>5s). If you need time to think, say "That's a great question, let me consider..."`, severity: 'critical' });
-    else strengths.push({ area: 'Flow', description: 'Maintained a steady flow of conversation without awkward silences.', severity: 'info' });
 
-    if (avgTonalVariety < -0.1) weaknesses.push({ area: 'Monotone Delivery', description: 'Voice lacks variety. vary your pitch to emphasize key points.', severity: 'warning' });
-    else strengths.push({ area: 'Dynamic Tone', description: 'Good vocal variety keeps the listener engaged.', severity: 'info' });
+    if (fillerCount === 0) {
+      strengths.push({
+        area: 'Speech Clarity',
+        description: 'No filler words were detected in the completed transcript.',
+        severity: 'info'
+      });
+    } else if (fillerCount > 5) {
+      weaknesses.push({
+        area: 'Filler Words',
+        description: `Detected ${fillerCount} fillers. Replace them with a short silent pause.`,
+        severity: fillerCount > 9 ? 'critical' : 'warning'
+      });
+    }
 
-    // Content Quality
-    if (numberCount > 0) strengths.push({ area: 'Data Driven', description: `Used numbers/metrics ${numberCount} times to quantify achievements. Excellent.`, severity: 'info' });
-    else weaknesses.push({ area: 'Quantification', description: 'Answers lacked specific metrics. Use numbers (%) to prove your impact.', severity: 'warning' });
+    if (quantifiedAnswerCount > 0) {
+      strengths.push({
+        area: 'Quantification',
+        description: `You used measurable proof in ${quantifiedAnswerCount} answer${quantifiedAnswerCount === 1 ? '' : 's'}.`,
+        severity: 'info'
+      });
+    } else {
+      weaknesses.push({
+        area: 'Proof Of Impact',
+        description: 'Answers need more numbers, scope, or concrete outcomes to feel credible.',
+        severity: 'warning'
+      });
+    }
 
-    if (starKeywordCount > 0) strengths.push({ area: 'Structure', description: 'Used STAR method keywords (Situation, Task, Result). Structured thinking detected.', severity: 'info' });
-    
-    if (weakWordCount > 2) weaknesses.push({ area: 'Assertiveness', description: `Used weak language (${weakWordCount} times: "I think", "maybe"). Be definitive.`, severity: 'warning' });
+    if (starKeywordCount > 0) {
+      strengths.push({
+        area: 'Structure',
+        description: 'Your answers showed signs of organized, story-based thinking.',
+        severity: 'info'
+      });
+    } else {
+      weaknesses.push({
+        area: 'Structure',
+        description: 'Behavioral answers need a clearer situation-action-result arc.',
+        severity: 'warning'
+      });
+    }
 
-    // Presence
-    if (avgAnxiety > 0.25) weaknesses.push({ area: 'Visible Discomfort', description: 'Facial analysis detected tension/anxiety. Smile more to build rapport.', severity: 'critical' });
-    else strengths.push({ area: 'Executive Presence', description: 'Maintained a calm, confident facial composition.', severity: 'info' });
+    if (postureData) {
+      if (postureData.overallScore >= 75) {
+        strengths.push({
+          area: 'Presence',
+          description: 'Posture stayed steady enough to support a confident screen presence.',
+          severity: 'info'
+        });
+      } else {
+        weaknesses.push({
+          area: 'Presence',
+          description: 'Posture drifted during the session. Sit taller and keep your head centered.',
+          severity: 'warning'
+        });
+      }
+    } else {
+      weaknesses.push({
+        area: 'Presence Data',
+        description: 'Visual presence signals were limited, so this score leans on transcript timing only.',
+        severity: 'info'
+      });
+    }
+
+    if (pausesOver10s > 0) {
+      weaknesses.push({
+        area: 'Recovery Time',
+        description: `There were ${pausesOver10s} long delays before answers. Buy time out loud instead of going silent.`,
+        severity: pausesOver10s > 1 ? 'critical' : 'warning'
+      });
+    } else {
+      strengths.push({
+        area: 'Flow',
+        description: 'You kept the conversation moving without major dead air.',
+        severity: 'info'
+      });
+    }
 
     return {
       overallScore,
       contentScore,
       deliveryScore,
       presenceScore,
-      avgVolume: Math.round(avgVolume * 100),
-      volumeVariance: Math.round(volumeVariance * 100),
+      avgVolume: Math.max(25, Math.min(95, Math.round(45 + tonalVariety * 0.35))),
+      volumeVariance: Math.max(0, Math.min(100, Math.round(cadenceVariance * 100))),
       speechRate,
       wpm,
       fillerWordCount: fillerCount,
-      tonalVariety: Math.round((avgTonalVariety + 1) * 50),
-      // New Metrics
+      tonalVariety,
       pauseScore,
       articulationScore,
-      interruptions: 0, // Placeholder for now, difficult without AI timestamps
+      interruptions: 0,
       dominantExpression,
-      anxietyLevel: Math.round(avgAnxiety * 100),
-      eyeContactEstimate: Math.min(100, Math.round(avgFace * 120)),
+      anxietyLevel: hesitationLevel,
+      eyeContactEstimate,
       timeline,
       strengths,
       weaknesses,
-      expressionBreakdown
+      expressionBreakdown,
+      benchmarks: this.getBenchmarks(role)
     };
   }
 
-  private static mapEmotions(emotions: { name: string; score: number }[]): Record<string, number> {
-    const map: Record<string, number> = {};
-    emotions.forEach(e => { map[e.name] = e.score; });
-    return map;
+  static getBenchmarks(role?: string): InterviewMetrics['benchmarks'] {
+    const roleBenchmarks: Record<string, { content: number; delivery: number; presence: number; overall: number }> = {
+      'Software Engineer': { content: 85, delivery: 75, presence: 68, overall: 78 },
+      'Manager': { content: 80, delivery: 84, presence: 84, overall: 82 },
+      'Executive': { content: 85, delivery: 88, presence: 90, overall: 87 },
+      'Customer Support': { content: 75, delivery: 85, presence: 80, overall: 80 },
+      'Sales': { content: 80, delivery: 90, presence: 85, overall: 85 },
+      Default: { content: 80, delivery: 78, presence: 75, overall: 78 }
+    };
+
+    const key = role && roleBenchmarks[role] ? role : 'Default';
+
+    return {
+      ...roleBenchmarks[key],
+      roleName: key === 'Default' && role ? role : key
+    };
   }
 
-  private static average(arr: number[]) {
-      if (arr.length === 0) return 0;
-      return arr.reduce((a,b) => a+b, 0) / arr.length;
-  }
-
-  private static averageSlice(arr: number[], start: number, end: number) {
-      const slice = arr.slice(start, Math.max(start + 1, end));
-      return this.average(slice);
-  }
-
-  static generateEmpty(): InterviewMetrics {
+  static generateEmpty(role?: string): InterviewMetrics {
     return {
       overallScore: 0,
       contentScore: 0,
@@ -380,13 +430,180 @@ export class AnalyticsEngine {
       pauseScore: 0,
       articulationScore: 0,
       interruptions: 0,
-      dominantExpression: 'Unknown',
+      dominantExpression: 'No Data',
       anxietyLevel: 0,
       eyeContactEstimate: 0,
       timeline: [],
       strengths: [],
-      weaknesses: [{ area: 'Analysis Failed', description: 'Could not process interview data.', severity: 'critical' }],
-      expressionBreakdown: {}
+      weaknesses: [{
+        area: 'Analysis Failed',
+        description: 'Could not process interview data from the completed session.',
+        severity: 'critical'
+      }],
+      expressionBreakdown: {},
+      benchmarks: this.getBenchmarks(role)
     };
+  }
+
+  private static segmentTranscript(transcript: TranscriptMessage[]): QuestionPair[] {
+    const pairs: QuestionPair[] = [];
+
+    for (let index = 0; index < transcript.length - 1; index += 1) {
+      const current = transcript[index];
+      const next = transcript[index + 1];
+
+      if (current.role === 'assistant' && next.role === 'user') {
+        pairs.push({ question: current, answer: next });
+      }
+    }
+
+    return pairs;
+  }
+
+  private static buildTimeline({
+    durationSecs,
+    questionPairs,
+    postureData,
+    defaultVoiceConfidence,
+    defaultFaceConfidence
+  }: {
+    durationSecs: number;
+    questionPairs: QuestionPair[];
+    postureData?: PostureAnalysisData;
+    defaultVoiceConfidence: number;
+    defaultFaceConfidence: number;
+  }): TimeSeriesPoint[] {
+    const bins = Math.max(1, Math.ceil(Math.max(durationSecs, 30) / this.BIN_SIZE));
+    const faceConfidenceBase = postureData
+      ? Math.max(0.35, Math.min(0.98, postureData.overallScore / 100))
+      : Math.max(0.45, Math.min(0.9, defaultFaceConfidence));
+
+    return Array.from({ length: bins }, (_, index) => {
+      const startTime = index * this.BIN_SIZE;
+      const minutes = Math.floor(startTime / 60);
+      const seconds = startTime % 60;
+
+      const pairIndex = questionPairs.length === 0
+        ? -1
+        : Math.min(questionPairs.length - 1, Math.floor((index / bins) * questionPairs.length));
+
+      let voiceConfidence = defaultVoiceConfidence;
+      let dominantEmotion = 'Steady';
+      let emotionIntensity = defaultVoiceConfidence;
+
+      if (pairIndex >= 0) {
+        const answer = questionPairs[pairIndex].answer.content;
+        const fillerCount = this.countMatches(answer, this.FILLER_WORDS);
+        const weakWordCount = this.countPhraseMatches(answer, this.WEAK_WORDS);
+        const responseLength = this.getWords(answer).length;
+        const responseLatencySec = Math.max(
+          1,
+          (new Date(questionPairs[pairIndex].answer.timestamp).getTime() - new Date(questionPairs[pairIndex].question.timestamp).getTime()) / 1000
+        );
+
+        const deliveryScore = this.scoreDeliveryProxy({
+          responseLength,
+          responseLatencySec,
+          fillerCount,
+          weakWordCount
+        });
+
+        voiceConfidence = Math.max(0.3, Math.min(0.95, deliveryScore / 100));
+        dominantEmotion = deliveryScore >= 75 ? 'Strong Answer' : deliveryScore >= 55 ? 'Steady Answer' : 'Hesitant Answer';
+        emotionIntensity = voiceConfidence;
+      }
+
+      return {
+        timestamp: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+        voiceConfidence,
+        faceConfidence: faceConfidenceBase,
+        dominantEmotion,
+        emotionIntensity
+      };
+    });
+  }
+
+  private static scoreDeliveryProxy({
+    responseLength,
+    responseLatencySec,
+    fillerCount,
+    weakWordCount
+  }: {
+    responseLength: number;
+    responseLatencySec: number;
+    fillerCount: number;
+    weakWordCount: number;
+  }): number {
+    let score = 68;
+
+    score += responseLength >= 30 ? 8 : responseLength < 12 ? -16 : 0;
+    score += responseLatencySec <= 4 ? 8 : responseLatencySec <= 8 ? 0 : -10;
+    score -= fillerCount * 4;
+    score -= weakWordCount * 3;
+
+    return Math.max(20, Math.min(95, Math.round(score)));
+  }
+
+  private static scorePresenceProxy({
+    postureData,
+    responseLatencySec,
+    fillerCount
+  }: {
+    postureData?: PostureAnalysisData;
+    responseLatencySec: number;
+    fillerCount: number;
+  }): number {
+    if (postureData) {
+      const headBonus = postureData.headPosition === 'centered' ? 6 : postureData.headPosition === 'forward' ? -4 : -8;
+      return Math.max(
+        25,
+        Math.min(
+          98,
+          Math.round(
+            postureData.overallScore * 0.55 +
+            postureData.timeInGoodPosture * 0.25 +
+            postureData.shoulderAlignment * 0.2 +
+            headBonus -
+            Math.max(0, responseLatencySec - 8) * 1.5 -
+            fillerCount * 0.8
+          )
+        )
+      );
+    }
+
+    return Math.max(35, Math.min(80, Math.round(62 - Math.max(0, responseLatencySec - 8) * 2 - fillerCount * 1.2)));
+  }
+
+  private static getWords(content: string): string[] {
+    return (content || '').trim().split(/\s+/).filter(Boolean);
+  }
+
+  private static countMatches(content: string, phrases: string[]): number {
+    return phrases.reduce((total, phrase) => {
+      const regex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      const matches = content.match(regex);
+      return total + (matches ? matches.length : 0);
+    }, 0);
+  }
+
+  private static countPhraseMatches(content: string, phrases: string[]): number {
+    const lowered = (content || '').toLowerCase();
+    return phrases.reduce((total, phrase) => total + (lowered.includes(phrase) ? 1 : 0), 0);
+  }
+
+  private static countSentences(content: string): number {
+    const sentences = (content || '').split(/[.!?]+/).map((sentence) => sentence.trim()).filter(Boolean);
+    return Math.max(1, sentences.length);
+  }
+
+  private static average(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  private static variance(values: number[]): number {
+    if (values.length < 2) return 0;
+    const mean = this.average(values);
+    return values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / values.length;
   }
 }

@@ -4,8 +4,6 @@ import {
   ArrowRight,
   Sparkles,
   Target,
-  Trophy,
-  Award,
   Brain,
   MessageSquare,
   ShieldCheck
@@ -108,19 +106,22 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const strengths = strengthsAndWeaknesses.strengths.slice(0, 3);
   const weaknesses = strengthsAndWeaknesses.weaknesses.slice(0, 3);
   const latestSession = interviewHistory[0];
+  const nextRecommendation = recommendations[0];
+  const nextWeakPoint = weaknesses[0] || nextRecommendation?.title || 'Run one session to surface your first target';
+  const recentWin = strengths[0] || 'No stable strength pattern yet';
 
   const heroStats = [
     { label: 'Sessions logged', value: stats.totalInterviews, helper: 'All time' },
-    { label: 'Avg score', value: stats.averageScore ? stats.averageScore.toFixed(1) : '--', helper: 'Latest cohorts' },
-    { label: 'Hours coached', value: `${stats.totalHours.toFixed(1)}h`, helper: 'Runtime' }
+    { label: 'Avg score', value: stats.averageScore ? stats.averageScore.toFixed(1) : '--', helper: 'Across saved mocks' },
+    { label: 'Hours coached', value: `${stats.totalHours.toFixed(1)}h`, helper: 'Live runtime' }
   ];
 
   const emptyState = (
-    <div className="border border-white/10 rounded-2xl p-8 text-center">
+    <div className="rounded-lg p-8 text-center" style={{ border: '1px solid var(--border)' }}>
       <p className="text-gray-400">No interviews logged yet. Kick off your first session to start tracking progress.</p>
       <button
         onClick={() => onStartRealtimeInterview('standard')}
-        className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold shadow-lg shadow-orange-500/30 hover:bg-orange-600 transition"
+        className="mt-6 inline-flex items-center gap-2 px-6 py-3.5 rounded-sm bg-orange-500 text-white text-sm font-medium tracking-wide shadow-[0_0_24px_rgba(232,101,26,0.25)] hover:bg-orange-400 transition-all duration-200"
       >
         Start now
         <ArrowRight className="w-4 h-4" />
@@ -129,26 +130,27 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   );
 
   return (
-    <div className="min-h-screen bg-[#030305] text-white pt-24">
-      <section className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,115,55,0.18),transparent_65%)]" />
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '180px 180px' }} />
+    <div className="min-h-screen text-white pt-24" style={{ background: 'var(--bg)' }}>
+      <section className="relative overflow-hidden" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at top, rgba(232,101,26,0.07) 0%, transparent 60%)' }} />
 
         <div className="relative px-6 lg:px-12 py-14 max-w-[1500px] mx-auto grid gap-12 lg:grid-cols-[1.35fr,0.65fr] items-start">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] uppercase tracking-[0.32em] text-orange-300">
-              Kelv Control Room
-            </div>
-            <h1 className="text-4xl md:text-5xl font-semibold mt-5 mb-3 leading-tight">
-              Launch drills, review receipts, and stay in rhythm.
-            </h1>
-            <p className="text-gray-400 text-lg max-w-2xl">
-              This dashboard is wired to your live interviews. Start a mock, jump into a focus lab, or pull proof for your mentor - without leaving the page.
+            <p className="text-[10px] uppercase tracking-[0.08em] mb-4" style={{ color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              Kelv · Control Room
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <h1 className="text-4xl font-medium mt-0 mb-3 leading-[1.1] md:text-5xl" style={{ color: 'var(--text)', letterSpacing: '-0.022em' }}>
+              Train the weak point,
+              <br />
+              not just the schedule.
+            </h1>
+            <p className="text-base max-w-xl" style={{ color: 'var(--text-3)' }}>
+              Kelv tells you what slipped, what held up, and what rep matters next.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
               <button
                 onClick={() => onStartRealtimeInterview('standard')}
-                className="px-7 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-lg shadow-orange-500/25 inline-flex items-center gap-2"
+                className="px-7 py-3.5 rounded-sm bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium tracking-wide shadow-[0_0_24px_rgba(232,101,26,0.25)] hover:shadow-[0_0_36px_rgba(232,101,26,0.4)] transition-all duration-200 inline-flex items-center gap-2"
               >
                 Start live interview
                 <ArrowRight className="w-4 h-4" />
@@ -157,9 +159,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
             <div className="mt-10 grid sm:grid-cols-3 gap-4">
               {heroStats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div key={stat.label} className="rounded-lg bg-white/[0.03] p-4" style={{ border: "1px solid var(--border)" }}>
                   <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">{stat.label}</p>
-                  <p className="text-3xl font-semibold mt-3">{stat.value}</p>
+                  <p className="font-mono text-3xl font-medium mt-3 text-white">{stat.value}</p>
                   <p className="text-xs text-gray-500 mt-1">{stat.helper}</p>
                 </div>
               ))}
@@ -170,24 +172,43 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="w-full rounded-3xl border border-white/10 bg-white/5 backdrop-blur-lg p-6 space-y-4"
+            className="w-full rounded-lg p-6 space-y-4"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
           >
-            <p className="text-sm uppercase tracking-[0.3em] text-gray-400">Next session brief</p>
+            <p className="text-sm uppercase tracking-[0.3em] text-gray-400">Practice target</p>
             {latestSession ? (
               <>
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-6">
                   <div>
                     <p className="text-xs text-gray-500">{new Date(latestSession.date).toLocaleDateString()}</p>
-                    <p className="text-xl font-semibold mt-1">{formatInterviewType(latestSession.interviewType)}</p>
+                    <p className="text-xl font-semibold mt-1">{nextWeakPoint}</p>
+                    <p className="text-sm text-gray-400 mt-2 max-w-sm">
+                      {nextRecommendation?.description || 'Revisit the last session and turn the lowest-signal answer into your next deliberate rep.'}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-semibold">{latestSession.overallScore?.toFixed(1) || '--'}</p>
                     <p className="text-xs text-gray-500">last score</p>
                   </div>
                 </div>
-                <div className="text-sm text-gray-400">
-                  {latestSession.setup.jobType} · {latestSession.setup.industry}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-white/[0.03] p-4" style={{ border: "1px solid var(--border)" }}>
+                    <p className="text-[10px] uppercase tracking-[0.28em] text-gray-500">Last interview trend</p>
+                    <p className="text-lg font-semibold mt-2">{formatInterviewType(latestSession.interviewType)}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {latestSession.setup.jobType} · {latestSession.setup.industry}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-white/[0.03] p-4" style={{ border: "1px solid var(--border)" }}>
+                    <p className="text-[10px] uppercase tracking-[0.28em] text-gray-500">Recent win</p>
+                    <p className="text-lg font-semibold mt-2">{recentWin}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Preserve this while tightening the next weakness.
+                    </p>
+                  </div>
                 </div>
+
                 <div className="text-xs text-gray-500 flex gap-3 flex-wrap">
                   <span>{latestSession.questionsAnswered} questions</span>
                   <span>·</span>
@@ -203,7 +224,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               </>
             ) : (
               <>
-                <p className="text-gray-400 text-sm">We’ll pin your next interview here once you run your first session.</p>
+                <p className="text-gray-400 text-sm">We’ll pin your next weak point here once you run your first saved session.</p>
                 <button
                   onClick={() => onStartRealtimeInterview('standard')}
                   className="inline-flex items-center gap-2 text-sm text-orange-300 hover:text-white"
@@ -219,11 +240,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
       <div className="max-w-[1500px] mx-auto px-6 lg:px-12 py-14 space-y-14">
         <section className="grid gap-8 lg:grid-cols-[1.25fr,0.75fr] items-start">
-          <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
+          <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }} className2="">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Live timeline</p>
-                <h3 className="text-2xl font-semibold mt-2">Latest sessions</h3>
+                <h3 className="text-base font-medium text-white mt-1">Recent sessions</h3>
               </div>
               <span className="text-xs text-gray-500">Auto-updates after every mock</span>
             </div>
@@ -238,7 +259,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                     onClick={() => onViewInterviewResults(session.id, session.interviewType)}
-                    className="w-full text-left border border-white/10 rounded-2xl p-4 hover:border-orange-500/40 transition bg-white/5"
+                    className="w-full text-left border rounded-lg p-4 hover:border-orange-500/40 transition bg-white/5"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -246,14 +267,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                         <p className="text-lg font-semibold">{formatInterviewType(session.interviewType)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-semibold">{session.overallScore?.toFixed(1) || '--'}</p>
+                        <p className="font-mono text-2xl font-medium text-white">{session.overallScore?.toFixed(1) || '--'}</p>
                         <p className="text-sm text-gray-500">score</p>
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-400">
-                      <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">{session.questionsAnswered} Qs</span>
-                      <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">{Math.round(session.duration / 60)} min</span>
-                      <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">{session.setup.industry}</span>
+                      <span className="px-3 py-1 rounded-sm border bg-white/[0.03]">{session.questionsAnswered} Qs</span>
+                      <span className="px-3 py-1 rounded-sm border bg-white/[0.03]">{Math.round(session.duration / 60)} min</span>
+                      <span className="px-3 py-1 rounded-sm border bg-white/[0.03]">{session.setup.industry}</span>
                     </div>
                   </motion.button>
                 ))}
@@ -261,9 +282,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           </div>
 
           <div className="space-y-6">
-            <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
+            <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }} className2="">
               <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Streak</p>
-              <h3 className="text-3xl font-semibold mt-3">{streakData.currentStreak} days</h3>
+              <h3 className="font-mono text-3xl font-medium mt-3 text-white">{streakData.currentStreak} days</h3>
               <p className="text-gray-400 text-sm">Longest streak: {streakData.longestStreak} days</p>
               <div className="flex items-center gap-4 mt-6">
                 <div className="flex-1">
@@ -281,15 +302,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               </div>
             </div>
 
-            <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
-              <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Strength scan</p>
+            <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }} className2="">
+              <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Signal scan</p>
               <div className="mt-4 grid grid-cols-1 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">What landed well</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {strengths.length === 0 && <span className="text-gray-500 text-sm">No data yet</span>}
                     {strengths.map((strength) => (
-                      <span key={strength} className="px-3 py-1 rounded-full border border-green-500/30 text-green-300 text-sm">
+                      <span key={strength} className="px-3 py-1 rounded-sm border border-green-500/20 text-green-300 text-xs">
                         {strength}
                       </span>
                     ))}
@@ -300,7 +321,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                   <div className="mt-2 flex flex-wrap gap-2">
                     {weaknesses.length === 0 && <span className="text-gray-500 text-sm">Kelv will highlight gaps after your first session.</span>}
                     {weaknesses.map((weakness) => (
-                      <span key={weakness} className="px-3 py-1 rounded-full border border-red-500/30 text-red-300 text-sm">
+                      <span key={weakness} className="px-3 py-1 rounded-sm border border-red-500/20 text-red-300 text-xs">
                         {weakness}
                       </span>
                     ))}
@@ -316,86 +337,131 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Focused labs</p>
-                <h3 className="text-2xl font-semibold mt-2">Dial in one behaviour at a time</h3>
+                <h3 className="text-base font-medium text-white mt-1">Dial in one behaviour at a time</h3>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {focusedModes.map((mode) => (
-                <motion.div
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {focusedModes.map((mode, idx) => (
+                <div
                   key={mode.id}
-                  whileHover={{ translateY: -6 }}
-                  className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5"
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    transition: 'border-color 0.15s',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${mode.accent}`} />
-                  <div className="relative p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-black/30 text-white">
-                        <mode.icon className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-white/70">{mode.duration}</p>
-                        <p className="text-lg font-semibold">{mode.label}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-white/80">{mode.copy}</p>
-                    <button
-                      onClick={() => onStartRealtimeInterview('focused', mode.id)}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white"
-                    >
-                      Run this drill
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em' }}>0{idx + 1}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{mode.duration}</span>
                   </div>
-                </motion.div>
+                  <div>
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>{mode.label}</p>
+                    <p style={{ fontSize: '12px', color: 'var(--text-3)', lineHeight: '1.55' }}>{mode.copy}</p>
+                  </div>
+                  <button
+                    onClick={() => onStartRealtimeInterview('focused', mode.id)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--orange)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 'auto' }}
+                  >
+                    Run drill
+                    <ArrowRight style={{ width: '12px', height: '12px' }} />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="border border-white/10 rounded-3xl p-6 bg-white/5 space-y-4">
-            <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Velocity notes</p>
-            <div className="space-y-3 text-sm text-gray-400">
-              <p>Kelv tracks how often you're running mocks, which formats you lean on, and which interview types are still untouched.</p>
-              <p>Use this card as your personal coach log - if you see gaps here, schedule the drill before the week ends.</p>
-            </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Practice cadence</p>
+            {interviewHistory.length > 0 ? (
+              <div className="space-y-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {[
+                    { label: 'This week', value: interviewHistory.filter(i => {
+                        const d = new Date(i.date);
+                        const now = new Date();
+                        return (now.getTime() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+                      }).length.toString(), unit: 'sessions' },
+                    { label: 'Best score', value: Math.max(...interviewHistory.map(i => i.overallScore)).toFixed(0), unit: 'pts' }
+                  ].map(stat => (
+                    <div key={stat.label} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '12px 14px' }}>
+                      <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{stat.label}</p>
+                      <p style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1 }}>{stat.value} <span style={{ fontSize: '11px', color: 'var(--text-4)', fontWeight: 400 }}>{stat.unit}</span></p>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.6' }}>
+                  {interviewHistory.length < 3
+                    ? 'Run at least 3 sessions to see your trend line. Kelv needs reps to surface the real gaps.'
+                    : `${interviewHistory.length} sessions logged. Keep a 3× weekly minimum until your avg clears 80.`}
+                </p>
+              </div>
+            ) : (
+              <p style={{ fontSize: '13px', color: 'var(--text-4)', lineHeight: '1.6' }}>
+                Your cadence shows here once you start logging sessions. Aim for 3× per week minimum — that's the rep count that moves your score.
+              </p>
+            )}
           </div>
         </section>
 
         <section className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-          <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-2xl font-semibold">Next reps from Kelv</h3>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Next reps from Kelv</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {recommendations.slice(0, 4).map((rec) => (
-                <div key={rec.title} className="p-4 rounded-2xl border border-white/10 bg-[#0f1117]">
-                  <p className="text-sm text-orange-300 uppercase tracking-[0.3em]">{rec.category}</p>
-                  <p className="text-lg font-semibold mt-2">{rec.title}</p>
-                  <p className="text-sm text-gray-400 mt-1">{rec.description}</p>
-                  <div className="mt-3 text-xs text-gray-500">Impact: {rec.impact}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+              {recommendations.slice(0, 4).map((rec, idx) => (
+                <div key={rec.title} style={{ background: 'var(--surface-2)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '2px', flexShrink: 0 }}>0{idx + 1}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '2px' }}>{rec.title}</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-3)' }}>{rec.impact}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onStartRealtimeInterview(rec.action.interviewType, rec.action.focusedType)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--orange)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                  >
+                    Run
+                    <ArrowRight style={{ width: '11px', height: '11px' }} />
+                  </button>
                 </div>
               ))}
-              {recommendations.length === 0 && <div className="text-gray-500 text-sm">Kelv will surface recommendations after your first interview.</div>}
+              {recommendations.length === 0 && (
+                <div style={{ background: 'var(--surface-2)', padding: '16px', fontSize: '13px', color: 'var(--text-4)' }}>Kelv will surface recommendations after your first interview.</div>
+              )}
             </div>
           </div>
 
-          <div className="border border-white/10 rounded-3xl p-6 bg-white/5">
-            <div className="flex items-center gap-3 mb-4">
-              <Trophy className="w-5 h-5 text-orange-300" />
-              <h3 className="text-xl font-semibold">Achievements</h3>
-            </div>
-            <div className="space-y-3">
-              {achievements.slice(0, 4).map((achievement) => (
-                <div key={achievement.id} className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-orange-500/20 flex items-center justify-center">
-                    <Award className="w-4 h-4 text-orange-200" />
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
+            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '20px' }}>Milestones</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+              {achievements.slice(0, 5).map((achievement, idx) => (
+                <div key={achievement.id} style={{ background: 'var(--surface-2)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', opacity: achievement.unlocked ? 1 : 0.45 }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', flexShrink: 0, width: '18px' }}>0{idx + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '1px' }}>{achievement.title}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-4)' }}>{achievement.description}</p>
                   </div>
-                  <div>
-                    <p className="font-semibold">{achievement.title}</p>
-                    <p className="text-sm text-gray-400">{achievement.description}</p>
-                  </div>
+                  {!achievement.unlocked && (
+                    <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', flexShrink: 0 }}>{Math.round(achievement.progress)}%</span>
+                  )}
+                  {achievement.unlocked && (
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(74,222,128,0.7)', flexShrink: 0 }} />
+                  )}
                 </div>
               ))}
-              {achievements.length === 0 && <p className="text-sm text-gray-500">Stay consistent and Kelv will unlock your first badge.</p>}
+              {achievements.length === 0 && (
+                <div style={{ background: 'var(--surface-2)', padding: '16px', fontSize: '13px', color: 'var(--text-4)' }}>Stay consistent and Kelv will unlock your first milestone.</div>
+              )}
             </div>
           </div>
         </section>

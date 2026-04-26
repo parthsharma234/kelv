@@ -1,259 +1,307 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import DeviceMockup from './DeviceMockup';
-import MockupResults from './MockupResults';
-import { Mic, Sparkles, Target } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
-/**
- * Features section with alternating left-right layouts (Stripe-style)
- */
+/* ── Inline product mockups ─────────────────────────────────────────── */
+
+const VoiceMockup: React.FC = () => (
+  <div style={{ background: 'var(--surface)', padding: '28px 32px', minHeight: '300px' }}>
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <p style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-4)', textTransform: 'uppercase', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>
+          Voice analysis · Q3
+        </p>
+        <p style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>Leadership story — time-to-impact</p>
+      </div>
+      <div className="text-right">
+        <p style={{ fontSize: '28px', fontWeight: 600, color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1 }}>78</p>
+        <p style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: '2px' }}>delivery score</p>
+      </div>
+    </div>
+
+    {/* Waveform */}
+    <div className="relative flex items-center gap-px" style={{ height: '64px', marginBottom: '20px' }}>
+      {Array.from({ length: 72 }).map((_, i) => {
+        const h = 15 + Math.abs(Math.sin(i * 0.4 + 1) * 45) + Math.abs(Math.sin(i * 0.8) * 20);
+        const isSpike = i >= 42 && i <= 52;
+        return (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              height: `${Math.min(h, 100)}%`,
+              borderRadius: '2px',
+              background: isSpike ? 'rgba(232,101,26,0.7)' : 'rgba(255,255,255,0.12)',
+            }}
+          />
+        );
+      })}
+      <div
+        style={{
+          position: 'absolute',
+          top: '-18px',
+          left: '59%',
+          fontSize: '9px',
+          color: 'var(--orange)',
+          background: 'rgba(232,101,26,0.12)',
+          border: '1px solid rgba(232,101,26,0.25)',
+          padding: '2px 6px',
+          borderRadius: '3px',
+          fontFamily: 'IBM Plex Mono, monospace',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        hesitation spike
+      </div>
+    </div>
+
+    <div className="grid grid-cols-4 gap-3">
+      {[
+        { label: 'Pace', value: '142 wpm', ok: true },
+        { label: 'Fillers', value: '3 detected', ok: false },
+        { label: 'Avg pause', value: '2.1 s', ok: true },
+        { label: 'Energy', value: 'Steady', ok: true },
+      ].map((m) => (
+        <div
+          key={m.label}
+          style={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            padding: '10px 12px',
+          }}
+        >
+          <p style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px', fontFamily: 'IBM Plex Mono, monospace' }}>{m.label}</p>
+          <p style={{ fontSize: '13px', fontWeight: 500, color: m.ok ? 'var(--text)' : 'var(--orange)' }}>{m.value}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const StoryMockup: React.FC = () => (
+  <div style={{ background: 'var(--surface)', padding: '28px 32px', minHeight: '300px' }}>
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <p style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-4)', textTransform: 'uppercase', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>
+          Story Coach · STAR analysis
+        </p>
+        <p style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>Q2: Tell me about a time you led a team</p>
+      </div>
+      <div style={{ display: 'flex', gap: '6px' }}>
+        {['S', 'T', 'A', 'R'].map((letter, i) => (
+          <div
+            key={letter}
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: 600,
+              fontFamily: 'IBM Plex Mono, monospace',
+              background: i < 3 ? 'rgba(232,101,26,0.15)' : 'rgba(255,255,255,0.04)',
+              color: i < 3 ? 'var(--orange)' : 'var(--text-4)',
+              border: `1px solid ${i < 3 ? 'rgba(232,101,26,0.3)' : 'var(--border)'}`,
+            }}
+          >
+            {letter}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div className="space-y-3">
+      {[
+        { label: 'Situation', note: 'Clear context set', score: 90, ok: true },
+        { label: 'Task', note: 'Role defined', score: 82, ok: true },
+        { label: 'Action', note: 'Missing specific steps taken', score: 54, ok: false },
+        { label: 'Result', note: 'No metric cited', score: 38, ok: false },
+      ].map((row) => (
+        <div
+          key={row.label}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <span style={{ width: '68px', fontSize: '11px', color: 'var(--text-3)', fontWeight: 500 }}>{row.label}</span>
+          <div style={{ flex: 1, height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${row.score}%`,
+                background: row.ok ? 'rgba(34,197,94,0.7)' : 'var(--orange)',
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', width: '24px', textAlign: 'right' }}>{row.score}</span>
+          <span style={{ fontSize: '10px', color: row.ok ? 'rgba(34,197,94,0.8)' : 'var(--orange)', minWidth: '160px' }}>{row.note}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const DrillsMockup: React.FC = () => (
+  <div style={{ background: 'var(--surface)', padding: '28px 32px', minHeight: '300px' }}>
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <p style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-4)', textTransform: 'uppercase', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>
+          Drill queue · 3 items
+        </p>
+        <p style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>Based on your last session</p>
+      </div>
+      <div style={{ padding: '4px 10px', background: 'rgba(232,101,26,0.1)', border: '1px solid rgba(232,101,26,0.2)', borderRadius: '4px', fontSize: '11px', color: 'var(--orange)' }}>
+        Next up
+      </div>
+    </div>
+
+    <div className="space-y-2">
+      {[
+        { name: 'Interrupt Recovery', dur: '3 min', progress: 0, active: true },
+        { name: 'Result framing with metrics', dur: '5 min', progress: 40, active: false },
+        { name: 'Closing statement cadence', dur: '2 min', progress: 100, active: false },
+      ].map((drill, i) => (
+        <div
+          key={drill.name}
+          style={{
+            padding: '14px 16px',
+            background: drill.active ? 'rgba(232,101,26,0.06)' : 'var(--surface-2)',
+            border: `1px solid ${drill.active ? 'rgba(232,101,26,0.2)' : 'var(--border)'}`,
+            borderRadius: '6px',
+          }}
+        >
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: '13px', fontWeight: 500, color: drill.active ? 'var(--text)' : 'var(--text-3)' }}>{drill.name}</span>
+              {drill.active && (
+                <span style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(232,101,26,0.15)', color: 'var(--orange)', borderRadius: '3px', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Priority</span>
+              )}
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{drill.dur}</span>
+          </div>
+          <div style={{ height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${drill.progress || (drill.active ? 0 : 0)}%`,
+                background: drill.progress === 100 ? 'rgba(34,197,94,0.7)' : 'var(--orange)',
+                borderRadius: '2px',
+                transition: 'width 0.6s ease',
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ── Feature data ───────────────────────────────────────────────────── */
+
+const features = [
+  {
+    num: '1.0',
+    label: 'Delivery signal',
+    heading: 'Your voice leaks confidence before the answer is finished.',
+    description:
+      'Kelv tracks filler load, pacing swings, and hesitation in real time — so you see the exact moment your answer lost force, not just a number after the fact.',
+    linkText: 'See delivery analysis',
+    mockup: <VoiceMockup />,
+  },
+  {
+    num: '2.0',
+    label: 'Story coach',
+    heading: 'Turn loose anecdotes into evidence a hiring manager can cite.',
+    description:
+      'Kelv scores STAR structure per question, flags where proof goes thin, and prompts for the metric or decision that makes the story credible.',
+    linkText: 'See story scoring',
+    mockup: <StoryMockup />,
+  },
+  {
+    num: '3.0',
+    label: 'Targeted drills',
+    heading: 'Practice the exact gap that cost you the room.',
+    description:
+      'After each session Kelv queues focused reps on the single weakness with the highest leverage — and tracks improvement across sessions until the pattern changes.',
+    linkText: 'See drill queue',
+    mockup: <DrillsMockup />,
+  },
+];
+
+/* ── Section ────────────────────────────────────────────────────────── */
+
 const FeaturesSection: React.FC = () => {
-    const features = [
-        {
-            id: 'voice',
-            icon: Mic,
-            title: 'Voice Intelligence',
-            subtitle: 'Your voice tells the story before your words do',
-            description: 'Kelv tracks confidence dips, filler word spikes, and pace changes in real-time. After your interview, you see exactly when the energy dropped and why.',
-            proofs: ['Filler word tracking', 'Pace analysis', 'Confidence scoring'],
-            mockup: 'waveform',
-            gradient: 'from-orange-500/20 via-transparent to-transparent',
-        },
-        {
-            id: 'story',
-            icon: Sparkles,
-            title: 'Story Coach',
-            subtitle: 'Turn rambling answers into receipts',
-            description: 'Kelv scores your STAR structure, flags when examples drift, and shows you how to land the metrics that hiring managers remember.',
-            proofs: ['STAR framework scoring', 'Example analysis', 'Metric extraction'],
-            mockup: 'results',
-            gradient: 'from-purple-500/20 via-transparent to-transparent',
-        },
-        {
-            id: 'targeted',
-            icon: Target,
-            title: 'Targeted Drills',
-            subtitle: 'Practice the exact skill that cost you the offer',
-            description: 'Based on your performance, Kelv queues focused drills—interrupt handling, technical pressure, or weak closing—until the gap is closed.',
-            proofs: ['Personalized drill queue', 'Weakness detection', 'Progress tracking'],
-            mockup: 'drills',
-            gradient: 'from-blue-500/20 via-transparent to-transparent',
-        },
-    ];
-
-    return (
-        <section id="features" className="py-32 bg-[#030305] relative overflow-hidden">
-            {/* Background */}
-            <div className="absolute inset-0 grid-pattern opacity-20" />
-
-            <div className="max-w-7xl mx-auto px-6 lg:px-10">
-                {/* Section header */}
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-24"
+  return (
+    <section id="features" style={{ background: 'var(--bg)' }}>
+      {features.map((f, i) => (
+        <div key={f.num} className="section-rule">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            viewport={{ once: true, margin: '-80px' }}
+            className="feature-section page-outer"
+          >
+            {/* Top row: left h2 | right description + link */}
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: '1fr 1fr',
+                gap: '48px',
+                marginBottom: '64px',
+                alignItems: 'start',
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--text-4)',
+                    fontFamily: 'IBM Plex Mono, monospace',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    marginBottom: '20px',
+                  }}
                 >
-                    <span className="inline-block text-xs uppercase tracking-[0.3em] text-orange-400 mb-4">
-                        Why Kelv works
-                    </span>
-                    <h2 className="text-4xl lg:text-5xl font-semibold text-white">
-                        More than practice.{' '}
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-300">
-                            Proof.
-                        </span>
-                    </h2>
-                </motion.div>
+                  {f.num}
+                </p>
+                <h2>{f.heading}</h2>
+              </div>
 
-                {/* Feature blocks */}
-                <div className="space-y-32">
-                    {features.map((feature, index) => {
-                        const isReversed = index % 2 === 1;
-                        const Icon = feature.icon;
-
-                        return (
-                            <motion.div
-                                key={feature.id}
-                                initial={{ opacity: 0, y: 60 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                                viewport={{ once: true, margin: "-100px" }}
-                                className={`grid lg:grid-cols-2 gap-16 items-center ${isReversed ? '' : ''}`}
-                            >
-                                {/* Content */}
-                                <div className={`space-y-6 ${isReversed ? 'lg:order-2' : ''}`}>
-                                    {/* Icon */}
-                                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
-                                        <Icon className="w-6 h-6 text-orange-400" />
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-gray-500 mb-2">{feature.subtitle}</p>
-                                        <h3 className="text-3xl font-semibold text-white">{feature.title}</h3>
-                                    </div>
-
-                                    <p className="text-lg text-gray-400 leading-relaxed">
-                                        {feature.description}
-                                    </p>
-
-                                    {/* Proof points */}
-                                    <div className="flex flex-wrap gap-2 pt-2">
-                                        {feature.proofs.map((proof) => (
-                                            <span
-                                                key={proof}
-                                                className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-400"
-                                            >
-                                                {proof}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Visual */}
-                                <div className={`relative ${isReversed ? 'lg:order-1' : ''}`}>
-                                    {/* Gradient glow */}
-                                    <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} blur-3xl scale-110 opacity-50`} />
-
-                                    <DeviceMockup variant="window" showChrome animate>
-                                        {feature.mockup === 'results' ? (
-                                            <MockupResults />
-                                        ) : feature.mockup === 'waveform' ? (
-                                            <WaveformMockup />
-                                        ) : (
-                                            <DrillsMockup />
-                                        )}
-                                    </DeviceMockup>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </div>
-            </div>
-        </section>
-    );
-};
-
-/**
- * Waveform visualization mockup for voice analysis feature
- */
-const WaveformMockup: React.FC = () => {
-    return (
-        <div className="bg-[#030305] p-6 min-h-[300px]">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">Voice Analysis</p>
-                    <h3 className="text-sm font-semibold text-white mt-1">Question 3: Leadership Story</h3>
-                </div>
-                <div className="text-right">
-                    <p className="text-lg font-bold text-orange-400">78%</p>
-                    <p className="text-[9px] text-gray-500">confidence</p>
-                </div>
+              <div style={{ paddingTop: '40px' }}>
+                <p style={{ fontSize: '16px', color: 'var(--text-3)', lineHeight: '1.65', marginBottom: '24px' }}>
+                  {f.description}
+                </p>
+                <a
+                  href="#waitlist"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('waitlist')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="feature-link"
+                >
+                  <span className="num">{f.num}</span>
+                  {f.linkText}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
             </div>
 
-            {/* Waveform visualization */}
-            <div className="relative h-24 mb-6 flex items-center gap-0.5">
-                {Array.from({ length: 60 }).map((_, i) => {
-                    const height = Math.random() * 60 + 20;
-                    const isHighlighted = i > 35 && i < 45;
-                    return (
-                        <motion.div
-                            key={i}
-                            initial={{ height: 0 }}
-                            animate={{ height: `${height}%` }}
-                            transition={{ delay: i * 0.02, duration: 0.3 }}
-                            className={`flex-1 rounded-full ${isHighlighted ? 'bg-orange-500/80' : 'bg-white/20'
-                                }`}
-                        />
-                    );
-                })}
-                {/* Highlighted section marker */}
-                <div className="absolute top-0 left-[58%] transform -translate-x-1/2 bg-orange-500/20 border border-orange-500/30 rounded px-2 py-0.5 text-[8px] text-orange-400">
-                    Confidence dip
-                </div>
+            {/* Full-width product screenshot */}
+            <div className="screenshot-frame">
+              {f.mockup}
             </div>
-
-            {/* Metrics */}
-            <div className="grid grid-cols-4 gap-3">
-                {[
-                    { label: 'Pace', value: '142 WPM', status: 'good' },
-                    { label: 'Fillers', value: '3', status: 'warning' },
-                    { label: 'Pauses', value: '2.1s avg', status: 'good' },
-                    { label: 'Energy', value: 'Steady', status: 'good' },
-                ].map((metric) => (
-                    <div key={metric.label} className="bg-[#0a0a0f] rounded-lg p-3 border border-white/5">
-                        <p className="text-[9px] uppercase tracking-wider text-gray-500">{metric.label}</p>
-                        <p className={`text-sm font-medium mt-1 ${metric.status === 'warning' ? 'text-orange-400' : 'text-white'
-                            }`}>
-                            {metric.value}
-                        </p>
-                    </div>
-                ))}
-            </div>
+          </motion.div>
         </div>
-    );
-};
-
-/**
- * Drills mockup for targeted practice feature
- */
-const DrillsMockup: React.FC = () => {
-    const drills = [
-        { name: 'Interrupt Recovery', duration: '3 min', priority: 'high', progress: 0 },
-        { name: 'Technical Deep-Dive', duration: '7 min', priority: 'medium', progress: 60 },
-        { name: 'Closing Statement', duration: '2 min', priority: 'low', progress: 100 },
-    ];
-
-    return (
-        <div className="bg-[#030305] p-6 min-h-[300px]">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">Your Drill Queue</p>
-                    <h3 className="text-sm font-semibold text-white mt-1">Based on last 3 sessions</h3>
-                </div>
-            </div>
-
-            <div className="space-y-3">
-                {drills.map((drill, i) => (
-                    <motion.div
-                        key={drill.name}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className={`p-4 rounded-xl border ${drill.priority === 'high'
-                                ? 'bg-orange-500/5 border-orange-500/20'
-                                : 'bg-white/5 border-white/5'
-                            }`}
-                    >
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <span className={`text-xs font-medium ${drill.priority === 'high' ? 'text-orange-400' : 'text-white'
-                                    }`}>
-                                    {drill.name}
-                                </span>
-                                {drill.priority === 'high' && (
-                                    <span className="text-[8px] px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded uppercase">
-                                        Priority
-                                    </span>
-                                )}
-                            </div>
-                            <span className="text-[10px] text-gray-500">{drill.duration}</span>
-                        </div>
-                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${drill.progress}%` }}
-                                transition={{ delay: 0.5 + i * 0.1, duration: 0.6 }}
-                                className={`h-full rounded-full ${drill.progress === 100 ? 'bg-green-500' : 'bg-orange-500'
-                                    }`}
-                            />
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
-    );
+      ))}
+    </section>
+  );
 };
 
 export default FeaturesSection;

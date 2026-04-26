@@ -6,6 +6,9 @@ import VapiInterviewSession from './VapiInterviewSession';
 import InterviewProcessing from './InterviewProcessing';
 import InterviewResults from './InterviewResults';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import { AnalyticsEngine } from '../../utils/analyticsEngine';
+import { PerQuestionAnalytics } from '../../utils/perQuestionAnalytics';
+import { getInterviewById, savePlatformInterviewResult } from '../../utils/supabase-interview';
 
 type PlatformState = 'dashboard' | 'interview' | 'processing' | 'results';
 
@@ -67,6 +70,43 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
     scrollToTop();
   };
 
+  const hydrateStoredSession = React.useCallback((data: any) => {
+    if (!data) return null;
+
+    const transcript = Array.isArray(data.transcript) ? data.transcript : [];
+    const postureData = data.postureData || data.session_metadata?.posture_data;
+    const jobContext = data.jobContext || data.session_metadata?.job_context || {
+      role: data.setup?.jobType,
+      industry: data.setup?.industry,
+      experienceLevel: data.setup?.experienceLevel
+    };
+
+    const metrics = data.metrics || (transcript.length > 0
+      ? AnalyticsEngine.process({
+        durationSecs: data.duration || 60,
+        transcript,
+        role: jobContext?.role,
+        postureData
+      })
+      : null);
+
+    const perQuestionAnalysis = data.perQuestionAnalysis ||
+      data.session_metadata?.per_question_analysis ||
+      (transcript.length > 0 && metrics
+        ? PerQuestionAnalytics.process(transcript, { postureData, overallMetrics: metrics })
+        : null);
+
+    return {
+      ...data,
+      transcript,
+      postureData,
+      jobContext,
+      metrics,
+      perQuestionAnalysis,
+      processingSource: data.processingSource || data.session_metadata?.processing_source || 'transcript-and-posture'
+    };
+  }, []);
+
   const handleInterviewComplete = React.useCallback((data: any) => {
     if (!data) {
       console.error('❌ handleInterviewComplete: Received null/undefined data');
@@ -99,9 +139,19 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
         <PlatformDashboard
           key={dashboardKey}
           onStartRealtimeInterview={handleStartInterview}
-          onViewInterviewResults={() => {
-            // TODO: Implement interview results viewing
-            console.log('View interview results - to be implemented');
+          onViewInterviewResults={async (id) => {
+            const stored = await getInterviewById(id);
+            const hydrated = hydrateStoredSession(stored);
+
+            if (!hydrated) {
+              console.error('Unable to load saved interview result:', id);
+              return;
+            }
+
+            sessionDataRef.current = hydrated;
+            setSessionData(hydrated);
+            setCurrentState('results');
+            scrollToTop();
           }}
         />
       )}
@@ -116,9 +166,17 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       {currentState === 'processing' && (
         <InterviewProcessing
           sessionData={sessionData || sessionDataRef.current}
-          onComplete={(results) => {
+          onComplete={async (results) => {
             // Merge processed metrics into session data
-            const finalData = { ...(sessionData || sessionDataRef.current), ...results };
+            const finalData = {
+              ...(sessionData || sessionDataRef.current),
+              ...results,
+              interviewType: 'standard'
+            };
+
+            const savedId = await savePlatformInterviewResult(finalData);
+            finalData.id = savedId;
+
             setSessionData(finalData);
             sessionDataRef.current = finalData;
 

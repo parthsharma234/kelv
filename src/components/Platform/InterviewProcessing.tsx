@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Mic, BarChart3, FileText, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import RedPandaLogo from '../RedPandaLogo';
-import { HumeBatchClient } from '../../utils/humeBatchClient';
 import { AnalyticsEngine } from '../../utils/analyticsEngine';
+import { PerQuestionAnalytics } from '../../utils/perQuestionAnalytics';
 
 interface InterviewProcessingProps {
   sessionData: any; // Contains { transcript, duration, recordingBlob }
@@ -23,10 +23,10 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
 
   // Processing Steps (Visuals)
   const processingSteps = [
-    { icon: FileText, title: 'Uploading Interview', description: 'Securely sending data to analytics engine' },
-    { icon: Brain, title: 'Analyzing Biometrics', description: 'Processing facial expressions and prosody' },
-    { icon: Mic, title: 'Evaluating Content', description: 'Generating detailed feedback and scores' },
-    { icon: BarChart3, title: 'Finalizing Report', description: 'Compiling your personal dashboard' }
+    { icon: FileText, title: 'Normalizing Session', description: 'Cleaning transcript, timing, and context data' },
+    { icon: Brain, title: 'Scoring Answer Quality', description: 'Breaking down structure, specificity, and pacing' },
+    { icon: Mic, title: 'Building Delivery Signals', description: 'Estimating cadence, hesitation, and presence' },
+    { icon: BarChart3, title: 'Finalizing Report', description: 'Compiling your results and next practice targets' }
   ];
 
   useEffect(() => {
@@ -37,56 +37,54 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
       try {
         console.log('[Processing] Starting analysis pipeline...');
 
-        // 1. Upload & Start Job
+        // 1. Normalize session data
         setCurrentStep(0);
         setProgress(10);
+        const transcript = Array.isArray(sessionData?.transcript)
+          ? sessionData.transcript.filter((entry: any) => entry && !entry.isPartial)
+          : [];
 
-        const apiKey = import.meta.env.VITE_HUME_API_KEY;
-        if (!apiKey) throw new Error('Missing Hume API Key');
-
-        const client = new HumeBatchClient(apiKey);
-
-        if (!sessionData?.recordingBlob) {
-          // STRICT MODE: No recording = No Analysis.
-          console.error('[Processing] Critical: No recording blob found.');
-          throw new Error('No recording data captured. Cannot generate real metrics.');
+        if (transcript.length === 0) {
+          throw new Error('No completed transcript was captured for this session.');
         }
 
-        const jobId = await client.startJob(sessionData.recordingBlob);
-        console.log('[Processing] Job started:', jobId);
+        await new Promise((resolve) => setTimeout(resolve, 250));
 
-        // 2. Poll for Results
+        // 2. Score overall interview metrics
         setCurrentStep(1);
-        setProgress(30);
+        setProgress(35);
 
-        // Poll with progress simulation
-        const pollInterval = setInterval(() => {
-          setProgress(prev => Math.min(prev + 1, 80));
-        }, 500);
+        const metrics = AnalyticsEngine.process({
+          durationSecs: sessionData?.duration || 60,
+          transcript,
+          role: sessionData?.jobContext?.role,
+          postureData: sessionData?.postureData
+        });
 
-        const predictions = await client.waitForCompletion(jobId);
-        clearInterval(pollInterval);
+        await new Promise((resolve) => setTimeout(resolve, 250));
 
-        // 3. Evaluation & Metrics
+        // 3. Build per-question analysis from owned data
         setCurrentStep(2);
-        setProgress(90);
+        setProgress(72);
 
-        const metrics = AnalyticsEngine.process(
-          predictions,
-          sessionData.duration || 60,
-          sessionData.transcript || []
-        );
+        const perQuestionAnalysis = PerQuestionAnalytics.process(transcript, {
+          postureData: sessionData?.postureData,
+          overallMetrics: metrics
+        });
 
-        // 4. Finalizing
+        // 4. Finalize output
         setCurrentStep(3);
         setProgress(100);
 
         setTimeout(() => {
           onComplete({
             metrics,
-            transcript: sessionData.transcript,
-            duration: sessionData.duration,
-            postureData: sessionData.postureData  // Pass through posture data
+            transcript,
+            duration: sessionData?.duration,
+            postureData: sessionData?.postureData,
+            jobContext: sessionData?.jobContext,
+            perQuestionAnalysis,
+            processingSource: 'transcript-and-posture'
           });
         }, 800);
 
@@ -102,7 +100,7 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
   if (error) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-dark-800 border border-red-500/20 rounded-2xl p-8 text-center">
+        <div className="max-w-md w-full bg-dark-800 border border-red-500/20 rounded-lg p-8 text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Processing Failed</h2>
           <p className="text-gray-400 mb-6">{error}</p>
@@ -148,7 +146,7 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          Extracting emotional intelligence and vocal prosody...
+          Turning transcript, timing, and posture signals into a usable coaching report...
         </motion.p>
 
         {/* Progress Bar */}

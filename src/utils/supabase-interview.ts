@@ -1,6 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { InterviewHistory, InterviewSetup } from '../types/interview';
 
+const HISTORY_STORAGE_KEY = 'kelv-interview-history';
+const PLATFORM_RESULTS_STORAGE_KEY = 'kelv-platform-results';
+
 // Realtime transcript interfaces
 export interface TranscriptChunk {
   id: string;
@@ -37,6 +40,102 @@ export interface SavedInterviewSetup {
   created_at: string;
   updated_at: string;
 }
+
+const getLocalHistory = (): InterviewHistory[] => {
+  const localHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+  return localHistory ? JSON.parse(localHistory) : [];
+};
+
+const saveLocalHistory = (history: InterviewHistory[]) => {
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+};
+
+const getLocalPlatformResults = (): any[] => {
+  const localResults = localStorage.getItem(PLATFORM_RESULTS_STORAGE_KEY);
+  return localResults ? JSON.parse(localResults) : [];
+};
+
+const saveLocalPlatformResults = (results: any[]) => {
+  localStorage.setItem(PLATFORM_RESULTS_STORAGE_KEY, JSON.stringify(results));
+};
+
+const buildInterviewSetupFromResult = (sessionData: any): InterviewSetup => ({
+  industry: sessionData?.jobContext?.industry || 'General',
+  jobType: sessionData?.jobContext?.role || 'Mock Interview',
+  experienceLevel: sessionData?.jobContext?.experienceLevel || 'General',
+  interviewMode: 'voice'
+});
+
+const buildHistoryEntryFromResult = (sessionData: any): InterviewHistory => {
+  const transcript = Array.isArray(sessionData?.transcript) ? sessionData.transcript : [];
+  const questionsAnswered = transcript.filter((entry: any) => entry.role === 'user').length;
+  const savedAt = sessionData?.savedAt || new Date().toISOString();
+
+  return {
+    id: sessionData.id,
+    date: new Date(savedAt),
+    setup: buildInterviewSetupFromResult(sessionData),
+    overallScore: sessionData?.metrics?.overallScore || 0,
+    duration: sessionData?.duration || 0,
+    questionsAnswered,
+    status: 'completed',
+    speechMetricsAverage: sessionData?.metrics ? {
+      overallConfidence: sessionData.metrics.presenceScore || 0,
+      fluencyScore: sessionData.metrics.articulationScore || 0,
+      speechRate: sessionData.metrics.wpm || 0,
+      voiceStability: sessionData.metrics.deliveryScore || 0
+    } : undefined,
+    interviewType: sessionData?.interviewType || 'standard'
+  };
+};
+
+const mergeHistoryEntries = (remoteHistory: InterviewHistory[], localHistory: InterviewHistory[]) => {
+  const merged = [...remoteHistory];
+  const existingIds = new Set(remoteHistory.map((entry) => entry.id));
+
+  localHistory.forEach((entry) => {
+    if (!existingIds.has(entry.id)) {
+      merged.push({
+        ...entry,
+        date: new Date(entry.date)
+      });
+    }
+  });
+
+  return merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
+
+const deriveStrengthsAndWeaknessesFromLocalResults = () => {
+  const results = getLocalPlatformResults().slice(0, 10);
+  const strengthCounts: Record<string, number> = {};
+  const weaknessCounts: Record<string, number> = {};
+
+  results.forEach((result: any) => {
+    (result?.metrics?.strengths || []).forEach((item: any) => {
+      if (item?.area) {
+        strengthCounts[item.area] = (strengthCounts[item.area] || 0) + 1;
+      }
+    });
+
+    (result?.metrics?.weaknesses || []).forEach((item: any) => {
+      if (item?.area) {
+        weaknessCounts[item.area] = (weaknessCounts[item.area] || 0) + 1;
+      }
+    });
+  });
+
+  const strengths = Object.entries(strengthCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([label]) => label);
+
+  const weaknesses = Object.entries(weaknessCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([label]) => label);
+
+  return { strengths, weaknesses, categories: {} };
+};
 
 export const createInitialInterviewSession = async (sessionId: string, setup: InterviewSetup, interviewType?: string): Promise<void> => {
   if (!isSupabaseConfigured()) {
@@ -508,12 +607,86 @@ export const deleteInterviewSetup = async (setupId: string): Promise<boolean> =>
   }
 };
 
+export const savePlatformInterviewResult = async (sessionData: any): Promise<string> => {
+  const sessionId = sessionData?.id || `kelv_${Date.now()}`;
+  const savedAt = new Date().toISOString();
+  const payload = {
+    ...sessionData,
+    id: sessionId,
+    savedAt,
+    interviewType: sessionData?.interviewType || 'standard'
+  };
+
+  try {
+    const localResults = getLocalPlatformResults().filter((entry: any) => entry.id !== sessionId);
+    localResults.unshift(payload);
+    saveLocalPlatformResults(localResults);
+
+    const localHistory = getLocalHistory().filter((entry) => entry.id !== sessionId);
+    localHistory.unshift(buildHistoryEntryFromResult(payload));
+    saveLocalHistory(localHistory);
+  } catch (error) {
+    console.error('Failed to save platform result locally:', error);
+  }
+
+  if (!isSupabaseConfigured()) {
+    return sessionId;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return sessionId;
+    }
+
+    const transcript = Array.isArray(payload.transcript) ? payload.transcript : [];
+    const questionsAnswered = transcript.filter((entry: any) => entry.role === 'user').length;
+
+    const upsertPayload = {
+      id: sessionId,
+      user_id: user.id,
+      interview_type: payload.interviewType,
+      setup: buildInterviewSetupFromResult(payload),
+      overall_score: payload?.metrics?.overallScore || 0,
+      duration: payload?.duration || 0,
+      questions_answered: questionsAnswered,
+      status: 'completed',
+      transcript,
+      metrics: payload?.metrics || {},
+      voice_metrics_summary: {
+        deliveryScore: payload?.metrics?.deliveryScore || 0,
+        presenceScore: payload?.metrics?.presenceScore || 0,
+        wpm: payload?.metrics?.wpm || 0,
+        fillerWordCount: payload?.metrics?.fillerWordCount || 0
+      },
+      session_metadata: {
+        source: 'vapi-platform',
+        processing_source: payload?.processingSource || 'transcript-and-posture',
+        job_context: payload?.jobContext || {},
+        posture_data: payload?.postureData || null,
+        per_question_analysis: payload?.perQuestionAnalysis || null
+      },
+      created_at: savedAt
+    };
+
+    const { error } = await supabase
+      .from('interview_sessions')
+      .upsert(upsertPayload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save platform result to Supabase:', error);
+    }
+  } catch (error) {
+    console.error('Failed to save platform result remotely:', error);
+  }
+
+  return sessionId;
+};
+
 
 export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
   if (!isSupabaseConfigured()) {
-    // Return localStorage data as fallback
-    const localHistory = localStorage.getItem('kelv-interview-history');
-    return localHistory ? JSON.parse(localHistory) : [];
+    return getLocalHistory();
   }
 
   try {
@@ -525,9 +698,7 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
 
     if (error) {
       console.error('Error fetching interview history:', error);
-      // Fallback to localStorage
-      const localHistory = localStorage.getItem('kelv-interview-history');
-      return localHistory ? JSON.parse(localHistory) : [];
+      return getLocalHistory();
     }    
 
     console.log('Fetched interview history from Supabase:', {
@@ -559,47 +730,45 @@ export const getInterviewHistory = async (): Promise<InterviewHistory[]> => {
       speechMetricsIncluded: !!h.speechMetricsAverage
     })));
 
-    return transformedHistory;
+    return mergeHistoryEntries(transformedHistory, getLocalHistory());
 
   } catch (error) {
     console.error('Failed to fetch interview history:', error);
-    // Fallback to localStorage
-    const localHistory = localStorage.getItem('kelv-interview-history');
-    return localHistory ? JSON.parse(localHistory) : [];
+    return getLocalHistory();
   }
 };
 
 export const getInterviewStats = async () => {
-  if (!isSupabaseConfigured()) {
-    // Calculate from localStorage
-    const localHistory = localStorage.getItem('kelv-interview-history');
-    const history = localHistory ? JSON.parse(localHistory) : [];
-    
+  try {
+    const history = await getInterviewHistory();
     const totalInterviews = history.length;
-    const averageScore = history.reduce((sum: number, interview: any) => sum + interview.overallScore, 0) / totalInterviews || 0;
-    const totalHours = history.reduce((sum: number, interview: any) => sum + interview.duration, 0) / 3600;
-    
+    const averageScore = history.reduce((sum, interview) => sum + interview.overallScore, 0) / totalInterviews || 0;
+    const totalHours = history.reduce((sum, interview) => sum + interview.duration, 0) / 3600;
+
     let improvement = 0;
     if (totalInterviews >= 6) {
-      const recent = history.slice(-3).reduce((sum: number, interview: any) => sum + interview.overallScore, 0) / 3;
-      const initial = history.slice(0, 3).reduce((sum: number, interview: any) => sum + interview.overallScore, 0) / 3;
+      const ordered = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const recent = ordered.slice(-3).reduce((sum, interview) => sum + interview.overallScore, 0) / 3;
+      const initial = ordered.slice(0, 3).reduce((sum, interview) => sum + interview.overallScore, 0) / 3;
       improvement = ((recent - initial) / initial) * 100;
     }
-    
-    // Calculate focused interview stats
-    const focusedInterviews = history.filter((interview: any) => interview.interviewType).length;
-    const focusedScores = history.filter((interview: any) => interview.interviewType).map((interview: any) => interview.overallScore);
-    const focusedAverageScore = focusedScores.length > 0 ? focusedScores.reduce((sum: number, score: number) => sum + score, 0) / focusedScores.length : 0;
-    
-    // Find most practiced type
+
+    const focusedSessions = history.filter((interview) => interview.interviewType);
+    const focusedInterviews = focusedSessions.length;
+    const focusedAverageScore = focusedSessions.length > 0
+      ? focusedSessions.reduce((sum, interview) => sum + interview.overallScore, 0) / focusedSessions.length
+      : 0;
+
     const typeCounts: { [key: string]: number } = {};
-    history.forEach((interview: any) => {
-      if (interview.interviewType) {
-        typeCounts[interview.interviewType] = (typeCounts[interview.interviewType] || 0) + 1;
+    focusedSessions.forEach((session) => {
+      if (session.interviewType) {
+        typeCounts[session.interviewType] = (typeCounts[session.interviewType] || 0) + 1;
       }
     });
-    const mostPracticedType = Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
-    
+    const mostPracticedType = Object.keys(typeCounts).length > 0
+      ? Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '')
+      : '';
+
     return {
       totalInterviews,
       averageScore: Math.round(averageScore),
@@ -609,94 +778,6 @@ export const getInterviewStats = async () => {
       focusedAverageScore: Math.round(focusedAverageScore),
       mostPracticedType,
       speechMetrics: null
-    };
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('interview_sessions')
-      .select('overall_score, duration, created_at, speech_metrics, responses, interview_type')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching interview stats:', error);
-      return { 
-        totalInterviews: 0, 
-        averageScore: 0, 
-        totalHours: 0, 
-        improvement: 0, 
-        focusedInterviews: 0,
-        focusedAverageScore: 0,
-        mostPracticedType: '',
-        speechMetrics: null 
-      };
-    }
-
-    const totalInterviews = data.length;
-    const averageScore = data.reduce((sum, session) => sum + session.overall_score, 0) / totalInterviews || 0;
-    const totalHours = data.reduce((sum, session) => sum + session.duration, 0) / 3600;
-    
-    let improvement = 0;
-    if (totalInterviews >= 6) {
-      const recent = data.slice(-3).reduce((sum, session) => sum + session.overall_score, 0) / 3;
-      const initial = data.slice(0, 3).reduce((sum, session) => sum + session.overall_score, 0) / 3;
-      improvement = ((recent - initial) / initial) * 100;
-    }
-
-    // Calculate focused interview stats
-    const focusedSessions = data.filter(session => session.interview_type);
-    const focusedInterviews = focusedSessions.length;
-    const focusedAverageScore = focusedSessions.length > 0 
-      ? focusedSessions.reduce((sum, session) => sum + session.overall_score, 0) / focusedSessions.length 
-      : 0;
-    
-    // Find most practiced type
-    const typeCounts: { [key: string]: number } = {};
-    focusedSessions.forEach(session => {
-      if (session.interview_type) {
-        typeCounts[session.interview_type] = (typeCounts[session.interview_type] || 0) + 1;
-      }
-    });
-    const mostPracticedType = Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
-
-    // Calculate speech metrics averages
-    const sessionsWithSpeech = data.filter(session => 
-      session.speech_metrics && Object.keys(session.speech_metrics).length > 0
-    );
-
-    let speechMetrics = null;
-    if (sessionsWithSpeech.length > 0) {
-      const avgConfidence = sessionsWithSpeech.reduce((sum, session) => 
-        sum + (session.speech_metrics?.confidence?.overallConfidence || 0), 0) / sessionsWithSpeech.length;
-      
-      const avgFluency = sessionsWithSpeech.reduce((sum, session) => 
-        sum + (session.speech_metrics?.fluency?.fluencyScore || 0), 0) / sessionsWithSpeech.length;
-      
-      const avgSpeechRate = sessionsWithSpeech.reduce((sum, session) => 
-        sum + (session.speech_metrics?.timing?.speechRate || 0), 0) / sessionsWithSpeech.length;
-      
-      const avgVoiceStability = sessionsWithSpeech.reduce((sum, session) => 
-        sum + (session.speech_metrics?.voice?.voiceStability || 0), 0) / sessionsWithSpeech.length;
-
-      speechMetrics = {
-        averageConfidence: Math.round(avgConfidence),
-        averageFluency: Math.round(avgFluency),
-        averageSpeechRate: Number(avgSpeechRate.toFixed(2)),
-        averageVoiceStability: Math.round(avgVoiceStability),
-        voiceSessionCount: sessionsWithSpeech.length
-      };
-    }
-    
-    return {
-      totalInterviews,
-      averageScore: Math.round(averageScore),
-      totalHours: Math.round(totalHours * 10) / 10,
-      improvement: Math.round(improvement),
-      focusedInterviews,
-      focusedAverageScore: Math.round(focusedAverageScore),
-      mostPracticedType,
-      speechMetrics
     };
 
   } catch (error) {
@@ -716,7 +797,7 @@ export const getInterviewStats = async () => {
 
 export const getUserStrengthsAndWeaknesses = async () => {
   if (!isSupabaseConfigured()) {
-    return { strengths: [], weaknesses: [], categories: {} };
+    return deriveStrengthsAndWeaknessesFromLocalResults();
   }
 
   try {
@@ -729,7 +810,7 @@ export const getUserStrengthsAndWeaknesses = async () => {
 
     if (error) {
       console.error('Error fetching interview data for analysis:', error);
-      return { strengths: [], weaknesses: [], categories: {} };
+      return deriveStrengthsAndWeaknessesFromLocalResults();
     }
 
     // Analyze responses for patterns
@@ -794,62 +875,52 @@ export const getUserStrengthsAndWeaknesses = async () => {
       weaknesses.push('Overall interview performance needs improvement');
     }
 
+    const localDerived = deriveStrengthsAndWeaknessesFromLocalResults();
+
     return {
-      strengths: strengths.slice(0, 3), // Limit to top 3
-      weaknesses: weaknesses.slice(0, 3), // Limit to top 3
+      strengths: [...strengths, ...localDerived.strengths].slice(0, 3),
+      weaknesses: [...weaknesses, ...localDerived.weaknesses].slice(0, 3),
       categories: categoryAverages
     };
 
   } catch (error) {
     console.error('Failed to analyze strengths and weaknesses:', error);
-    return { 
-      strengths: [], 
-      weaknesses: [],
-      categories: {}
-    };
+    return deriveStrengthsAndWeaknessesFromLocalResults();
   }
 };
 
 export const getInterviewById = async (interviewId: string) => {
   console.log('getInterviewById called with ID:', interviewId);
-  
+
+  const localPlatformResult = getLocalPlatformResults().find((entry: any) => entry.id === interviewId);
+  if (localPlatformResult) {
+    return {
+      ...localPlatformResult,
+      transcript: localPlatformResult.transcript || [],
+      metrics: localPlatformResult.metrics,
+      perQuestionAnalysis: localPlatformResult.perQuestionAnalysis || null,
+      postureData: localPlatformResult.postureData || undefined,
+      jobContext: localPlatformResult.jobContext || undefined,
+      processingSource: localPlatformResult.processingSource || 'transcript-and-posture',
+      date: new Date(localPlatformResult.savedAt || Date.now())
+    };
+  }
+
   if (!isSupabaseConfigured()) {
-    console.log('Supabase not configured, using localStorage fallback');
-    // Return localStorage data as fallback
-    const localHistory = localStorage.getItem('kelv-interview-history');
-    const history = localHistory ? JSON.parse(localHistory) : [];
-    console.log('Local history found:', history.length, 'interviews');
-    
-    const interview = history.find((interview: any) => interview.id === interviewId);
-    console.log('Found interview in localStorage:', !!interview, interview ? interview.type || interview.interviewType : 'N/A');
-    
+    const interview = getLocalHistory().find((entry: any) => entry.id === interviewId);
     if (!interview) {
-      console.log('Interview not found in localStorage');
       return null;
     }
 
-    // Transform localStorage data to sessionData format if needed
-    const transformedData = {
+    return {
       id: interview.id,
       setup: interview.setup,
       overallScore: interview.overallScore,
       duration: interview.duration,
       questionsAnswered: interview.questionsAnswered,
       status: interview.status,
-      responses: interview.responses || [],
-      questions: interview.questions || [],
-      interviewType: interview.interviewType || interview.type,
-      speechMetrics: interview.speechMetrics ? [interview.speechMetrics] : [],
-      date: new Date(interview.date),
-      startTime: interview.startTime ? new Date(interview.startTime) : new Date(interview.date),
-      endTime: interview.endTime ? new Date(interview.endTime) : undefined,
-      speechMetricsAverage: interview.speechMetricsAverage,
-      metrics: interview.metrics || undefined,
-      voiceMetrics: interview.voiceMetrics || undefined
+      date: new Date(interview.date)
     };
-    
-    console.log('Transformed localStorage data:', transformedData);
-    return transformedData;
   }
   try {
     console.log('Querying Supabase for interview ID:', interviewId);
@@ -891,7 +962,11 @@ export const getInterviewById = async (interviewId: string) => {
       voiceMetrics: data.speech_metrics || undefined,
       transcript: data.transcript || [],
       voice_metrics_summary: data.voice_metrics_summary || undefined,
-      voiceTimeline: data.voice_timeline || undefined
+      voiceTimeline: data.voice_timeline || undefined,
+      postureData: data.session_metadata?.posture_data || undefined,
+      perQuestionAnalysis: data.session_metadata?.per_question_analysis || null,
+      jobContext: data.session_metadata?.job_context || undefined,
+      processingSource: data.session_metadata?.processing_source || undefined
     };
 
     console.log('=== SUPABASE DATA LOADED ===');

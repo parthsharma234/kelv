@@ -17,7 +17,7 @@ const HomePage: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-dark-900 text-white">
+    <div className="min-h-screen text-white">
       <Navbar />
       <ScrollNarrativeHomepage />
       <Footer />
@@ -50,7 +50,7 @@ const PlatformRoute: React.FC = () => {
   const [isFullScreen, setIsFullScreen] = React.useState(false);
 
   return (
-    <div className="min-h-screen bg-dark-900 text-white">
+    <div className="min-h-screen text-white">
       {!isFullScreen && <Navbar />}
       <PlatformContainer onFullScreenChange={setIsFullScreen} />
     </div>

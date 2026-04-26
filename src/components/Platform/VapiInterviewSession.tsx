@@ -62,7 +62,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         startInterview,
         endInterview,
     } = useVapiInterview({
-        onComplete,
+        // onComplete intentionally omitted here - we trigger it manually in useEffect below
         onError: (err) => setCameraError(err),
     });
 
@@ -156,23 +156,6 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     const toggleMute = useCallback(() => {
         const s = streamRef.current;
         if (s) {
-            s.getAudioTracks().forEach(t => t.enabled = isMuted); // logic inverted in previous toggle, fixing here:
-            // wait, logic is: clicking button TOGGLES state. State `isMuted` represents CURRENT state? No, usually represents DESIRED state.
-            // logic: `t.enabled = !isMuted` (if isMuted is TRUE, enabled should be FALSE).
-            // Logic was `t.enabled = isMuted` vs `setIsMuted(!isMuted)`.
-            // If `isMuted` is false (mic on), clicking sets `isMuted` to true. `t.enabled` should become false.
-            // So `t.enabled = !(!isMuted)` -> `t.enabled = isMuted`? No.
-            // Let's stick to standard behavior:
-            // If we are about to mute, enabled = false.
-            // New state will be !isMuted.
-            // So enabled = !(!isMuted) = isMuted?
-            // Wait. If `isMuted` is false. We want to MUTE. `setIsMuted(true)`. `enabled = false`.
-            // If `isMuted` is true. We want to UNMUTE. `setIsMuted(false)`. `enabled = true`.
-            s.getAudioTracks().forEach(t => t.enabled = isMuted); // Existing logic seems to toggle based on *current* state before update?
-            // Actually let's trust the logic that was working:
-            // `t.enabled = isMuted` means if currently Muted (true), enable it (true).
-            // Then set `isMuted(!isMuted)` -> false.
-            // Correct.
             s.getAudioTracks().forEach(t => t.enabled = isMuted);
             setIsMuted(!isMuted);
         }
@@ -200,18 +183,15 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 
         try {
             if (isPDF(file)) {
-                // Extract text from PDF
                 setIsParsingResume(true);
                 console.log('[Resume] Extracting text from PDF:', file.name);
                 const extractedText = await extractTextFromPDF(file);
                 setTempResume(extractedText);
                 console.log('[Resume] Successfully extracted', extractedText.length, 'characters');
             } else if (isTextFile(file)) {
-                // Read text file directly
                 const text = await file.text();
                 setTempResume(text);
             } else {
-                // Unsupported file type - try to read as text anyway
                 console.warn('[Resume] Unsupported file type, attempting text read:', file.type);
                 const text = await file.text();
                 if (text && text.length > 10) {
@@ -229,7 +209,6 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         }
     };
 
-    // Start recording when interview starts
     useEffect(() => {
         if (status === 'interviewing') {
             startRecording();
@@ -240,20 +219,20 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     useEffect(() => {
         // Condition: Interview is marked completed AND we have the recording blob ready
         if (status === 'completed' && recordedBlob) {
+            console.log('[Session] ✅ Completing with blob size:', recordedBlob.size);
 
             if (recordedBlob.size === 0) {
-                console.error('[Session] ❌ Recorded blob is empty (0 bytes).');
-                // We might want to handle this as an error, or retry?
-                // For now, let's log it. Processing will fail with "Critical: No recording blob" if null, but 0 bytes passes check.
-                // Processing should check size.
-            } else {
-                console.log('[Session] ✅ Completing with blob size:', recordedBlob.size);
+                console.error('[Session] ❌ Recorded blob is empty (0 bytes). This will cause analysis failure.');
             }
 
             const sessionData = {
                 transcript,
                 duration,
                 recordingBlob: recordedBlob,
+                jobContext: {
+                    role: 'Software Engineer', // Default for now, could be parsed from JD
+                    jobDescription: tempJD
+                },
                 postureData: postureData ? {
                     shoulderAlignment: postureData.shoulderAlignment,
                     headPosition: postureData.headPosition,
@@ -261,19 +240,19 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                     timeInGoodPosture: postureData.timeInGoodPosture
                 } : undefined
             };
+
             onComplete(sessionData);
         } else if (status === 'completed' && !recordedBlob) {
             // If completed but no blob yet, ensure we stopped recording to trigger blob generation
-            console.log('[Session] Status completed, waiting for blob...');
+            console.log('[Session] Status completed, ensuring recorder is stopped...');
             stopRecording();
         }
-    }, [status, recordedBlob, transcript, duration, postureData, onComplete, stopRecording]);
+    }, [status, recordedBlob, transcript, duration, postureData, onComplete, stopRecording, tempJD]);
 
     const handleStartInterview = async () => {
         if (!tempJD.trim() || !tempResume.trim()) return;
         setIsInjectingContext(true);
 
-        // Slight artificial delay to show state transition
         await new Promise(resolve => setTimeout(resolve, 800));
 
         setPreviewPhase(false);
@@ -289,7 +268,6 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 
     const isReady = tempJD.trim().length > 0 && tempResume.trim().length > 0 && stream;
 
-    // Warm-up handlers
     const handleStartWarmUp = () => {
         setShowWarmUp(true);
     };
@@ -303,9 +281,6 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         setShowWarmUp(false);
     };
 
-    // ===================
-    // WARM-UP SCREEN
-    // ===================
     if (showWarmUp) {
         return (
             <InteractiveWarmUp
@@ -315,9 +290,6 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         );
     }
 
-    // ===================
-    // PRE-INTERVIEW LOBBY
-    // ===================
     if (previewPhase) {
         return (
             <div className="min-h-screen bg-[#030305] text-white font-sans relative overflow-hidden">
@@ -326,7 +298,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 
                 <header className="fixed top-0 inset-x-0 z-50 h-20 border-b border-white/10 bg-[#030305]/70 backdrop-blur-xl flex items-center justify-between px-10">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { stopMedia(); onBack(); }} className="p-2 -ml-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                        <button onClick={() => { stopMedia(); onBack(); }} className="p-2 -ml-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                         <div className="space-y-0.5">
@@ -346,9 +318,8 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 
                 <main className="pt-32 pb-16 px-10 max-w-[1700px] mx-auto relative z-10">
                     <div className="grid lg:grid-cols-[280px,1fr,380px] gap-10">
-                        {/* Left Rail */}
                         <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 space-y-4">
+                            <div className="bg-white/5 border border-white/10 rounded-lg p-5 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <p className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase">Steps</p>
                                     <span className="text-xs text-gray-500">1/3</span>
@@ -359,7 +330,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                         { label: 'Warm-up', active: completedWarmUp },
                                         { label: 'Context', active: !!tempJD.trim() && !!tempResume.trim() }
                                     ].map((step) => (
-                                        <div key={step.label} className={`flex items-center justify-between px-3 py-2 rounded-xl border ${step.active ? 'border-orange-500/40 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
+                                        <div key={step.label} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${step.active ? 'border-orange-500/40 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${step.active ? 'bg-orange-500/20 text-orange-300' : 'bg-white/10 text-gray-500'}`}>
                                                     <Check className="w-4 h-4" />
@@ -374,10 +345,10 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                 </div>
                             </div>
 
-                            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 space-y-5">
+                            <div className="bg-white/5 border border-white/10 rounded-lg p-5 space-y-5">
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`p-2.5 rounded-xl ${completedWarmUp ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                                        <div className={`p-2.5 rounded-lg ${completedWarmUp ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
                                             <Dumbbell className={`w-5 h-5 ${completedWarmUp ? 'text-green-400' : 'text-orange-400'}`} />
                                         </div>
                                         <div>
@@ -396,7 +367,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                         { label: 'Breath pacing', time: '35s' },
                                         { label: 'Voice warm-up', time: '45s' }
                                     ].map((item) => (
-                                        <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0b0b11] border border-white/10">
+                                        <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#0b0b11] border border-white/10">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[11px] uppercase tracking-widest text-orange-300">Step</span>
                                                 <span className="text-sm text-gray-200">{item.label}</span>
@@ -406,13 +377,13 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                     ))}
                                 </div>
 
-                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl px-4 py-3 text-xs text-orange-200">
+                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-4 py-3 text-xs text-orange-200">
                                     {completedWarmUp ? 'You are cleared. Jump in when ready.' : 'Calm your breathing, then start the session with confidence.'}
                                 </div>
 
                                 <button
                                     onClick={handleStartWarmUp}
-                                    className={`w-full py-2.5 rounded-xl text-sm font-medium transition-all ${completedWarmUp
+                                    className={`w-full py-2.5 rounded-lg text-sm font-medium transition-all ${completedWarmUp
                                         ? 'bg-white/5 text-gray-300 hover:bg-white/10'
                                         : 'bg-orange-500 text-white hover:bg-orange-400 shadow-lg shadow-orange-500/20'
                                         }`}
@@ -422,7 +393,6 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                             </div>
                         </div>
 
-                        {/* Center: Preview */}
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -465,11 +435,11 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-3 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10">
-                                    <button onClick={toggleMute} className={`p-3 rounded-xl transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-3 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
+                                    <button onClick={toggleMute} className={`p-3 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
                                         {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                                     </button>
-                                    <button onClick={toggleVideo} className={`p-3 rounded-xl transition-all ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                                    <button onClick={toggleVideo} className={`p-3 rounded-lg transition-all ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
                                         {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                                     </button>
                                 </div>
@@ -483,12 +453,12 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                 ].map((item) => {
                                     const Icon = item.icon;
                                     return (
-                                        <div key={item.label} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                                        <div key={item.label} className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between">
                                             <div>
                                                 <p className="text-xs text-gray-500 uppercase tracking-[0.3em]">{item.label}</p>
                                                 <p className="text-sm font-semibold mt-1">{item.value}</p>
                                             </div>
-                                            <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-300">
+                                            <div className="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-300">
                                                 <Icon className="w-5 h-5" />
                                             </div>
                                         </div>
@@ -497,9 +467,8 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                             </div>
                         </div>
 
-                        {/* Right: Context */}
                         <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-6">
+                            <div className="bg-white/5 border border-white/10 rounded-lg p-6 space-y-6">
                                 <div>
                                     <h2 className="text-xl font-semibold mb-1">Session context</h2>
                                     <p className="text-sm text-gray-400">Give Kelv the job details and your background.</p>
@@ -511,7 +480,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                         <textarea
                                             value={tempJD}
                                             onChange={(e) => setTempJD(e.target.value)}
-                                            className="w-full h-32 bg-[#080a0f] border border-white/10 rounded-2xl p-4 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/40 transition-colors resize-none"
+                                            className="w-full h-32 bg-[#080a0f] border border-white/10 rounded-lg p-4 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/40 transition-colors resize-none"
                                             placeholder="Paste target job description..."
                                         />
                                     </div>
@@ -523,7 +492,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                             onDragLeave={() => setIsDragging(false)}
                                             onDrop={handleDrop}
-                                            className={`border border-dashed rounded-2xl p-6 transition-all cursor-pointer ${isDragging ? 'border-orange-500/70 bg-orange-500/5' : resumeFileName ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-white/20 bg-[#080a0f]'
+                                            className={`border border-dashed rounded-lg p-6 transition-all cursor-pointer ${isDragging ? 'border-orange-500/70 bg-orange-500/5' : resumeFileName ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-white/20 bg-[#080a0f]'
                                                 }`}
                                         >
                                             <input ref={fileInputRef} type="file" accept=".pdf,.txt" onChange={(e) => e.target.files?.[0] && handleResumeFile(e.target.files[0])} className="hidden" />
@@ -556,16 +525,16 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 text-sm text-orange-100">
+                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 text-sm text-orange-100">
                                     Strong context makes feedback sharper. You can paste an abbreviated role summary too.
                                 </div>
 
                                 <button
                                     onClick={handleStartInterview}
                                     disabled={!isReady || isInjectingContext}
-                                    className={`w-full py-4 rounded-2xl font-medium text-sm transition-all ${isReady
-                                        ? 'bg-orange-500 text-white hover:bg-orange-400 shadow-lg shadow-orange-500/20'
-                                        : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5'
+                                    className={`w-full py-3.5 rounded-sm font-sans font-medium text-sm tracking-wide transition-all duration-200 ${isReady
+                                        ? 'bg-orange-500 text-white hover:bg-orange-400 shadow-[0_0_24px_rgba(232,101,26,0.25)]'
+                                        : 'bg-white/[0.03] text-gray-500 cursor-not-allowed border border-kelv-border'
                                         }`}
                                 >
                                     {isInjectingContext ? 'Initializing Session...' : !stream ? 'Waiting for Media...' : !isReady ? 'Complete Requirements' : 'Launch Session'}
@@ -578,12 +547,8 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         );
     }
 
-    // ===================
-    // ACTIVE SESSION
-    // ===================
     return (
         <div className="h-screen bg-black text-white flex overflow-hidden font-sans">
-
             <AnimatePresence>
                 {showTranscript && (
                     <motion.aside
@@ -626,7 +591,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                 <header className="absolute top-6 left-6 right-6 z-20 flex justify-between items-start pointer-events-none">
                     <div className="pointer-events-auto flex items-center gap-2">
                         {!showTranscript && (
-                            <button onClick={() => setShowTranscript(true)} className="p-3 bg-white/5 backdrop-blur border border-white/10 rounded-xl text-gray-400 hover:text-white transition-colors">
+                            <button onClick={() => setShowTranscript(true)} className="p-3 bg-white/5 backdrop-blur border border-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
                                 <PanelLeftOpen className="w-5 h-5" />
                             </button>
                         )}
@@ -658,7 +623,7 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                         </div>
                     </div>
 
-                    <div className="absolute bottom-8 right-8 w-[400px] aspect-video bg-[#0f0f12] rounded-2xl overflow-hidden border border-white/10 shadow-2xl z-30">
+                    <div className="absolute bottom-8 right-8 w-[400px] aspect-video bg-[#0f0f12] rounded-lg overflow-hidden border border-white/10 shadow-2xl z-30">
                         {isVideoOff ? (
                             <div className="w-full h-full flex items-center justify-center">
                                 <div className="w-20 h-20 rounded-full bg-white/5 text-gray-500 flex items-center justify-center text-2xl font-medium">You</div>
@@ -671,8 +636,8 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                         </div>
                         {poseReady && currentPosture && (
                             <div className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-xs font-medium backdrop-blur-sm border ${currentPosture.isGoodPosture
-                                    ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                                    : 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
+                                ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                                : 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
                                 }`}>
                                 {currentPosture.isGoodPosture ? 'Good Posture' : 'Adjust Posture'}
                             </div>
@@ -681,15 +646,15 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                 </main>
 
                 <footer className="h-24 flex items-center justify-center gap-6 relative z-30">
-                    <div className="flex items-center gap-2 p-2 bg-[#0f0f12] border border-white/10 rounded-2xl shadow-xl">
-                        <button onClick={toggleMute} className={`p-4 rounded-xl transition-all ${isMuted ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
+                    <div className="flex items-center gap-2 p-2 bg-[#0f0f12] border border-white/10 rounded-lg shadow-xl">
+                        <button onClick={toggleMute} className={`p-4 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
                             {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                         </button>
-                        <button onClick={toggleVideo} className={`p-4 rounded-xl transition-all ${isVideoOff ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
+                        <button onClick={toggleVideo} className={`p-4 rounded-lg transition-all ${isVideoOff ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
                             {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                         </button>
                         <div className="w-px h-8 bg-white/10 mx-2" />
-                        <button onClick={handleEndInterview} className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-medium text-sm transition-all shadow-lg shadow-red-600/20">
+                        <button onClick={handleEndInterview} className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium text-sm transition-all shadow-lg shadow-red-600/20">
                             End Session
                         </button>
                     </div>
@@ -700,4 +665,3 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
 };
 
 export default VapiInterviewSession;
-

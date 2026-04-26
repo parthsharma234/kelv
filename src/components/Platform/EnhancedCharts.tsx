@@ -28,7 +28,7 @@ interface EnhancedChartsProps {
   metrics: InterviewMetrics;
 }
 
-// Cleaner emotion color palette
+// Signal color palette
 const EMOTION_COLORS: Record<string, { bg: string; border: string }> = {
   Joy: { bg: 'rgba(16, 185, 129, 0.6)', border: '#10b981' },
   Calmness: { bg: 'rgba(59, 130, 246, 0.6)', border: '#3b82f6' },
@@ -44,9 +44,9 @@ const EMOTION_COLORS: Record<string, { bg: string; border: string }> = {
   Sadness: { bg: 'rgba(107, 114, 128, 0.6)', border: '#6b7280' }
 };
 
-// Emotion Timeline - Fixed and cleaned up
+// Delivery Trend - Built from transcript-based confidence proxies
 export const EmotionTimeline: React.FC<{ metrics: InterviewMetrics }> = ({ metrics }) => {
-  // Get top emotions with actual data
+  // Get top signal categories with actual data
   const topEmotions = Object.entries(metrics.expressionBreakdown)
     .filter(([_, value]) => value > 5) // Only emotions above 5%
     .sort((a, b) => b[1] - a[1])
@@ -55,23 +55,23 @@ export const EmotionTimeline: React.FC<{ metrics: InterviewMetrics }> = ({ metri
   if (topEmotions.length === 0 || metrics.timeline.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-        No emotion data available
+        No delivery trend data available
       </div>
     );
   }
 
-  // Create smooth line data for each emotion
+  // Create smooth line data for each signal
   const datasets = topEmotions.map(([emotion]) => {
     const colors = EMOTION_COLORS[emotion] || { bg: 'rgba(107, 114, 128, 0.3)', border: '#6b7280' };
 
     return {
       label: emotion,
       data: metrics.timeline.map(t => {
-        // Show intensity when this emotion is dominant, otherwise show baseline
+        // Show intensity when this signal is dominant, otherwise show baseline
         if (t.dominantEmotion === emotion) {
           return t.emotionIntensity * 100;
         }
-        // Check if this emotion is in the top emotions and show a reduced intensity
+        // Keep a reduced baseline to show recurring signal strength
         const emotionScore = metrics.expressionBreakdown[emotion] || 0;
         return emotionScore * 0.3; // Show a baseline level
       }),
@@ -481,9 +481,9 @@ const EnhancedCharts: React.FC<EnhancedChartsProps> = ({ metrics }) => {
   return (
     <div className="space-y-6">
       {/* Emotion Timeline - Full Width */}
-      <div className="bg-[#0f0f12] border border-white/5 rounded-2xl p-6">
-        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6">
-          Emotional Expression Over Time
+      <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-6">
+          <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6">
+          Delivery Signals Over Time
         </h3>
         <div className="h-[280px] w-full">
           <EmotionTimeline metrics={metrics} />
@@ -493,7 +493,7 @@ const EnhancedCharts: React.FC<EnhancedChartsProps> = ({ metrics }) => {
       {/* Voice Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Voice Confidence */}
-        <div className="bg-[#0f0f12] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-5">
           <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4">
             Voice Confidence
           </h3>
@@ -503,7 +503,7 @@ const EnhancedCharts: React.FC<EnhancedChartsProps> = ({ metrics }) => {
         </div>
 
         {/* Speaking Pace */}
-        <div className="bg-[#0f0f12] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-5">
           <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4">
             Speaking Pace
           </h3>
@@ -513,7 +513,7 @@ const EnhancedCharts: React.FC<EnhancedChartsProps> = ({ metrics }) => {
         </div>
 
         {/* Filler Words */}
-        <div className="bg-[#0f0f12] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-5">
           <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4">
             Speech Clarity
           </h3>
@@ -523,7 +523,7 @@ const EnhancedCharts: React.FC<EnhancedChartsProps> = ({ metrics }) => {
         </div>
 
         {/* Tonal Variety */}
-        <div className="bg-[#0f0f12] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-5">
           <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4">
             Tonal Variety
           </h3>

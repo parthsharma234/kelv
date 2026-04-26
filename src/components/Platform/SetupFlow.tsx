@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Heart, Trash2, Check, Shield, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Heart, Trash2, Check } from 'lucide-react';
 import { InterviewSetup } from '../../types/interview';
 import {
   getUserInterviewSetups,
@@ -50,9 +50,9 @@ const jobTypes = [
 ];
 
 const experienceLevels = [
-  { id: 'Entry Level (0-2 years)', label: 'Entry', helper: '0-2 years' },
-  { id: 'Mid Level (3-5 years)', label: 'Mid', helper: '3-5 years' },
-  { id: 'Senior Level (6-10 years)', label: 'Senior', helper: '6-10 years' },
+  { id: 'Entry Level (0-2 years)', label: 'Entry', helper: '0–2 years' },
+  { id: 'Mid Level (3-5 years)', label: 'Mid', helper: '3–5 years' },
+  { id: 'Senior Level (6-10 years)', label: 'Senior', helper: '6–10 years' },
   { id: 'Executive Level (10+ years)', label: 'Executive', helper: '10+ years' }
 ];
 
@@ -79,34 +79,20 @@ const wizardSteps: { id: StepId; label: string; description: string }[] = [
 ];
 
 const stepTips: Record<StepId, string> = {
-  industry:
-    'Pick the field you actually want feedback in - Kelv swaps follow-ups using real recruiter scripts from that industry.',
-  jobType:
-    'We tailor prompts and rubrics to the title you choose. Go specific if you already have a target offer.',
-  experienceLevel:
-    'Experience level nudges question depth and how hard we push on leadership versus execution.',
-  interviewMode:
-    'Voice captures confidence and filler words, text helps you sandbox messaging. Choose what you need today.'
+  industry: 'Kelv swaps follow-ups using real recruiter scripts from that industry.',
+  jobType: 'We tailor prompts and rubrics to the title you choose. Go specific if you already have a target offer.',
+  experienceLevel: 'Experience level nudges question depth and how hard we push on leadership versus execution.',
+  interviewMode: 'Voice captures confidence and filler words. Text helps you sandbox messaging.'
 };
 
 const buildSetupNarrative = (setup: Partial<InterviewSetup>) => {
   const role = setup.jobType || 'your next role';
   const industry = setup.industry || 'the companies you care about';
-  const experience =
-    setup.experienceLevel ? setup.experienceLevel.split('(')[0].trim().toLowerCase() : 'growing';
+  const experience = setup.experienceLevel ? setup.experienceLevel.split('(')[0].trim().toLowerCase() : 'growing';
   const mode = setup.interviewMode === 'text' ? 'text drills' : 'voice reps';
-  const emphasis =
-    setup.interviewMode === 'text' ? 'precision and structure' : 'confidence, pacing, and receipts';
-
+  const emphasis = setup.interviewMode === 'text' ? 'precision and structure' : 'confidence, pacing, and receipts';
   return `Kelv is lining up ${mode} for a ${experience} ${role} interview in ${industry}. Expect follow-ups that stress ${emphasis}.`;
 };
-
-const SummaryRow = ({ label, value }: { label: string; value?: string }) => (
-  <div className="flex items-center justify-between text-sm">
-    <span className="text-gray-500">{label}</span>
-    <span className="text-white font-medium">{value || '-'}</span>
-  </div>
-);
 
 export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initialSetup }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -136,23 +122,15 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
         setIsLoadingSetups(false);
       }
     };
-
     loadSavedSetups();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {
-    if (
-      useAutoName &&
-      setup.industry &&
-      setup.jobType &&
-      setup.experienceLevel &&
-      setup.interviewMode
-    ) {
+    if (useAutoName && setup.industry && setup.jobType && setup.experienceLevel && setup.interviewMode) {
       const mode = setup.interviewMode === 'voice' ? 'Voice' : 'Text';
       const role = setup.jobType.split(' ')[0];
-      const industry = setup.industry;
-      setSetupName(`${mode} · ${role} · ${industry}`);
+      setSetupName(`${mode} · ${role} · ${setup.industry}`);
     }
   }, [setup, useAutoName]);
 
@@ -160,15 +138,10 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
   const isSetupComplete = () => wizardSteps.every((step) => isStepComplete(step.id));
 
   const handleSelect = (field: StepId, value: string) => {
-    if (value === 'Other') {
-      setShowOtherField(true);
-      return;
-    }
+    if (value === 'Other') { setShowOtherField(true); return; }
     setSetup((prev) => ({ ...prev, [field]: value }));
     setShowOtherField(false);
-    if (currentStep < wizardSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
+    if (currentStep < wizardSteps.length - 1) setCurrentStep(currentStep + 1);
   };
 
   const handleOtherSubmit = () => {
@@ -177,9 +150,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
     setSetup((prev) => ({ ...prev, [field]: otherValue.trim() }));
     setOtherValue('');
     setShowOtherField(false);
-    if (currentStep < wizardSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
+    if (currentStep < wizardSteps.length - 1) setCurrentStep(currentStep + 1);
   };
 
   const handleSaveSetup = async () => {
@@ -198,61 +169,50 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
     }
   };
 
-  const handleStartInterview = () => {
-    if (isSetupComplete()) {
-      onComplete(setup as InterviewSetup);
-    }
-  };
+  const handleStartInterview = () => { if (isSetupComplete()) onComplete(setup as InterviewSetup); };
 
   const handleUseSavedSetup = async (savedSetup: SavedInterviewSetup) => {
-    try {
-      await updateSetupUsage(savedSetup.id);
-    } catch (error) {
-      console.error('Error updating usage:', error);
-    } finally {
-      onComplete(savedSetup.setup);
-    }
+    try { await updateSetupUsage(savedSetup.id); } catch {}
+    onComplete(savedSetup.setup);
   };
 
   const handleToggleFavorite = async (setupId: string, isFavorite: boolean) => {
     try {
       await toggleSetupFavorite(setupId, !isFavorite);
-      const setups = await getUserInterviewSetups();
-      setSavedSetups(setups);
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
+      setSavedSetups(await getUserInterviewSetups());
+    } catch {}
   };
 
   const handleDeleteSetup = async (setupId: string) => {
     try {
       await deleteInterviewSetup(setupId);
-      const setups = await getUserInterviewSetups();
-      setSavedSetups(setups);
-    } catch (error) {
-      console.error('Error deleting setup:', error);
-    }
+      setSavedSetups(await getUserInterviewSetups());
+    } catch {}
   };
+
+  const optionCardStyle = (active: boolean, disabled = false): React.CSSProperties => ({
+    background: active ? 'rgba(232,101,26,0.06)' : 'var(--surface-2)',
+    border: `1px solid ${active ? 'rgba(232,101,26,0.4)' : 'var(--border)'}`,
+    borderRadius: '6px',
+    padding: '14px 16px',
+    textAlign: 'left',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.4 : 1,
+    transition: 'border-color 0.15s',
+    width: '100%',
+  });
 
   const renderOptions = () => {
     const stepId = wizardSteps[currentStep].id;
 
     if (stepId === 'jobType') {
       return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
           {jobTypes.map((role) => {
             const isActive = setup.jobType === role;
             return (
-              <button
-                key={role}
-                onClick={() => handleSelect('jobType', role)}
-                className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-                  isActive
-                    ? 'border-orange-500 bg-orange-500/10 text-white'
-                    : 'border-white/10 text-gray-300 hover:border-orange-500/50'
-                }`}
-              >
-                <p className="font-semibold">{role}</p>
+              <button key={role} onClick={() => handleSelect('jobType', role)} style={optionCardStyle(isActive)}>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: isActive ? 'var(--text)' : 'var(--text-3)' }}>{role}</p>
               </button>
             );
           })}
@@ -262,23 +222,12 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
 
     if (stepId === 'industry') {
       return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
           {industries.map((industry) => {
             const isActive = setup.industry === industry.id;
             return (
-              <button
-                key={industry.id}
-                onClick={() => handleSelect('industry', industry.id)}
-                className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-                  isActive
-                    ? 'border-orange-500 bg-orange-500/10 text-white'
-                    : 'border-white/10 text-gray-300 hover:border-orange-500/50'
-                }`}
-              >
-                <p className="text-base font-semibold">{industry.label}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {industry.label === 'Other' ? 'Add your own' : 'Common in mocks'}
-                </p>
+              <button key={industry.id} onClick={() => handleSelect('industry', industry.id)} style={optionCardStyle(isActive)}>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: isActive ? 'var(--text)' : 'var(--text-3)' }}>{industry.label}</p>
               </button>
             );
           })}
@@ -288,21 +237,13 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
 
     if (stepId === 'experienceLevel') {
       return (
-        <div className="grid grid-cols-2 gap-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
           {experienceLevels.map((level) => {
             const isActive = setup.experienceLevel === level.id;
             return (
-              <button
-                key={level.id}
-                onClick={() => handleSelect('experienceLevel', level.id)}
-                className={`rounded-2xl border px-4 py-5 text-left transition-all ${
-                  isActive
-                    ? 'border-orange-500 bg-orange-500/10 text-white'
-                    : 'border-white/10 text-gray-300 hover:border-orange-500/50'
-                }`}
-              >
-                <p className="text-lg font-semibold">{level.label}</p>
-                <p className="text-xs text-gray-500">{level.helper}</p>
+              <button key={level.id} onClick={() => handleSelect('experienceLevel', level.id)} style={optionCardStyle(isActive)}>
+                <p style={{ fontSize: '15px', fontWeight: 510, color: isActive ? 'var(--text)' : 'var(--text-2)', marginBottom: '2px' }}>{level.label}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{level.helper}</p>
               </button>
             );
           })}
@@ -312,7 +253,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
 
     const voiceDisabled = !hasAPIKey;
     return (
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {interviewModes.map((mode) => {
           const isActive = setup.interviewMode === mode.id;
           const isDisabled = mode.id === 'voice' && voiceDisabled;
@@ -320,31 +261,25 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
             <button
               key={mode.id}
               onClick={() => !isDisabled && handleSelect('interviewMode', mode.id)}
-              className={`w-full rounded-2xl border p-5 text-left transition-all ${
-                isDisabled
-                  ? 'border-white/5 text-gray-500 cursor-not-allowed'
-                  : isActive
-                  ? 'border-orange-500 bg-orange-500/10 text-white'
-                  : 'border-white/10 text-gray-300 hover:border-orange-500/50'
-              }`}
+              style={optionCardStyle(isActive, isDisabled)}
             >
-              <div className="flex items-center justify-between">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p className="text-lg font-semibold flex items-center gap-2">
-                    {mode.title}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <p style={{ fontSize: '14px', fontWeight: 510, color: isActive ? 'var(--text)' : 'var(--text-2)' }}>{mode.title}</p>
                     {mode.badge && (
-                      <span className="text-[10px] uppercase tracking-[0.2em] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300">
+                      <span style={{ fontSize: '9px', padding: '2px 7px', background: 'rgba(232,101,26,0.1)', border: '1px solid rgba(232,101,26,0.2)', borderRadius: '3px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         {mode.badge}
                       </span>
                     )}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">{mode.description}</p>
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>{mode.description}</p>
+                  {mode.id === 'voice' && voiceDisabled && (
+                    <p style={{ fontSize: '11px', color: '#f87171', marginTop: '6px' }}>Add your OpenAI API key to unlock voice mode.</p>
+                  )}
                 </div>
-                {isActive && <Check className="w-5 h-5 text-orange-400" />}
+                {isActive && <Check style={{ width: '14px', height: '14px', color: 'var(--orange)', flexShrink: 0 }} />}
               </div>
-              {mode.id === 'voice' && voiceDisabled && (
-                <p className="text-xs text-red-400 mt-3">Add your OpenAI API key to unlock voice mode.</p>
-              )}
             </button>
           );
         })}
@@ -352,399 +287,320 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
     );
   };
 
-  const progressPercent =
-    wizardSteps.length > 1 ? (currentStep / (wizardSteps.length - 1)) * 100 : 100;
-
+  const progressPercent = wizardSteps.length > 1 ? (currentStep / (wizardSteps.length - 1)) * 100 : 100;
   const isLastStep = currentStep === wizardSteps.length - 1;
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    padding: '10px 14px',
+    fontSize: '13px',
+    color: 'var(--text)',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'Inter, -apple-system, sans-serif',
+  };
+
   return (
-    <div className="min-h-screen bg-[#010103] text-white pt-24 pb-20">
-      <div className="max-w-7xl mx-auto px-4 space-y-10">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', paddingTop: '80px', paddingBottom: '80px' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 32px' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '48px' }}>
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-white/50">Setup</p>
-            <h1 className="text-3xl md:text-4xl font-semibold mt-2">Build your next interview run</h1>
+            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Setup</p>
+            <h1 style={{ fontSize: '28px', fontWeight: 510, letterSpacing: '-0.018em', color: 'var(--text)' }}>Configure your session</h1>
           </div>
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           >
-            <ArrowLeft className="w-4 h-4" /> Back to dashboard
+            <ArrowLeft style={{ width: '13px', height: '13px' }} />
+            Back to dashboard
           </button>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="rounded-[32px] border border-white/5 bg-gradient-to-br from-[#080808] via-[#050505] to-[#020203] p-6 lg:p-8 flex flex-col lg:flex-row gap-6 lg:gap-10 shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
-        >
-          <div className="flex-1 space-y-3">
-            <p className="text-xs uppercase tracking-[0.45em] text-orange-200/70">Kelv ritual</p>
-            <h2 className="text-2xl font-semibold leading-tight">
-              Set the intention before Kelv starts rolling.
-            </h2>
-            <p className="text-gray-400">
-              Every choice below tunes the interviewer's tone, pacing, and rubric. Pick the lane you are aiming for today.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 flex-shrink-0 min-w-[240px]">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="uppercase text-[10px] tracking-[0.4em] text-white/60">Industry</p>
-              <p className="text-white text-lg font-semibold mt-2">{setup.industry || 'Not chosen'}</p>
+        {/* Summary bar */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', marginBottom: '32px', overflow: 'hidden' }}>
+          {[
+            { label: 'Role', value: setup.jobType || '—' },
+            { label: 'Industry', value: setup.industry || '—' },
+            { label: 'Experience', value: setup.experienceLevel ? setup.experienceLevel.split('(')[0].trim() : '—' },
+            { label: 'Format', value: setup.interviewMode === 'text' ? 'Text' : 'Voice' },
+          ].map((item, i) => (
+            <div key={item.label} style={{ padding: i > 0 ? '0 0 0 20px' : '0', borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }}>
+              <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{item.label}</p>
+              <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>{item.value}</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="uppercase text-[10px] tracking-[0.4em] text-white/60">Role</p>
-              <p className="text-white text-lg font-semibold mt-2">{setup.jobType || 'None yet'}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="uppercase text-[10px] tracking-[0.4em] text-white/60">Experience</p>
-              <p className="text-white text-lg font-semibold mt-2">
-                {setup.experienceLevel ? setup.experienceLevel.split('(')[0].trim() : 'TBD'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="uppercase text-[10px] tracking-[0.4em] text-white/60">Format</p>
-              <p className="text-white text-lg font-semibold mt-2">
-                {setup.interviewMode === 'text' ? 'Text' : 'Voice'}
-              </p>
-            </div>
-          </div>
-        </motion.div>
+          ))}
+        </div>
 
-        <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] items-start mt-10">
-          <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45 }}
-              className="rounded-[32px] border border-white/5 bg-[#050506] p-6"
-            >
-              <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-white/60">
-                <span>Flow</span>
-                <span>
-                  {currentStep + 1}/{wizardSteps.length}
-                </span>
+        {/* Two-column layout */}
+        <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+
+          {/* Left: wizard steps + briefing */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Progress steps */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Progress</p>
+                <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{currentStep + 1}/{wizardSteps.length}</p>
               </div>
-              <div className="mt-3 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+              <div style={{ height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden', marginBottom: '16px' }}>
                 <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-400 via-amber-200 to-yellow-200"
                   animate={{ width: `${progressPercent}%` }}
                   initial={false}
                   transition={{ duration: 0.4 }}
-                  style={{ width: `${progressPercent}%` }}
+                  style={{ height: '100%', background: 'var(--orange)', borderRadius: '1px' }}
                 />
               </div>
-              <div className="mt-6 space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {wizardSteps.map((step, index) => {
                   const isActive = index === currentStep;
                   const isDone = index < currentStep;
-                  const isUnlocked =
-                    index <= currentStep ||
-                    wizardSteps.slice(0, index).every((s) => isStepComplete(s.id));
+                  const isUnlocked = index <= currentStep || wizardSteps.slice(0, index).every((s) => isStepComplete(s.id));
                   return (
-                    <motion.button
+                    <button
                       key={step.id}
                       type="button"
-                      whileHover={{ scale: isUnlocked ? 1.01 : 1 }}
-                      whileTap={{ scale: isUnlocked ? 0.99 : 1 }}
                       disabled={!isUnlocked}
                       onClick={() => isUnlocked && setCurrentStep(index)}
-                      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-                        isActive
-                          ? 'border-orange-400/70 bg-orange-400/10 text-white shadow-[0_0_30px_rgba(251,146,60,0.2)]'
-                          : isDone
-                          ? 'border-white/20 bg-white/5 text-white'
-                          : 'border-white/10 text-white/60'
-                      } ${!isUnlocked ? 'cursor-not-allowed opacity-40' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        background: isActive ? 'rgba(232,101,26,0.06)' : 'transparent',
+                        border: `1px solid ${isActive ? 'rgba(232,101,26,0.3)' : 'transparent'}`,
+                        borderRadius: '5px',
+                        cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                        opacity: isUnlocked ? 1 : 0.35,
+                        textAlign: 'left',
+                        width: '100%',
+                        transition: 'background 0.15s, border-color 0.15s',
+                      }}
                     >
-                      <div className="flex items-center justify-between text-sm font-semibold">
-                        <span className="flex items-center gap-3">
-                          <span
-                            className={`flex h-9 w-9 items-center justify-center rounded-full border text-base ${
-                              isDone || isActive
-                                ? 'border-orange-400 bg-orange-400/15 text-orange-200'
-                                : 'border-white/20 text-white/70'
-                            }`}
-                          >
-                            {isDone ? <Check className="w-4 h-4" /> : index + 1}
-                          </span>
-                          {step.label}
-                        </span>
-                        <ArrowRight className="w-4 h-4 text-white/50" />
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        border: `1px solid ${isDone || isActive ? 'var(--orange)' : 'var(--border)'}`,
+                        background: isDone ? 'var(--orange)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        {isDone
+                          ? <Check style={{ width: '10px', height: '10px', color: '#fff' }} />
+                          : <span style={{ fontSize: '9px', color: isActive ? 'var(--orange)' : 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{index + 1}</span>
+                        }
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">{step.description}</p>
-                    </motion.button>
+                      <div>
+                        <p style={{ fontSize: '13px', fontWeight: 500, color: isActive ? 'var(--text)' : 'var(--text-3)' }}>{step.label}</p>
+                        <p style={{ fontSize: '10px', color: 'var(--text-4)' }}>{step.description}</p>
+                      </div>
+                    </button>
                   );
                 })}
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45 }}
-              className="rounded-[32px] border border-white/5 bg-gradient-to-br from-[#140a04] to-[#050505] p-6 space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-orange-500/20 text-orange-200">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-white/60">Kelv briefing</p>
-                  <p className="text-sm text-gray-400">Auto-updates as you tweak each step.</p>
-                </div>
-              </div>
-              <p className="text-lg leading-relaxed text-white">{dynamicNarrative}</p>
-            </motion.div>
-          </div>
+            {/* Kelv briefing */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+              <p style={{ fontSize: '9px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Session preview</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.65' }}>{dynamicNarrative}</p>
+            </div>
 
-          <div className="space-y-8">
-            <motion.div
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4 }}
-              className="rounded-[32px] border border-white/5 bg-[#050506] p-6 space-y-4 text-center"
-            >
-              <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.35em] text-white/60">Templates</p>
-                <h3 className="text-xl font-semibold">Saved runs</h3>
-                <p className="text-sm text-gray-500">
-                  Side stash of rituals. Click a card to load it instantly.
-                </p>
-              </div>
-              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2 custom-scrollbar text-left">
-                {isLoadingSetups && (
-                  <p className="text-sm text-gray-500 text-center">Loading templates...</p>
-                )}
-                {!isLoadingSetups && savedSetups.length === 0 && (
-                  <p className="text-sm text-gray-500 text-center">
-                    Save any configuration once and it will live here for one-tap relaunches.
-                  </p>
-                )}
-                {!isLoadingSetups &&
-                  savedSetups.map((saved) => (
-                    <div
-                      key={saved.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleUseSavedSetup(saved)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handleUseSavedSetup(saved);
-                        }
-                      }}
-                      className="border border-white/10 bg-white/5 rounded-2xl p-4 flex items-start justify-between gap-4 hover:border-orange-500/40 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40"
-                    >
+            {/* Saved setups */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+              <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>Saved setups</p>
+              {isLoadingSetups && (
+                <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>Loading...</p>
+              )}
+              {!isLoadingSetups && savedSetups.length === 0 && (
+                <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.6' }}>Save a config to relaunch it here with one click.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '280px', overflowY: 'auto' }}>
+                {!isLoadingSetups && savedSetups.map((saved) => (
+                  <div
+                    key={saved.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleUseSavedSetup(saved)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleUseSavedSetup(saved); } }}
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '12px 14px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                       <div>
-                        <p className="text-sm font-semibold flex items-center gap-2">
+                        <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {saved.name}
-                          {saved.is_favorite && <Heart className="w-3.5 h-3.5 text-red-400" />}
+                          {saved.is_favorite && <Heart style={{ width: '10px', height: '10px', color: '#f87171' }} />}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {saved.setup.jobType} · {saved.setup.industry}
-                        </p>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleToggleFavorite(saved.id, saved.is_favorite);
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 ${
-                              saved.is_favorite
-                                ? 'bg-red-500/20 text-red-300'
-                                : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                            }`}
-                          >
-                            <Heart className="w-3 h-3" />{' '}
-                            {saved.is_favorite ? 'Favorited' : 'Favorite'}
-                          </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteSetup(saved.id);
-                            }}
-                            className="px-3 py-1.5 rounded-xl text-xs text-red-300 bg-red-500/10 hover:bg-red-500/20 flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3 h-3" /> Delete
-                          </button>
-                        </div>
+                        <p style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: '2px' }}>{saved.setup.jobType} · {saved.setup.industry}</p>
                       </div>
-                      <div className="text-xs text-gray-500 text-right">
-                        <p>Last used</p>
-                        <p className="font-semibold text-white mt-1">
-                          {new Date(saved.updated_at || saved.created_at).toLocaleDateString()}
-                        </p>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleToggleFavorite(saved.id, saved.is_favorite); }}
+                          style={{ padding: '3px', color: saved.is_favorite ? '#f87171' : 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Heart style={{ width: '11px', height: '11px' }} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteSetup(saved.id); }}
+                          style={{ padding: '3px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Trash2 style={{ width: '11px', height: '11px' }} />
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
               </div>
-            </motion.div>
+            </div>
+          </div>
 
+          {/* Right: step options + summary */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* Step panel */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={wizardSteps[currentStep].id}
-                initial={{ opacity: 0, y: 24 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -24 }}
-                transition={{ duration: 0.35 }}
-                className="rounded-[32px] border border-white/5 bg-[#050506] p-6 lg:p-8 space-y-6 shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25 }}
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '28px' }}
               >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-white/60">
-                      Step {currentStep + 1}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-baseline gap-3">
-                      <h2 className="text-3xl font-semibold">
-                        {wizardSteps[currentStep].label}
-                      </h2>
-                      <span className="text-sm text-gray-400">
-                        {wizardSteps[currentStep].description}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs tracking-[0.25em] border border-white/15 text-white/70">
-                    {currentStep + 1}/{wizardSteps.length}
-                  </span>
+                <div style={{ marginBottom: '24px' }}>
+                  <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                    Step {currentStep + 1} of {wizardSteps.length}
+                  </p>
+                  <h2 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)', marginBottom: '4px' }}>
+                    {wizardSteps[currentStep].label}
+                  </h2>
+                  <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>{wizardSteps[currentStep].description}</p>
                 </div>
 
-                <div className="space-y-6">
-                  {renderOptions()}
+                {renderOptions()}
 
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-gray-300 flex items-start gap-3">
-                    <Shield className="w-4 h-4 text-orange-300 mt-0.5" />
-                    <p>{stepTips[wizardSteps[currentStep].id]}</p>
-                  </div>
+                {/* Tip */}
+                <div style={{ marginTop: '20px', padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '5px' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.6' }}>{stepTips[wizardSteps[currentStep].id]}</p>
+                </div>
 
-                  <AnimatePresence>
-                    {showOtherField && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="flex flex-wrap gap-2"
+                {/* Custom input */}
+                <AnimatePresence>
+                  {showOtherField && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
+                    >
+                      <input
+                        value={otherValue}
+                        onChange={(e) => setOtherValue(e.target.value)}
+                        placeholder="Type your custom option"
+                        style={{ ...inputStyle, flex: 1 }}
+                        onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
+                        onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
+                      />
+                      <button
+                        onClick={handleOtherSubmit}
+                        style={{ padding: '10px 16px', background: 'var(--orange)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
                       >
-                        <input
-                          value={otherValue}
-                          onChange={(e) => setOtherValue(e.target.value)}
-                          placeholder="Type your custom option"
-                          className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500"
-                        />
-                        <button
-                          onClick={handleOtherSubmit}
-                          className="px-5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold"
-                        >
-                          Add
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                        Add
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                <div className="flex flex-wrap justify-between items-center gap-3 pt-2">
+                {/* Navigation */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
                   <button
                     onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-                    className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white disabled:opacity-40"
                     disabled={currentStep === 0}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: currentStep === 0 ? 'not-allowed' : 'pointer', opacity: currentStep === 0 ? 0.4 : 1, padding: 0 }}
                   >
-                    <ArrowLeft className="w-4 h-4" /> Previous
+                    <ArrowLeft style={{ width: '13px', height: '13px' }} />
+                    Previous
                   </button>
                   <button
                     onClick={() => {
-                      if (isLastStep) {
-                        handleStartInterview();
-                      } else {
-                        setCurrentStep(Math.min(wizardSteps.length - 1, currentStep + 1));
-                      }
+                      if (isLastStep) handleStartInterview();
+                      else setCurrentStep(Math.min(wizardSteps.length - 1, currentStep + 1));
                     }}
-                    className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-orange-500/80 hover:bg-orange-500 text-sm font-semibold disabled:bg-white/10 disabled:text-gray-500"
                     disabled={!isStepComplete(wizardSteps[currentStep].id)}
+                    className="btn-primary"
+                    style={{ opacity: isStepComplete(wizardSteps[currentStep].id) ? 1 : 0.4, cursor: isStepComplete(wizardSteps[currentStep].id) ? 'pointer' : 'not-allowed' }}
                   >
                     {isLastStep ? 'Launch interview' : 'Continue'}
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight style={{ width: '13px', height: '13px' }} />
                   </button>
                 </div>
               </motion.div>
             </AnimatePresence>
 
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45 }}
-              className="rounded-[32px] border border-white/5 bg-[#050506] p-6 lg:p-8 space-y-6"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Summary + save */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
+              <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>Summary</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '20px' }}>
+                {[
+                  { label: 'Industry', value: setup.industry },
+                  { label: 'Role', value: setup.jobType },
+                  { label: 'Experience', value: setup.experienceLevel },
+                  { label: 'Mode', value: setup.interviewMode === 'voice' ? 'Voice interview' : setup.interviewMode === 'text' ? 'Text interview' : undefined },
+                ].map((row) => (
+                  <div key={row.label} style={{ background: 'var(--surface-2)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-4)' }}>{row.label}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: row.value ? 'var(--text)' : 'var(--text-4)' }}>{row.value || '—'}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-white/60">Summary</p>
-                  <h3 className="text-xl font-semibold mt-2">Blueprint</h3>
-                </div>
-                <button
-                  onClick={() => setUseAutoName(true)}
-                  className="text-xs text-gray-500 hover:text-white"
-                >
-                  Reset auto naming
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <SummaryRow label="Industry" value={setup.industry} />
-                <SummaryRow label="Role" value={setup.jobType} />
-                <SummaryRow label="Experience" value={setup.experienceLevel} />
-                <SummaryRow
-                  label="Mode"
-                  value={
-                    setup.interviewMode === 'voice'
-                      ? 'Voice interview'
-                      : setup.interviewMode === 'text'
-                      ? 'Text interview'
-                      : undefined
-                  }
-                />
-              </div>
-
-              <div className="pt-4 border-t border-white/10 space-y-3">
-                <label className="text-xs text-gray-500 uppercase tracking-[0.3em]">Setup name</label>
-                <input
-                  value={setupName}
-                  onChange={(e) => {
-                    setSetupName(e.target.value);
-                    setUseAutoName(false);
-                  }}
-                  placeholder="Voice · SWE · Tech"
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500"
-                />
-                <label className="flex items-center gap-2 text-sm text-gray-400">
+                  <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Setup name</label>
                   <input
-                    type="checkbox"
-                    checked={saveAsFavorite}
-                    onChange={(e) => setSaveAsFavorite(e.target.checked)}
-                    className="accent-orange-500"
+                    value={setupName}
+                    onChange={(e) => { setSetupName(e.target.value); setUseAutoName(false); }}
+                    placeholder="Voice · SWE · Tech"
+                    style={inputStyle}
+                    onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
                   />
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-4)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={saveAsFavorite} onChange={(e) => setSaveAsFavorite(e.target.checked)} style={{ accentColor: 'var(--orange)' }} />
                   Mark as favorite
                 </label>
-                <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <button
                     onClick={handleSaveSetup}
                     disabled={!isSetupComplete() || !setupName.trim()}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-orange-500 text-white font-semibold disabled:bg-white/10 disabled:text-gray-500"
+                    className="btn-primary"
+                    style={{ justifyContent: 'center', opacity: isSetupComplete() && setupName.trim() ? 1 : 0.4 }}
                   >
-                    Save & launch <ArrowRight className="w-4 h-4" />
+                    Save & launch
+                    <ArrowRight style={{ width: '13px', height: '13px' }} />
                   </button>
                   <button
                     onClick={handleStartInterview}
                     disabled={!isSetupComplete()}
-                    className="inline-flex items-center justify-center px-4 py-3 rounded-2xl border border-white/10 text-sm font-semibold text-white disabled:text-gray-500"
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-3)', cursor: isSetupComplete() ? 'pointer' : 'not-allowed', opacity: isSetupComplete() ? 1 : 0.4 }}
                   >
-                    Launch without saving
+                    Skip save
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
           </div>
         </div>

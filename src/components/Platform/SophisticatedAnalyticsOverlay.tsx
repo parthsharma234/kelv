@@ -255,13 +255,13 @@ const SophisticatedAnalyticsOverlay: React.FC<SophisticatedAnalyticsOverlayProps
                   </div>
                   <div className="flex items-center gap-2">
                     {cvMetrics.facialExpressions.slice(-1)[0].happiness > 0.6 && (
-                      <span className="text-green-400">😊</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">Engaged</span>
                     )}
                     {cvMetrics.facialExpressions.slice(-1)[0].concentration > 0.7 && (
-                      <span className="text-blue-400">🤔</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Focused</span>
                     )}
                     {cvMetrics.facialExpressions.slice(-1)[0].nervousness > 0.6 && (
-                      <span className="text-yellow-400">😰</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Tense</span>
                     )}
                   </div>
                 </div>

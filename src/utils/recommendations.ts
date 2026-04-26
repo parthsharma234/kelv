@@ -3,6 +3,7 @@ import { InterviewHistory } from '../types/interview';
 export interface Recommendation {
   id: string;
   type: 'practice' | 'improvement' | 'challenge' | 'milestone';
+  category: string;
   title: string;
   description: string;
   action: {
@@ -10,8 +11,8 @@ export interface Recommendation {
     interviewType: 'standard' | 'focused';
     focusedType?: string;
   };
-  priority: number; // 1-5, 5 being highest
-  icon: string;
+  priority: number;
+  impact: string;
   color: string;
   gradient: string;
 }
@@ -20,10 +21,9 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: string;
   unlocked: boolean;
   unlockedAt?: Date;
-  progress: number; // 0-100
+  progress: number;
   requirement: number;
   category: 'interviews' | 'scores' | 'streaks' | 'practice' | 'special';
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
@@ -35,10 +35,9 @@ export interface StreakData {
   longestStreak: number;
   lastInterviewDate: Date | null;
   interviewDates: Date[];
-  streakCalendar: { date: Date; hasInterview: boolean }[];
+  streakCalendar: { date: Date; hasInterview: boolean; completed: boolean }[];
 }
 
-// Calculate real streak from interview history
 export function calculateStreak(history: InterviewHistory[]): StreakData {
   if (history.length === 0) {
     return {
@@ -50,12 +49,10 @@ export function calculateStreak(history: InterviewHistory[]): StreakData {
     };
   }
 
-  // Sort interviews by date (most recent first)
   const sortedHistory = [...history].sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  // Get unique dates (ignore time)
   const uniqueDates = Array.from(new Set(
     sortedHistory.map(i => new Date(i.date).toDateString())
   )).map(d => new Date(d));
@@ -67,129 +64,122 @@ export function calculateStreak(history: InterviewHistory[]): StreakData {
   let longestStreak = 0;
   let tempStreak = 0;
 
-  // Calculate current streak (working backwards from today)
   const lastInterviewDate = uniqueDates[0];
   const daysSinceLastInterview = Math.floor(
     (today.getTime() - lastInterviewDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  // Streak breaks if no interview today or yesterday
   if (daysSinceLastInterview <= 1) {
     let checkDate = new Date(today);
 
     for (let i = 0; i < uniqueDates.length; i++) {
       const interviewDate = new Date(uniqueDates[i]);
-      const dayDiff = Math.floor(
+      interviewDate.setHours(0, 0, 0, 0);
+
+      const daysDiff = Math.floor(
         (checkDate.getTime() - interviewDate.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      if (dayDiff <= 1) {
+      if (daysDiff <= 1) {
         currentStreak++;
-        checkDate = new Date(interviewDate);
+        checkDate = interviewDate;
       } else {
         break;
       }
     }
   }
 
-  // Calculate longest streak
-  for (let i = 0; i < uniqueDates.length; i++) {
-    tempStreak = 1;
+  tempStreak = 0;
+  for (let i = 0; i < uniqueDates.length - 1; i++) {
+    const current = uniqueDates[i];
+    const next = uniqueDates[i + 1];
+    const daysDiff = Math.floor(
+      (current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-    for (let j = i + 1; j < uniqueDates.length; j++) {
-      const dayDiff = Math.floor(
-        (uniqueDates[j - 1].getTime() - uniqueDates[j].getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (dayDiff <= 1) {
-        tempStreak++;
-      } else {
-        break;
-      }
+    tempStreak++;
+    if (daysDiff > 1) {
+      longestStreak = Math.max(longestStreak, tempStreak);
+      tempStreak = 0;
     }
-
-    longestStreak = Math.max(longestStreak, tempStreak);
   }
+  longestStreak = Math.max(longestStreak, tempStreak + 1, currentStreak);
 
   return {
     currentStreak,
     longestStreak,
-    lastInterviewDate,
+    lastInterviewDate: lastInterviewDate,
     interviewDates: uniqueDates,
     streakCalendar: generateCalendar(uniqueDates)
   };
 }
 
-// Generate last 30 days calendar
-function generateCalendar(interviewDates: Date[]): { date: Date; hasInterview: boolean }[] {
+function generateCalendar(interviewDates: Date[]): { date: Date; hasInterview: boolean; completed: boolean }[] {
   const calendar = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const interviewDateStrings = interviewDates.map(d => d.toDateString());
+  const interviewDateStrings = new Set(interviewDates.map(d => {
+    const date = new Date(d);
+    date.setHours(0, 0, 0, 0);
+    return date.toDateString();
+  }));
 
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 27; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-
-    calendar.push({
-      date,
-      hasInterview: interviewDateStrings.includes(date.toDateString())
-    });
+    const hasInterview = interviewDateStrings.has(date.toDateString());
+    calendar.push({ date, hasInterview, completed: hasInterview });
   }
 
   return calendar;
 }
 
-// Generate personalized recommendations
 export function generateRecommendations(
   history: InterviewHistory[],
   strengthsAndWeaknesses: { strengths: string[]; weaknesses: string[] }
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
 
-  // If no interviews, recommend starting
   if (history.length === 0) {
     recommendations.push({
       id: 'first-interview',
       type: 'milestone',
-      title: 'Start Your First Interview',
-      description: 'Begin your journey with a 20-minute dynamic interview',
+      category: 'First session',
+      title: 'Run your first session',
+      description: 'Start the loop. One session gives Kelv enough signal to surface your first weak point.',
       action: { type: 'start-interview', interviewType: 'standard' },
       priority: 5,
-      icon: '🚀',
+      impact: 'Unlocks all tracking',
       color: 'orange',
       gradient: 'from-orange-500 to-red-500'
     });
     return recommendations;
   }
 
-  // Analyze recent performance
   const recentInterviews = history.slice(0, 5);
   const avgRecentScore = recentInterviews.reduce((sum, i) => sum + i.overallScore, 0) / recentInterviews.length;
 
-  // Check which types haven't been practiced
   const practiceTypes = ['technical', 'behavioral', 'situational', 'leadership', 'problemSolving', 'communication'];
   const practicedTypes = new Set(history.map(i => i.interviewType).filter(Boolean));
   const unpracticedTypes = practiceTypes.filter(t => !practicedTypes.has(t));
 
-  // Recommendation 1: Unpracticed areas
   if (unpracticedTypes.length > 0) {
     const type = unpracticedTypes[0];
     recommendations.push({
       id: `try-${type}`,
       type: 'practice',
-      title: `Try ${formatTypeName(type)} Practice`,
-      description: 'Expand your skillset with a new interview type',
+      category: formatTypeName(type),
+      title: `Untested: ${formatTypeName(type)}`,
+      description: `You haven't run a ${formatTypeName(type).toLowerCase()} drill yet. Gaps you haven't seen are the ones that cost offers.`,
       action: { type: 'start-interview', interviewType: 'focused', focusedType: type },
       priority: 4,
-      icon: getTypeIcon(type),
+      impact: 'Exposes unknown gap',
       color: getTypeColor(type),
       gradient: getTypeGradient(type)
     });
   }
 
-  // Recommendation 2: Weaknesses to improve
   if (strengthsAndWeaknesses.weaknesses.length > 0) {
     const weakness = strengthsAndWeaknesses.weaknesses[0];
     const suggestedType = mapWeaknessToType(weakness);
@@ -197,63 +187,60 @@ export function generateRecommendations(
     recommendations.push({
       id: 'improve-weakness',
       type: 'improvement',
-      title: 'Strengthen Your Weak Spots',
-      description: `Focus on: ${weakness}`,
+      category: 'Proof gap',
+      title: `Weak point: ${weakness}`,
+      description: `This is your most consistent gap. Drill it directly until the score moves.`,
       action: { type: 'start-interview', interviewType: 'focused', focusedType: suggestedType },
       priority: 5,
-      icon: '🎯',
+      impact: 'Highest score leverage',
       color: 'blue',
       gradient: 'from-blue-500 to-cyan-500'
     });
   }
 
-  // Recommendation 3: Challenge yourself if doing well
   if (avgRecentScore >= 75) {
     recommendations.push({
       id: 'challenge',
       type: 'challenge',
-      title: 'Take on a Challenge',
-      description: 'You\'re doing great! Try a full dynamic interview',
+      category: 'Full pressure',
+      title: 'Full dynamic — no safety net',
+      description: `You're averaging ${Math.round(avgRecentScore)}. A full session under pressure is where the remaining gaps show.`,
       action: { type: 'start-interview', interviewType: 'standard' },
       priority: 3,
-      icon: '💪',
+      impact: 'Tests ceiling under pressure',
       color: 'purple',
       gradient: 'from-purple-500 to-pink-500'
     });
   }
 
-  // Recommendation 4: Practice most improved area
   const mostImprovedType = findMostImprovedType(history);
   if (mostImprovedType) {
     recommendations.push({
       id: 'build-momentum',
       type: 'practice',
-      title: 'Build on Your Momentum',
-      description: `Keep improving your ${formatTypeName(mostImprovedType)} skills`,
+      category: formatTypeName(mostImprovedType),
+      title: `Press your best area: ${formatTypeName(mostImprovedType)}`,
+      description: `This is your most improved format. Keep the reps coming while the pattern is live.`,
       action: { type: 'start-interview', interviewType: 'focused', focusedType: mostImprovedType },
       priority: 3,
-      icon: '📈',
+      impact: 'Consolidate improvement',
       color: 'green',
       gradient: 'from-green-500 to-emerald-500'
     });
   }
 
-  // Sort by priority
   return recommendations.sort((a, b) => b.priority - a.priority).slice(0, 3);
 }
 
-// Generate achievements
 export function calculateAchievements(
   history: InterviewHistory[],
   streakData: StreakData
 ): Achievement[] {
   const achievements: Achievement[] = [
-    // Interview count achievements
     {
       id: 'first-steps',
-      title: 'First Steps',
+      title: 'First Rep',
       description: 'Complete your first interview',
-      icon: '🎯',
       unlocked: history.length >= 1,
       unlockedAt: history.length >= 1 ? new Date(history[history.length - 1].date) : undefined,
       progress: Math.min(100, (history.length / 1) * 100),
@@ -264,9 +251,8 @@ export function calculateAchievements(
     },
     {
       id: 'getting-started',
-      title: 'Getting Started',
+      title: '5 Sessions',
       description: 'Complete 5 interviews',
-      icon: '🚀',
       unlocked: history.length >= 5,
       unlockedAt: history.length >= 5 ? new Date(history[4].date) : undefined,
       progress: Math.min(100, (history.length / 5) * 100),
@@ -277,9 +263,8 @@ export function calculateAchievements(
     },
     {
       id: 'dedicated',
-      title: 'Dedicated Learner',
+      title: '10 Sessions',
       description: 'Complete 10 interviews',
-      icon: '📚',
       unlocked: history.length >= 10,
       unlockedAt: history.length >= 10 ? new Date(history[9].date) : undefined,
       progress: Math.min(100, (history.length / 10) * 100),
@@ -290,9 +275,8 @@ export function calculateAchievements(
     },
     {
       id: 'interview-master',
-      title: 'Interview Master',
+      title: '25 Sessions',
       description: 'Complete 25 interviews',
-      icon: '👑',
       unlocked: history.length >= 25,
       unlockedAt: history.length >= 25 ? new Date(history[24].date) : undefined,
       progress: Math.min(100, (history.length / 25) * 100),
@@ -303,9 +287,8 @@ export function calculateAchievements(
     },
     {
       id: 'legend',
-      title: 'Legend',
+      title: '50 Sessions',
       description: 'Complete 50 interviews',
-      icon: '🏆',
       unlocked: history.length >= 50,
       unlockedAt: history.length >= 50 ? new Date(history[49].date) : undefined,
       progress: Math.min(100, (history.length / 50) * 100),
@@ -314,13 +297,10 @@ export function calculateAchievements(
       rarity: 'legendary',
       gradient: 'from-orange-500 via-red-500 to-pink-500'
     },
-
-    // Score achievements
     {
       id: 'first-success',
-      title: 'First Success',
+      title: 'Broke 80',
       description: 'Score 80% or higher',
-      icon: '⭐',
       unlocked: history.some(i => i.overallScore >= 80),
       unlockedAt: history.find(i => i.overallScore >= 80) ? new Date(history.find(i => i.overallScore >= 80)!.date) : undefined,
       progress: history.length > 0 ? Math.min(100, (Math.max(...history.map(i => i.overallScore)) / 80) * 100) : 0,
@@ -331,9 +311,8 @@ export function calculateAchievements(
     },
     {
       id: 'perfectionist',
-      title: 'Perfectionist',
+      title: 'Broke 95',
       description: 'Score 95% or higher',
-      icon: '💎',
       unlocked: history.some(i => i.overallScore >= 95),
       unlockedAt: history.find(i => i.overallScore >= 95) ? new Date(history.find(i => i.overallScore >= 95)!.date) : undefined,
       progress: history.length > 0 ? Math.min(100, (Math.max(...history.map(i => i.overallScore)) / 95) * 100) : 0,
@@ -342,13 +321,10 @@ export function calculateAchievements(
       rarity: 'legendary',
       gradient: 'from-cyan-500 via-blue-500 to-purple-500'
     },
-
-    // Streak achievements
     {
       id: 'on-fire',
-      title: 'On Fire',
+      title: '3-Day Run',
       description: 'Maintain a 3-day streak',
-      icon: '🔥',
       unlocked: streakData.currentStreak >= 3 || streakData.longestStreak >= 3,
       unlockedAt: streakData.currentStreak >= 3 ? new Date() : undefined,
       progress: Math.min(100, (streakData.currentStreak / 3) * 100),
@@ -359,9 +335,8 @@ export function calculateAchievements(
     },
     {
       id: 'unstoppable',
-      title: 'Unstoppable',
+      title: '7-Day Run',
       description: 'Maintain a 7-day streak',
-      icon: '🌟',
       unlocked: streakData.currentStreak >= 7 || streakData.longestStreak >= 7,
       unlockedAt: streakData.currentStreak >= 7 ? new Date() : undefined,
       progress: Math.min(100, (streakData.currentStreak / 7) * 100),
@@ -372,9 +347,8 @@ export function calculateAchievements(
     },
     {
       id: 'dedication-personified',
-      title: 'Dedication Personified',
+      title: '30-Day Run',
       description: 'Maintain a 30-day streak',
-      icon: '🏅',
       unlocked: streakData.currentStreak >= 30 || streakData.longestStreak >= 30,
       unlockedAt: streakData.currentStreak >= 30 ? new Date() : undefined,
       progress: Math.min(100, (streakData.currentStreak / 30) * 100),
@@ -383,13 +357,10 @@ export function calculateAchievements(
       rarity: 'legendary',
       gradient: 'from-yellow-500 via-orange-500 to-red-500'
     },
-
-    // Practice diversity
     {
       id: 'well-rounded',
-      title: 'Well-Rounded',
+      title: 'All Six Formats',
       description: 'Complete all 6 focused interview types',
-      icon: '🎨',
       unlocked: new Set(history.map(i => i.interviewType).filter(Boolean)).size >= 6,
       unlockedAt: undefined,
       progress: Math.min(100, (new Set(history.map(i => i.interviewType).filter(Boolean)).size / 6) * 100),
@@ -403,7 +374,6 @@ export function calculateAchievements(
   return achievements;
 }
 
-// Helper functions
 function formatTypeName(type: string): string {
   const names: Record<string, string> = {
     technical: 'Technical',
@@ -414,18 +384,6 @@ function formatTypeName(type: string): string {
     communication: 'Communication'
   };
   return names[type] || type;
-}
-
-function getTypeIcon(type: string): string {
-  const icons: Record<string, string> = {
-    technical: '💻',
-    behavioral: '🎯',
-    situational: '🧩',
-    leadership: '👑',
-    problemSolving: '🧠',
-    communication: '💬'
-  };
-  return icons[type] || '📝';
 }
 
 function getTypeColor(type: string): string {
@@ -460,7 +418,7 @@ function mapWeaknessToType(weakness: string): string {
   if (lower.includes('leadership') || lower.includes('team')) return 'leadership';
   if (lower.includes('problem') || lower.includes('solving')) return 'problemSolving';
   if (lower.includes('communication') || lower.includes('explain')) return 'communication';
-  return 'behavioral'; // Default
+  return 'behavioral';
 }
 
 function findMostImprovedType(history: InterviewHistory[]): string | null {

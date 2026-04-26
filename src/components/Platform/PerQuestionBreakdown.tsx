@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MessageSquare, Mic, User, CheckCircle, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { QuestionMetrics, PerQuestionAnalysis } from '../../utils/perQuestionAnalytics';
 
 interface PerQuestionBreakdownProps {
@@ -12,7 +12,7 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
 
   if (!analysis || analysis.questions.length === 0) {
     return (
-      <div className="bg-[#0f0f12] border border-white/5 rounded-2xl p-8 text-center">
+      <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-8 text-center">
         <p className="text-gray-400">No question-level data available</p>
       </div>
     );
@@ -25,27 +25,11 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
   return (
     <div className="space-y-6">
       {/* Summary Header */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryCard
-          label="Average Content"
-          value={analysis.averageScores.content}
-          color="text-purple-400"
-        />
-        <SummaryCard
-          label="Average Delivery"
-          value={analysis.averageScores.delivery}
-          color="text-orange-400"
-        />
-        <SummaryCard
-          label="Average Presence"
-          value={analysis.averageScores.presence}
-          color="text-green-400"
-        />
-        <SummaryCard
-          label="Overall"
-          value={analysis.averageScores.overall}
-          color="text-blue-400"
-        />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <SummaryCard label="Communication" value={analysis.averageScores.content} />
+        <SummaryCard label="Delivery" value={analysis.averageScores.delivery} />
+        <SummaryCard label="Presence" value={analysis.averageScores.presence} />
+        <SummaryCard label="Overall" value={analysis.averageScores.overall} />
       </div>
 
       {/* Strongest/Weakest Highlights */}
@@ -65,7 +49,7 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
       </div>
 
       {/* Per-Question List */}
-      <div className="bg-[#0f0f12] border border-white/5 rounded-2xl overflow-hidden">
+      <div className="bg-[#0f0f12] border border-white/5 rounded-lg overflow-hidden">
         <div className="p-6 border-b border-white/5">
           <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">
             Question-by-Question Breakdown ({analysis.questions.length} Questions)
@@ -89,37 +73,27 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
 
 // --- SUBCOMPONENTS ---
 
-const SummaryCard: React.FC<{ label: string; value: number; color: string }> = ({ label, value, color }) => (
-  <div className="bg-[#0f0f12] border border-white/5 rounded-xl p-4">
-    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-    <p className={`text-2xl font-bold ${color}`}>{value}/100</p>
+const SummaryCard: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <div className="bg-white/[0.02] border border-white/[0.05] rounded-lg p-6 transition-all hover:bg-white/[0.04]">
+    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-medium">{label}</p>
+    <p className="text-2xl font-light text-white/90 tracking-tight">{value}%</p>
   </div>
 );
 
 const HighlightCard: React.FC<{ type: 'strongest' | 'weakest'; question: QuestionMetrics }> = ({ type, question }) => (
-  <div className={`bg-gradient-to-br ${type === 'strongest'
-    ? 'from-green-500/10 to-emerald-500/5 border-green-500/20'
-    : 'from-red-500/10 to-orange-500/5 border-red-500/20'
-    } border rounded-xl p-4`}>
-    <div className="flex items-start gap-3">
-      {type === 'strongest' ? (
-        <TrendingUp className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" />
-      ) : (
-        <TrendingDown className="w-5 h-5 text-red-400 flex-shrink-0 mt-1" />
-      )}
-      <div className="flex-1">
-        <h4 className={`text-sm font-bold mb-1 ${type === 'strongest' ? 'text-green-400' : 'text-red-400'}`}>
-          {type === 'strongest' ? 'Strongest Question' : 'Needs Work'}
-        </h4>
-        <p className="text-xs text-gray-400 mb-2">Q{question.questionNumber}: {question.questionText.substring(0, 80)}...</p>
-        <div className="flex gap-2">
-          <span className="text-xs px-2 py-1 bg-white/5 rounded">
-            Score: {question.overallScore}/100
-          </span>
-          <span className="text-xs px-2 py-1 bg-white/5 rounded">
-            {question.responseLength} words
-          </span>
-        </div>
+  <div className={`bg-white/[0.02] border ${type === 'strongest' ? 'border-green-500/10' : 'border-red-500/10'} rounded-lg p-5 relative overflow-hidden`}>
+    {/* Subtlest background tint */}
+    <div className={`absolute inset-0 opacity-[0.03] ${type === 'strongest' ? 'bg-green-500' : 'bg-red-500'}`} />
+
+    <div className="relative z-10">
+      <h4 className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${type === 'strongest' ? 'text-green-400/80' : 'text-red-400/80'}`}>
+        {type === 'strongest' ? 'Strongest answer' : 'Proof gap — revisit this'}
+      </h4>
+      <p className="text-sm text-gray-300 font-medium mb-3 line-clamp-2">"{question.questionText}"</p>
+      <div className="flex items-center gap-4 text-[10px] text-gray-500 font-serif italic">
+        <span>Score: {question.overallScore}%</span>
+        <div className="w-1 h-1 rounded-full bg-gray-700" />
+        <span>{question.responseLength} words</span>
       </div>
     </div>
   </div>
@@ -137,36 +111,31 @@ const QuestionCard: React.FC<{
   };
 
   return (
-    <div className="transition-colors hover:bg-white/[0.02]">
+    <div className="transition-all hover:bg-white/[0.01] border-b border-white/[0.04] last:border-0">
       {/* Collapsed Header */}
       <button
         onClick={onToggle}
-        className="w-full p-6 flex items-center justify-between text-left"
+        className="w-full p-8 flex items-center justify-between text-left group"
       >
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-xs font-bold text-gray-500">Q{question.questionNumber}</span>
-            <p className="text-sm text-gray-300 flex-1">{question.questionText}</p>
+          <div className="flex items-center gap-4 mb-3">
+            <span className="text-[10px] font-medium text-gray-600 uppercase tracking-widest px-2 py-0.5 border border-white/5 rounded">Part {question.questionNumber}</span>
+            <p className="text-sm text-white/90 font-medium flex-1">{question.questionText}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-lg font-bold ${getScoreColor(question.overallScore)}`}>
-              {question.overallScore}/100
-            </span>
-            <span className="text-xs text-gray-500">{question.responseLength} words</span>
-            <span className="text-xs text-gray-500">{question.wpm} WPM</span>
-            {question.fillerWordCount > 0 && (
-              <span className="text-xs px-2 py-1 bg-yellow-500/10 text-yellow-400 rounded">
-                {question.fillerWordCount} fillers
+          <div className="flex items-center gap-6">
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-xl font-light ${getScoreColor(question.overallScore)}`}>
+                {question.overallScore}%
               </span>
-            )}
+              <span className="text-[10px] text-gray-600 font-serif italic">overall quality</span>
+            </div>
+            <div className="h-4 w-px bg-white/5" />
+            <span className="text-xs text-gray-500 font-medium">{question.responseLength} words</span>
+            <span className="text-xs text-gray-500 font-medium">{question.wpm} WPM</span>
           </div>
         </div>
-        <div className="ml-4">
-          {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
-          )}
+        <div className={`transition-all duration-300 ${isExpanded ? 'rotate-180 opacity-40' : 'opacity-20 group-hover:opacity-60'}`}>
+          <ChevronDown className="w-5 h-5 text-gray-400" />
         </div>
       </button>
 
@@ -177,141 +146,58 @@ const QuestionCard: React.FC<{
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="px-6 pb-6 space-y-4">
+            <div className="px-8 pb-10 space-y-10">
               {/* Answer Text */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Your Answer</p>
-                <p className="text-sm text-gray-300 leading-relaxed">{question.answerText}</p>
-              </div>
-
-              {/* Score Breakdown */}
-              <div className="grid grid-cols-3 gap-3">
-                <ScorePill
-                  icon={MessageSquare}
-                  label="Content"
-                  score={question.contentScore}
-                  color="purple"
-                />
-                <ScorePill
-                  icon={Mic}
-                  label="Delivery"
-                  score={question.deliveryScore}
-                  color="orange"
-                />
-                <ScorePill
-                  icon={User}
-                  label="Presence"
-                  score={question.presenceScore}
-                  color="green"
-                />
-              </div>
-
-              {/* Detailed Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricBox label="Voice Confidence" value={`${question.voiceConfidence}/100`} />
-                <MetricBox label="Face Confidence" value={`${question.faceConfidence}/100`} />
-                <MetricBox label="Tonal Variety" value={`${question.tonalVariety}/100`} />
-                <MetricBox label="Expression" value={question.dominantExpression} />
-              </div>
-
-              {/* Content Analysis */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Content Quality</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div>
-                    <p className="text-xs text-gray-400">STAR Keywords</p>
-                    <p className="text-lg font-bold text-white">{question.starKeywordCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Numbers Used</p>
-                    <p className="text-lg font-bold text-white">{question.numberCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Weak Words</p>
-                    <p className="text-lg font-bold text-yellow-400">{question.weakWordCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Filler Words</p>
-                    <p className="text-lg font-bold text-red-400">{question.fillerWordCount}</p>
-                  </div>
+              <div className="space-y-3">
+                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">Recorded Transcript</p>
+                <div className="text-base text-gray-400 font-light leading-relaxed max-w-4xl italic">
+                  <HighlightedText text={question.answerText} />
                 </div>
               </div>
 
-              {/* Strengths & Weaknesses */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Strengths */}
+              {/* Score Breakdown - Simplified */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <ScorePill label="Logic & Flow" score={question.contentScore} />
+                <ScorePill label="Voice Clarity" score={question.deliveryScore} />
+                <ScorePill label="Physical Presence" score={question.presenceScore} />
+                <ScorePill label="Tonal Resonance" score={question.tonalVariety} />
+              </div>
+
+              {/* Personal Observations */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/[0.04]">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Strengths</p>
-                  {question.strengths.length > 0 ? (
-                    <div className="space-y-2">
-                      {question.strengths.map((item, i) => (
-                        <div key={i} className="flex gap-2 items-start p-2 bg-green-500/5 border border-green-500/20 rounded-lg">
-                          <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs font-bold text-green-400">{item.area}</p>
-                            <p className="text-xs text-gray-300">{item.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">None detected</p>
-                  )}
-                </div>
-
-                {/* Weaknesses */}
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Areas to Improve</p>
-                  {question.weaknesses.length > 0 ? (
-                    <div className="space-y-2">
-                      {question.weaknesses.map((item, i) => (
-                        <div key={i} className={`flex gap-2 items-start p-2 rounded-lg ${item.severity === 'critical'
-                          ? 'bg-red-500/5 border border-red-500/20'
-                          : 'bg-yellow-500/5 border border-yellow-500/20'
-                          }`}>
-                          <AlertTriangle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${item.severity === 'critical' ? 'text-red-400' : 'text-yellow-400'
-                            }`} />
-                          <div>
-                            <p className={`text-xs font-bold ${item.severity === 'critical' ? 'text-red-400' : 'text-yellow-400'
-                              }`}>{item.area}</p>
-                            <p className="text-xs text-gray-300">{item.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">None detected</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Ideal Answer Comparison Placeholder (Phase 1 Feature 2) */}
-              {question.idealAnswerSimilarity !== undefined && (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                  <p className="text-xs text-blue-400 uppercase tracking-wider mb-2">Ideal Answer Comparison</p>
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <p className="text-xs text-gray-400">Similarity Score</p>
-                      <p className="text-2xl font-bold text-blue-400">{question.idealAnswerSimilarity}/100</p>
-                    </div>
-                    {question.missingKeyPoints && question.missingKeyPoints.length > 0 && (
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-400 mb-1">Missing Key Points:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {question.missingKeyPoints.map((point, i) => (
-                            <span key={i} className="text-xs px-2 py-1 bg-white/5 rounded text-gray-300">
-                              {point}
-                            </span>
-                          ))}
+                  <h5 className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-4">What worked well</h5>
+                  <div className="space-y-4">
+                    {question.strengths.length > 0 ? question.strengths.map((item, i) => (
+                      <div key={i} className="flex gap-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500/20 mt-1.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm text-white/80 font-medium mb-1">{item.area}</p>
+                          <p className="text-sm text-gray-500 leading-relaxed font-light">{item.description}</p>
                         </div>
                       </div>
-                    )}
+                    )) : <p className="text-sm text-gray-600 italic font-light">Natural delivery without major highlights.</p>}
                   </div>
                 </div>
-              )}
+
+                <div>
+                  <h5 className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-4">Gentle adjustments</h5>
+                  <div className="space-y-4">
+                    {question.weaknesses.length > 0 ? question.weaknesses.map((item, i) => (
+                      <div key={i} className="flex gap-4">
+                        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${item.severity === 'critical' ? 'bg-orange-500/20' : 'bg-yellow-500/10'}`} />
+                        <div>
+                          <p className="text-sm text-white/80 font-medium mb-1">{item.area}</p>
+                          <p className="text-sm text-gray-500 leading-relaxed font-light">{item.description}</p>
+                        </div>
+                      </div>
+                    )) : <p className="text-sm text-gray-600 italic font-light">Consistent and polished throughout.</p>}
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -321,33 +207,40 @@ const QuestionCard: React.FC<{
 };
 
 const ScorePill: React.FC<{
-  icon: React.FC<{ className?: string }>;
   label: string;
   score: number;
-  color: 'purple' | 'orange' | 'green';
-}> = ({ icon: Icon, label, score, color }) => {
-  const colors = {
-    purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-    orange: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-    green: 'text-green-400 bg-green-500/10 border-green-500/20'
-  };
-
-  return (
-    <div className={`${colors[color]} border rounded-xl p-3 flex items-center gap-3`}>
-      <Icon className="w-4 h-4 flex-shrink-0" />
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className={`text-lg font-bold ${colors[color].split(' ')[0]}`}>{score}</p>
-      </div>
+}> = ({ label, score }) => (
+  <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4">
+    <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5 font-medium">{label}</p>
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 w-1.5 rounded-full bg-white/20" />
+      <p className="text-lg font-light text-white/80">{score}%</p>
     </div>
-  );
-};
-
-const MetricBox: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="bg-white/5 border border-white/5 rounded-lg p-3">
-    <p className="text-xs text-gray-500 mb-1">{label}</p>
-    <p className="text-sm font-bold text-white truncate">{value}</p>
   </div>
 );
+
+
+
+const HighlightedText = ({ text }: { text: string }) => {
+  const fillers = ['um', 'uh', 'like', 'actually', 'basically', 'really', 'just'];
+  const weak = ['maybe', 'i think', 'sort of', 'kind of', 'might'];
+
+  const words = text.split(/(\s+)/);
+
+  return (
+    <p className="leading-relaxed">
+      {words.map((word, i) => {
+        const cleanWord = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (fillers.includes(cleanWord)) {
+          return <span key={i} className="text-white decoration-red-500/40 underline underline-offset-4 decoration-1">{word}</span>;
+        }
+        if (weak.includes(cleanWord)) {
+          return <span key={i} className="text-white decoration-yellow-500/40 underline underline-offset-4 decoration-1">{word}</span>;
+        }
+        return <span key={i}>{word}</span>;
+      })}
+    </p>
+  );
+};
 
 export default PerQuestionBreakdown;

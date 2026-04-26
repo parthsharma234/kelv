@@ -261,7 +261,7 @@ const ProblemSection: React.FC = () => {
             <style>{laptopStyles}</style>
 
             {/* Subtle background elements */}
-            <div className="absolute inset-0 grid-pattern opacity-30" />
+            {/* background decoration removed */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-red-500/5 rounded-full blur-[100px]" />
 
             <div className="max-w-7xl mx-auto px-6 lg:px-10">
@@ -382,7 +382,7 @@ const ProblemSection: React.FC = () => {
                                                             onClick={() => setIsDetailOpen(false)}
                                                             className="hover:text-white transition-colors"
                                                         >
-                                                            ← Back to inbox
+                                                            â† Back to inbox
                                                         </button>
                                                         <span>{rejectionLetters[activeEmail].time}</span>
                                                     </div>

@@ -68,7 +68,8 @@ export function useVapiInterview({
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      onComplete?.({ transcript, duration });
+      // REMOVED: Premature onComplete call. 
+      // VapiInterviewSession handles this after ensuring recorder stopped.
     });
 
     vapi.on('speech-start', () => {

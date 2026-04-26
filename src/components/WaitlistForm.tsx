@@ -128,9 +128,9 @@ export default function WaitlistForm() {
         className="text-center p-8 bg-dark-700/50 rounded-lg border border-dark-600 max-w-md mx-auto"
       >
         <CheckCircleIcon className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-        <h3 className="text-2xl font-semibold mb-2 text-white">Welcome aboard! 🎉</h3>
+        <h3 className="text-2xl font-semibold mb-2 text-white">You're on the list.</h3>
         <p className="text-gray-300 mb-4">
-          You're now on the exclusive Kelv AI waitlist. Get ready to revolutionize your interview preparation.
+          We'll reach out when your access is ready. In the meantime, the best thing you can do is practice.
         </p>
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
         <p className="text-gray-400 text-sm mt-2">Redirecting to your dashboard...</p>

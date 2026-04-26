@@ -1,122 +1,166 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight, Mic, Brain, MessageSquare, Target, Sparkles } from 'lucide-react';
+import { ArrowRight, Mic } from 'lucide-react';
 
-/**
- * Simplified dashboard mockup for homepage - shows Kelv's analytics dashboard
- * Based on PlatformDashboard.tsx but styled for marketing
- */
 const MockupDashboard: React.FC = () => {
-    const stats = [
-        { label: 'Sessions', value: '12', trend: '+3 this week' },
-        { label: 'Avg Score', value: '78', trend: '+8% improvement' },
-        { label: 'Streak', value: '5 days', trend: 'Keep going!' },
-    ];
+  return (
+    <div style={{ background: '#0a0b0c', padding: '0', display: 'flex', minHeight: '460px', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+      {/* Left sidebar */}
+      <div
+        style={{
+          width: '200px',
+          flexShrink: 0,
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+          padding: '20px 0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+        }}
+      >
+        {[
+          { label: 'Dashboard', active: true },
+          { label: 'Sessions' },
+          { label: 'Analytics' },
+          { label: 'Drill queue' },
+          { label: 'Settings' },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              padding: '6px 16px',
+              fontSize: '12px',
+              color: item.active ? '#f7f8f8' : '#62666d',
+              background: item.active ? 'rgba(255,255,255,0.05)' : 'transparent',
+              borderRadius: '4px',
+              margin: '0 8px',
+              fontWeight: item.active ? 500 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {item.label}
+          </div>
+        ))}
+      </div>
 
-    const recentSession = {
-        type: 'Behavioral',
-        score: 82,
-        date: 'Today',
-        strengths: ['Clear structure', 'Good examples'],
-        improvements: ['Reduce filler words', 'Stronger closing'],
-    };
-
-    return (
-        <div className="bg-[#030305] p-6 min-h-[420px] sm:min-h-[480px] lg:min-h-[520px]">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">Kelv Control Room</p>
-                    <h3 className="text-lg font-semibold text-white mt-1">Your Interview Dashboard</h3>
-                </div>
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    className="px-4 py-2 bg-orange-500 text-white text-xs font-medium rounded-lg flex items-center gap-2"
-                >
-                    Start Interview <ArrowRight className="w-3 h-3" />
-                </motion.button>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-                {stats.map((stat, i) => (
-                    <motion.div
-                        key={stat.label}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="bg-[#0a0a0f] border border-white/5 rounded-xl p-3"
-                    >
-                        <p className="text-[9px] uppercase tracking-wider text-gray-500">{stat.label}</p>
-                        <p className="text-xl font-bold text-white mt-1">{stat.value}</p>
-                        <p className="text-[9px] text-orange-400 mt-1">{stat.trend}</p>
-                    </motion.div>
-                ))}
-            </div>
-
-            {/* Recent Session Card */}
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="bg-[#0a0a0f] border border-white/5 rounded-xl p-4"
-            >
-                <div className="flex items-center justify-between mb-3">
-                    <div>
-                        <p className="text-[9px] text-gray-500">{recentSession.date}</p>
-                        <p className="text-sm font-medium text-white">{recentSession.type} Interview</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-2xl font-bold text-orange-400">{recentSession.score}</p>
-                        <p className="text-[9px] text-gray-500">score</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                        <p className="text-[8px] text-gray-500 uppercase mb-1">What landed</p>
-                        <div className="flex flex-wrap gap-1">
-                            {recentSession.strengths.map((s) => (
-                                <span key={s} className="text-[9px] px-2 py-0.5 bg-green-500/10 text-green-400 rounded-full border border-green-500/20">
-                                    {s}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-[8px] text-gray-500 uppercase mb-1">Needs work</p>
-                        <div className="flex flex-wrap gap-1">
-                            {recentSession.improvements.map((s) => (
-                                <span key={s} className="text-[9px] px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-full border border-orange-500/20">
-                                    {s}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </motion.div>
-
-            {/* Focus Modes Preview */}
-            <div className="grid grid-cols-3 gap-2 mt-4">
-                {[
-                    { icon: Brain, label: 'Technical', color: 'orange' },
-                    { icon: MessageSquare, label: 'Behavioral', color: 'purple' },
-                    { icon: Target, label: 'Situational', color: 'blue' },
-                ].map((mode, i) => (
-                    <motion.div
-                        key={mode.label}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.5 + i * 0.1 }}
-                        className={`p-3 rounded-lg border border-white/5 bg-gradient-to-br from-${mode.color}-500/10 to-transparent cursor-pointer hover:border-${mode.color}-500/30 transition-colors`}
-                    >
-                        <mode.icon className={`w-4 h-4 text-${mode.color}-400 mb-1`} />
-                        <p className="text-[10px] text-white font-medium">{mode.label}</p>
-                    </motion.div>
-                ))}
-            </div>
+      {/* Main content */}
+      <div style={{ flex: 1, padding: '24px 28px', overflow: 'hidden' }}>
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <div>
+            <p style={{ fontSize: '10px', color: '#62666d', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>
+              Interview dashboard
+            </p>
+            <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#f7f8f8', letterSpacing: '-0.01em', margin: 0 }}>
+              Good morning, Alex
+            </h3>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              background: '#E8651A',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            <Mic style={{ width: '12px', height: '12px' }} />
+            Start interview
+            <ArrowRight style={{ width: '12px', height: '12px' }} />
+          </div>
         </div>
-    );
+
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
+          {[
+            { label: 'Total sessions', value: '12', sub: '+3 this week' },
+            { label: 'Avg score', value: '78', sub: '+8 pts vs last week' },
+            { label: 'Day streak', value: '5', sub: 'Keep going' },
+            { label: 'Drills done', value: '24', sub: '8 remaining' },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              style={{
+                background: '#111213',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '6px',
+                padding: '12px 14px',
+              }}
+            >
+              <p style={{ fontSize: '9px', color: '#62666d', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>{stat.label}</p>
+              <p style={{ fontSize: '20px', fontWeight: 600, color: '#f7f8f8', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1, marginBottom: '4px' }}>{stat.value}</p>
+              <p style={{ fontSize: '9px', color: '#E8651A' }}>{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Latest session card */}
+        <div
+          style={{
+            background: '#111213',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '6px',
+            padding: '16px',
+            marginBottom: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+            <div>
+              <p style={{ fontSize: '9px', color: '#62666d', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Latest session · Today</p>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: '#f7f8f8', margin: 0 }}>Behavioral · Product Manager · Mid Level</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '26px', fontWeight: 700, color: '#E8651A', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1, margin: 0 }}>82</p>
+              <p style={{ fontSize: '9px', color: '#62666d', marginTop: '2px' }}>overall score</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {[
+              { label: 'Content', score: 85, color: 'rgba(34,197,94,0.7)' },
+              { label: 'Delivery', score: 72, color: '#E8651A' },
+              { label: 'Presence', score: 89, color: 'rgba(34,197,94,0.7)' },
+            ].map((d) => (
+              <div key={d.label} style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '9px', color: '#8a8f98' }}>{d.label}</span>
+                  <span style={{ fontSize: '9px', fontFamily: 'IBM Plex Mono, monospace', color: '#8a8f98' }}>{d.score}</span>
+                </div>
+                <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: `${d.score}%`, height: '100%', background: d.color, borderRadius: '2px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Drill queue preview */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {[
+            { name: 'Interrupt Recovery', priority: true },
+            { name: 'Metric framing', priority: false },
+            { name: 'Closing statement', priority: false },
+          ].map((drill) => (
+            <div
+              key={drill.name}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                background: drill.priority ? 'rgba(232,101,26,0.06)' : '#111213',
+                border: `1px solid ${drill.priority ? 'rgba(232,101,26,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: '6px',
+              }}
+            >
+              <p style={{ fontSize: '10px', color: drill.priority ? '#E8651A' : '#8a8f98', fontWeight: 500, margin: 0 }}>{drill.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default MockupDashboard;

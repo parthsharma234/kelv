@@ -13,7 +13,7 @@ import CTASection from './homepage/CTASection';
  */
 const ScrollNarrativeHomepage: React.FC = () => {
   return (
-    <div className="relative bg-[#030305]">
+    <div className="relative">
       {/* Hero: The hook */}
       <HeroSection />
 

@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, ArrowRight, Sparkles, Target, Zap } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import RedPandaLogo from '../RedPandaLogo';
 
-/**
- * Premium Kelv-branded login page
- */
 const LoginPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -21,22 +18,14 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      navigate('/waitlist-success');
-    }
+    if (user) navigate('/waitlist-success');
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!isConfigured) {
-      setError('Database connection not configured. Please contact support.');
-      return;
-    }
-
+    if (!isConfigured) { setError('Database connection not configured. Please contact support.'); return; }
     setLoading(true);
     setError('');
-
     try {
       if (isSignUp) {
         const { error } = await signUp(email, password, fullName);
@@ -52,322 +41,273 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const resetForm = () => {
-    setEmail('');
-    setPassword('');
-    setFullName('');
-    setError('');
-    setShowPassword(false);
-  };
-
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
-    resetForm();
+    setEmail(''); setPassword(''); setFullName(''); setError('');
   };
 
-  const features = [
-    { icon: Sparkles, text: 'Real-time coaching as you speak' },
-    { icon: Target, text: 'Scenario packs built by hiring teams' },
-    { icon: Zap, text: 'Progress insights that compound weekly' },
-  ];
-
-  const proofPoints = [
-    { label: 'Avg. confidence lift', value: '2.3x', detail: 'after 3 sessions' },
-    { label: 'Filler words', value: '-67%', detail: 'in mock sessions' },
-    { label: 'Feedback latency', value: '<2s', detail: 'live on camera' },
-  ];
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    padding: '10px 14px',
+    fontSize: '14px',
+    color: 'var(--text)',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
+  };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#030305] text-white">
-      {/* Background elements */}
-      <div className="absolute inset-0 stripe-gradient-mesh opacity-60" />
-      <div className="absolute inset-0 grid-pattern opacity-40" />
-      <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] animated-gradient-orb opacity-30" />
-      <div className="absolute bottom-[-20%] left-[-15%] h-[480px] w-[480px] rounded-full bg-orange-500/10 blur-[140px]" />
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* Navbar strip */}
+      <header
+        style={{
+          height: 'var(--header-h)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 var(--page-outer)',
+          borderBottom: '1px solid var(--border)',
+          maxWidth: 'calc(var(--page-max) + var(--page-outer) * 2)',
+          margin: '0 auto',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <RedPandaLogo size="md" animate={true} />
+          <span style={{ fontSize: '15px', fontWeight: 590, color: 'var(--text)', letterSpacing: '-0.01em' }}>Kelv</span>
+        </Link>
+        <Link
+          to="/"
+          style={{ fontSize: '13px', color: 'var(--text-3)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          ← Back to home
+        </Link>
+      </header>
 
-      <div className="relative z-10 min-h-screen flex flex-col">
-        <header className="flex items-center justify-between px-6 lg:px-16 py-6">
-          <Link to="/" className="flex items-center gap-3">
-            <RedPandaLogo size="lg" animate={true} />
-            <span className="text-xl font-semibold tracking-tight text-white">Kelv AI</span>
-          </Link>
-          <Link
-            to="/"
-            className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition hover:-translate-y-0.5 hover:border-white/20 hover:text-white"
-          >
-            Back to home
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </header>
-
-        <main className="flex-1 grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-16 items-center px-6 lg:px-16 pb-12 lg:pb-20">
+      {/* Main two-column layout */}
+      <main
+        style={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          maxWidth: 'calc(var(--page-max) + var(--page-outer) * 2)',
+          margin: '0 auto',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Left: brand side */}
+        <div
+          style={{
+            padding: '80px var(--page-outer) 80px',
+            borderRight: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="max-w-2xl"
           >
-            <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-              <span className="h-2 w-2 rounded-full bg-orange-500" />
-              Interview readiness
-            </div>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.05 }}
-              className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold leading-tight text-white"
-            >
-              The coaching layer for{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-orange-300 to-amber-200">
-                career-defining interviews.
-              </span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="mt-6 text-lg text-gray-400"
-            >
+            <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '24px' }}>
+              Interview intelligence
+            </p>
+            <h1 style={{ fontSize: 'clamp(32px, 3vw, 48px)', fontWeight: 510, letterSpacing: '-0.022em', lineHeight: 1.08, color: 'var(--text)', marginBottom: '20px' }}>
+              The coaching layer for career-defining interviews.
+            </h1>
+            <p style={{ fontSize: '16px', color: 'var(--text-3)', lineHeight: '1.65', marginBottom: '48px', maxWidth: '440px' }}>
               Kelv watches, listens, and scores in real time so you can rehearse the moments that matter.
-              Sharper delivery, clearer stories, and confidence that compounds.
-            </motion.p>
+            </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="mt-10 grid gap-4 sm:grid-cols-2"
-            >
-              {features.map((feature, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.25 + i * 0.1 }}
-                  className="flex items-start gap-4 rounded-2xl border border-white/10 bg-[#0a0a0f]/80 p-4 shadow-[0_20px_40px_rgba(0,0,0,0.35)]"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400">
-                    <feature.icon className="h-5 w-5" />
+            {/* Signal rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', maxWidth: '440px' }}>
+              {[
+                { num: '01', label: 'Voice analysis', desc: 'Pace, fillers, hesitation — timestamped.' },
+                { num: '02', label: 'Story scoring', desc: 'STAR structure graded per answer.' },
+                { num: '03', label: 'Targeted drills', desc: 'Next rep queued on your actual weak point.' },
+              ].map((item) => (
+                <div key={item.num} style={{ background: 'var(--surface)', padding: '16px 20px', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '2px', flexShrink: 0 }}>{item.num}</span>
+                  <div>
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '2px' }}>{item.label}</p>
+                    <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>{item.desc}</p>
                   </div>
-                  <span className="text-sm font-medium text-gray-200">{feature.text}</span>
-                </motion.div>
-              ))}
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-10 grid gap-4 sm:grid-cols-3"
-            >
-              {proofPoints.map((point, i) => (
-                <div
-                  key={i}
-                  className="rounded-2xl border border-white/10 bg-[#0b0b10]/80 px-4 py-5 text-center"
-                >
-                  <p className="text-2xl font-semibold text-white">{point.value}</p>
-                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                    {point.label}
-                  </p>
-                  <p className="mt-2 text-xs text-gray-500">{point.detail}</p>
                 </div>
               ))}
-            </motion.div>
+            </div>
           </motion.div>
+        </div>
 
+        {/* Right: form side */}
+        <div
+          style={{
+            padding: '80px var(--page-outer) 80px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-            className="w-full max-w-lg justify-self-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            style={{ maxWidth: '400px' }}
           >
-            {/* Mobile logo */}
-            <div className="lg:hidden text-center mb-8">
-              <Link to="/" className="inline-flex items-center gap-3">
-                <RedPandaLogo size="lg" animate={true} />
-                <span className="text-2xl font-bold text-white">Kelv AI</span>
-              </Link>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', gap: '1px', background: 'var(--border)', borderRadius: '6px', overflow: 'hidden', marginBottom: '32px', width: 'fit-content' }}>
+              {[{ label: 'Sign in', val: false }, { label: 'Join waitlist', val: true }].map((m) => (
+                <button
+                  key={m.label}
+                  onClick={() => { setIsSignUp(m.val); setEmail(''); setPassword(''); setFullName(''); setError(''); }}
+                  style={{
+                    padding: '8px 20px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    background: isSignUp === m.val ? 'var(--orange)' : 'var(--surface)',
+                    color: isSignUp === m.val ? '#fff' : 'var(--text-3)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s, color 0.15s',
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
 
-            <div className="relative">
-              <div className="absolute -inset-6 rounded-[36px] bg-gradient-to-br from-orange-500/10 via-transparent to-transparent blur-2xl" />
-              <div className="relative rounded-[32px] border border-white/10 bg-[#0a0a0f]/90 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-                <AnimatePresence mode="wait">
+            <div style={{ marginBottom: '28px' }}>
+              <h2 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)', marginBottom: '6px' }}>
+                {isSignUp ? 'Join the waitlist' : 'Welcome back'}
+              </h2>
+              <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>
+                {isSignUp ? 'Get early access and launch updates.' : 'Sign in to review your progress.'}
+              </p>
+            </div>
+
+            {!isConfigured && (
+              <div style={{ marginBottom: '20px', padding: '10px 14px', background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '6px', fontSize: '13px', color: 'rgba(253,224,71,0.9)' }}>
+                Demo mode — authentication offline.
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <AnimatePresence>
+                {isSignUp && (
                   <motion.div
-                    key={isSignUp ? 'signup' : 'signin'}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ overflow: 'hidden' }}
                   >
-                    <div className="flex items-center justify-between gap-3 mb-6">
-                      <div>
-                        <h2 className="text-2xl font-semibold text-white">
-                          {isSignUp ? 'Join the waitlist' : 'Welcome back'}
-                        </h2>
-                        <p className="text-sm text-gray-400">
-                          {isSignUp
-                            ? 'Get early access and launch updates.'
-                            : 'Sign in to review your progress.'
-                          }
-                        </p>
-                      </div>
-                      <div className="hidden sm:flex rounded-full border border-white/10 bg-white/5 p-1 text-xs font-semibold text-gray-400">
-                        <button
-                          type="button"
-                          onClick={() => setIsSignUp(false)}
-                          className={`px-4 py-2 rounded-full transition ${
-                            !isSignUp ? 'bg-orange-500 text-white' : 'text-gray-400'
-                          }`}
-                        >
-                          Sign in
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsSignUp(true)}
-                          className={`px-4 py-2 rounded-full transition ${
-                            isSignUp ? 'bg-orange-500 text-white' : 'text-gray-400'
-                          }`}
-                        >
-                          Waitlist
-                        </button>
-                      </div>
-                    </div>
-
-                    {!isConfigured && (
-                      <div className="mb-6 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-center text-sm text-yellow-200">
-                        Demo mode: authentication is offline.
-                      </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                      <AnimatePresence>
-                        {isSignUp && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Full name
-                            </label>
-                            <input
-                              type="text"
-                              value={fullName}
-                              onChange={(e) => setFullName(e.target.value)}
-                              className="w-full rounded-2xl border border-white/10 bg-[#07070b] px-4 py-3.5 text-white placeholder-gray-500 shadow-sm focus:border-orange-500/60 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                              placeholder="Ada Lovelace"
-                              required
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full rounded-2xl border border-white/10 bg-[#07070b] px-4 py-3.5 text-white placeholder-gray-500 shadow-sm focus:border-orange-500/60 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                          placeholder="you@email.com"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPassword ? 'text' : 'password'}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full rounded-2xl border border-white/10 bg-[#07070b] px-4 py-3.5 pr-12 text-white placeholder-gray-500 shadow-sm focus:border-orange-500/60 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                            placeholder={isSignUp ? 'Create a secure password' : 'Your password'}
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
-                          >
-                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                          </button>
-                        </div>
-                        {isSignUp && (
-                          <p className="mt-2 text-xs text-gray-500">
-                            This becomes your login password when approved.
-                          </p>
-                        )}
-                      </div>
-
-                      <AnimatePresence>
-                        {error && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
-                          >
-                            {error}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <motion.button
-                        type="submit"
-                        disabled={loading}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        className="w-full rounded-2xl bg-orange-500 py-4 text-white shadow-lg shadow-orange-500/30 transition hover:-translate-y-0.5 hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {loading ? (
-                          <div className="mx-auto h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <span className="inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                            {isSignUp ? 'Join waitlist' : 'Sign in'}
-                            <ArrowRight className="h-4 w-4" />
-                          </span>
-                        )}
-                      </motion.button>
-                    </form>
-
-                    <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-xs text-gray-500">
-                      By continuing you agree to receive product updates and early access notes.
-                    </div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Full name</label>
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Ada Lovelace"
+                      required={isSignUp}
+                      style={inputStyle}
+                      onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
+                      onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
+                    />
                   </motion.div>
-                </AnimatePresence>
+                )}
+              </AnimatePresence>
 
-                <div className="mt-8 flex flex-col items-center gap-2 border-t border-white/10 pt-6 text-center">
-                  <p className="text-sm text-gray-400">
-                    {isSignUp ? 'Already on the waitlist?' : "Don't have an account yet?"}
-                  </p>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@email.com"
+                  required
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Password</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={isSignUp ? 'Create a password (min. 6 chars)' : 'Your password'}
+                    required
+                    style={{ ...inputStyle, paddingRight: '40px' }}
+                    onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
+                  />
                   <button
-                    onClick={toggleMode}
-                    className="text-sm font-semibold text-orange-400 transition hover:text-orange-300"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}
                   >
-                    {isSignUp ? 'Sign in instead' : 'Join the waitlist'}
+                    {showPassword ? <EyeOff style={{ width: '15px', height: '15px' }} /> : <Eye style={{ width: '15px', height: '15px' }} />}
                   </button>
                 </div>
               </div>
+
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    style={{ marginBottom: '16px', padding: '10px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', fontSize: '13px', color: '#f87171' }}
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary"
+                style={{ width: '100%', justifyContent: 'center', padding: '11px 20px', fontSize: '14px', opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? (
+                  <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                ) : (
+                  <>
+                    {isSignUp ? 'Join waitlist' : 'Sign in'}
+                    <ArrowRight style={{ width: '14px', height: '14px' }} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-4)' }}>
+                {isSignUp ? 'Already on the list?' : "Don't have an account?"}
+              </span>
+              <button
+                onClick={toggleMode}
+                style={{ fontSize: '13px', color: 'var(--orange)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                {isSignUp ? 'Sign in' : 'Join waitlist'}
+              </button>
             </div>
           </motion.div>
-        </main>
+        </div>
+      </main>
 
-        <footer className="px-6 lg:px-16 pb-8 text-xs text-gray-500">
-          (c) 2026 Kelv AI. All rights reserved.
-        </footer>
-      </div>
+      <footer style={{ borderTop: '1px solid var(--border)', padding: '16px var(--page-outer)', textAlign: 'center' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>© 2026 Kelv. All rights reserved.</p>
+      </footer>
     </div>
   );
 };
 
 export default LoginPage;
-

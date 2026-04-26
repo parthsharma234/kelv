@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Sparkles, Brain, ArrowRight, Mail, Calendar, Users, Star, Bell, Gift, Target } from 'lucide-react';
+import { Check, ArrowRight, Calendar, Users, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -8,289 +8,239 @@ import RedPandaLogo from './RedPandaLogo';
 
 const WaitlistSuccess: React.FC = () => {
   const { user } = useAuth();
-  const [waitlistCount, setWaitlistCount] = useState<number>(2847); // Fallback number
-  const [weeklyGrowth, setWeeklyGrowth] = useState<number>(156); // Fallback number
+  const [waitlistCount, setWaitlistCount] = useState<number>(2847);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchWaitlistStats = async () => {
+    const fetchStats = async () => {
       if (isSupabaseConfigured()) {
         try {
-          const { data: totalUsers, error: totalError } = await supabase
-            .rpc('get_user_count');
-
-          if (!totalError && totalUsers) {
-            setWaitlistCount(totalUsers);
-            const estimatedWeekly = Math.max(1, Math.floor(totalUsers * 0.07));
-            setWeeklyGrowth(estimatedWeekly);
-          }
-        } catch (error) {
-          console.error('Error fetching waitlist stats:', error);
-        }
+          const { data: totalUsers } = await supabase.rpc('get_user_count');
+          if (totalUsers) setWaitlistCount(totalUsers);
+        } catch {}
       }
       setIsLoading(false);
     };
-
-    fetchWaitlistStats();
+    fetchStats();
   }, []);
 
-  const joinedDate = user?.user_metadata?.waitlist_joined_at
-    ? new Date(user.user_metadata.waitlist_joined_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
-    : user?.created_at
-    ? new Date(user.created_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
+  const joinedDate = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Recently';
 
-  const benefits = [
-    {
-      icon: Star,
-      title: 'Early access',
-      description: 'Get the product before the public launch and help shape it.'
-    },
-    {
-      icon: Target,
-      title: 'Role packs',
-      description: 'Role-specific drills and interviewer patterns as they ship.'
-    },
-    {
-      icon: Bell,
-      title: 'Priority updates',
-      description: 'Cohort invitations and product notes delivered directly.'
-    },
-    {
-      icon: Gift,
-      title: 'Founders pricing',
-      description: 'Launch pricing and perks reserved for the waitlist.'
-    }
-  ];
-
-  const waitlistStats = [
-    {
-      icon: Users,
-      label: 'Waitlist members',
-      value: isLoading ? '...' : waitlistCount.toLocaleString(),
-      change: isLoading ? '...' : `+${weeklyGrowth} this week`
-    },
-    {
-      icon: Calendar,
-      label: 'Beta launch',
-      value: 'January, 2026',
-      change: 'Cohorts open in waves'
-    }
-  ];
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || null;
 
   return (
-    <div className="min-h-screen bg-[#030305] text-white relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 stripe-gradient-mesh opacity-40" />
-      <div className="absolute inset-0 grid-pattern opacity-30" />
-      <div className="absolute top-[-10%] right-[-5%] w-[520px] h-[520px] bg-orange-500/10 rounded-full blur-[140px]" />
-      <div className="absolute bottom-[-20%] left-[-10%] w-[520px] h-[520px] bg-orange-400/10 rounded-full blur-[160px]" />
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <header
+        style={{
+          height: 'var(--header-h)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 var(--page-outer)',
+          borderBottom: '1px solid var(--border)',
+          maxWidth: 'calc(var(--page-max) + var(--page-outer) * 2)',
+          margin: '0 auto',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <RedPandaLogo size="md" animate={true} />
+          <span style={{ fontSize: '15px', fontWeight: 590, color: 'var(--text)', letterSpacing: '-0.01em' }}>Kelv</span>
+        </Link>
+        <Link to="/" style={{ fontSize: '13px', color: 'var(--text-3)', textDecoration: 'none' }}>
+          ← Back to home
+        </Link>
+      </header>
 
-      <div className="relative z-10">
-        <header className="flex items-center justify-between px-6 lg:px-16 py-6">
-          <Link to="/" className="flex items-center gap-3">
-            <RedPandaLogo size="md" animate={true} />
-            <span className="text-xl font-semibold tracking-tight text-white">Kelv AI</span>
-          </Link>
-          <Link
-            to="/"
-            className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white"
-          >
-            Back to home
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </header>
-
-        <main className="max-w-6xl mx-auto px-6 lg:px-12 pb-16">
-          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="space-y-8"
-            >
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.2em] text-gray-400">
-                <span className="h-2 w-2 rounded-full bg-orange-500" />
-                Waitlist confirmed
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center shadow-lg shadow-orange-500/30">
-                  <CheckCircle className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-4xl sm:text-5xl font-semibold text-white">You're on the list.</h1>
-                  <p className="text-gray-400 text-lg mt-2">
-                    {user?.user_metadata?.full_name ? `Hi ${user.user_metadata.full_name}, ` : ''}
-                    your spot is secured. We'll invite cohorts in waves so the experience stays personal.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-                  <Calendar className="h-4 w-4 text-orange-400" />
-                  Joined on <span className="text-white font-semibold">{joinedDate}</span>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-                  <Users className="h-4 w-4 text-orange-400" />
-                  Community growing weekly
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-[#0b0b11]/80 p-7">
-                <div className="flex items-center gap-3 mb-6">
-                  <Brain className="h-6 w-6 text-orange-400" />
-                  <h2 className="text-xl font-semibold text-white">What happens next</h2>
-                </div>
-                <div className="grid md:grid-cols-3 gap-6">
-                  {[
-                    {
-                      title: 'Build notes',
-                      description: 'Short monthly updates with what shipped and what is next.'
-                    },
-                    {
-                      title: 'Invite window',
-                      description: 'We open cohorts in waves for a focused onboarding.'
-                    },
-                    {
-                      title: 'Beta access',
-                      description: 'Hands-on access plus feedback channels with the team.'
-                    }
-                  ].map((step, index) => (
-                    <div key={step.title} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                      <p className="text-xs uppercase tracking-[0.3em] text-orange-300/80">Step {index + 1}</p>
-                      <h3 className="mt-3 text-lg font-semibold text-white">{step.title}</h3>
-                      <p className="mt-2 text-sm text-gray-400">{step.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="rounded-3xl border border-white/10 bg-[#0b0b11]/90 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.4)]"
-            >
-              <h2 className="text-lg font-semibold text-white mb-4">Your status</h2>
-              <div className="space-y-4">
-                {waitlistStats.map((stat) => {
-                  const Icon = stat.icon;
-                  return (
-                    <div
-                      key={stat.label}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                          <Icon className="h-5 w-5 text-orange-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-400">{stat.label}</p>
-                          <p className="text-2xl font-semibold text-white">{stat.value}</p>
-                        </div>
-                      </div>
-                      <div className="text-xs text-orange-300/90">{stat.change}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
-                <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Cohort readiness</p>
-                <div className="mt-4 h-2 w-full rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full w-[35%] bg-gradient-to-r from-orange-500 to-orange-300" />
-                </div>
-                <p className="mt-3 text-xs text-gray-400">We are prepping onboarding flow and interview packs.</p>
-              </div>
-            </motion.div>
-          </div>
-
+      {/* Main */}
+      <main
+        style={{
+          flex: 1,
+          maxWidth: 'calc(var(--page-max) + var(--page-outer) * 2)',
+          margin: '0 auto',
+          width: '100%',
+          padding: '80px var(--page-outer)',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '48px', alignItems: 'start' }}>
+          {/* Left */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-10 grid lg:grid-cols-[1.2fr_0.8fr] gap-8 items-start"
+            transition={{ duration: 0.6 }}
           >
-            <div className="rounded-3xl border border-white/10 bg-[#0b0b11]/80 p-7">
-              <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Included with your invite</p>
-              <div className="mt-6 space-y-5">
-                {benefits.map((benefit) => {
-                  const Icon = benefit.icon;
-                  return (
-                    <div key={benefit.title} className="flex items-start gap-4">
-                      <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                        <Icon className="h-4 w-4 text-orange-400" />
-                      </div>
-                      <div className="flex-1 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
-                        <p className="text-base font-semibold text-white">{benefit.title}</p>
-                        <p className="mt-1 text-sm text-gray-400">{benefit.description}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Confirmation badge */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 14px',
+                background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.2)',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: 'rgba(74,222,128,0.9)',
+                marginBottom: '32px',
+                fontFamily: 'IBM Plex Mono, monospace',
+                letterSpacing: '0.04em',
+              }}
+            >
+              <Check style={{ width: '12px', height: '12px' }} />
+              Waitlist confirmed
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-7">
-              <p className="text-sm text-gray-400">Ready when your invite lands</p>
-              <h3 className="mt-2 text-2xl font-semibold text-white">Keep the momentum going.</h3>
-              <p className="mt-3 text-sm text-gray-400">
-                Explore the product story or jump back into the platform if you are already set up.
-              </p>
-              <div className="mt-6 flex flex-col gap-3">
-                <Link
-                  to="/"
-                  className="inline-flex items-center justify-between gap-3 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold shadow-lg shadow-orange-500/25 hover:bg-orange-400 transition"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    Explore Kelv AI
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+            <h1 style={{ fontSize: 'clamp(36px, 4vw, 56px)', fontWeight: 510, letterSpacing: '-0.022em', lineHeight: 1.05, color: 'var(--text)', marginBottom: '20px' }}>
+              {firstName ? `${firstName}, you're on the list.` : "You're on the list."}
+            </h1>
+            <p style={{ fontSize: '16px', color: 'var(--text-3)', lineHeight: '1.65', maxWidth: '480px', marginBottom: '48px' }}>
+              Your spot is secured. We invite cohorts in waves so the onboarding stays focused — you'll hear from us when your window opens.
+            </p>
 
-                {user && (
-                  <Link
-                    to="/platform"
-                    className="inline-flex items-center justify-between gap-3 px-6 py-3 rounded-full border border-white/10 bg-white/5 text-white font-semibold hover:border-white/20 transition"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Brain className="h-4 w-4 text-orange-400" />
-                      Try Interview Platform
-                    </span>
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                )}
+            {/* What happens next */}
+            <div>
+              <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>
+                What happens next
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                {[
+                  { num: '01', title: 'Build notes', desc: 'Short monthly updates on what shipped and what\'s coming.' },
+                  { num: '02', title: 'Invite window', desc: 'We open cohorts in waves for a focused onboarding experience.' },
+                  { num: '03', title: 'Beta access', desc: 'Hands-on access plus direct feedback channels with the team.' },
+                ].map((step) => (
+                  <div key={step.num} style={{ background: 'var(--surface)', padding: '18px 24px', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '2px', flexShrink: 0 }}>{step.num}</span>
+                    <div>
+                      <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)', marginBottom: '3px' }}>{step.title}</p>
+                      <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.5' }}>{step.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </motion.div>
 
-          <div className="mt-10 text-center text-sm text-gray-400">
-            <div className="flex items-center justify-center gap-2">
-              <Mail className="h-4 w-4 text-orange-400" />
-              <span>Questions? Reach us at</span>
-              <a
-                href="mailto:team@kelvai.com"
-                className="text-orange-300 hover:text-orange-200 transition-colors font-medium"
-              >
-                team@kelvai.com
-              </a>
+          {/* Right: status card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            {/* Status panel */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '24px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '20px' }}>Your status</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '6px', overflow: 'hidden', marginBottom: '20px' }}>
+                <div style={{ background: 'var(--surface-2)', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users style={{ width: '13px', height: '13px', color: 'var(--orange)' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>Waitlist members</span>
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>
+                    {isLoading ? '…' : waitlistCount.toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ background: 'var(--surface-2)', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar style={{ width: '13px', height: '13px', color: 'var(--orange)' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>Joined on</span>
+                  </div>
+                  <span style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>{joinedDate}</span>
+                </div>
+              </div>
+
+              {/* Readiness progress */}
+              <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                Cohort readiness
+              </p>
+              <div style={{ height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{ height: '100%', width: '35%', background: 'var(--orange)', borderRadius: '2px' }} />
+              </div>
+              <p style={{ fontSize: '11px', color: 'var(--text-4)' }}>Prepping onboarding flow and interview packs.</p>
             </div>
-            <p className="mt-2 text-xs text-gray-500">(c) 2026 Kelv AI. All rights reserved.</p>
-          </div>
-        </main>
-      </div>
+
+            {/* Benefits */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '24px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>
+                Included with your invite
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {[
+                  { title: 'Early access', desc: 'Before the public launch.' },
+                  { title: 'Role packs', desc: 'Role-specific drills as they ship.' },
+                  { title: 'Priority updates', desc: 'Cohort invites delivered directly.' },
+                  { title: 'Founders pricing', desc: 'Launch pricing locked for you.' },
+                ].map((b) => (
+                  <div key={b.title} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid var(--border-soft)' }}>
+                    <Check style={{ width: '12px', height: '12px', color: 'var(--orange)', marginTop: '3px', flexShrink: 0 }} />
+                    <div>
+                      <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '1px' }}>{b.title}</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>{b.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <Link
+              to="/"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '14px 20px',
+                background: 'var(--orange)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#fff',
+                textDecoration: 'none',
+                transition: 'background 0.15s',
+              }}
+            >
+              Explore Kelv
+              <ArrowRight style={{ width: '14px', height: '14px' }} />
+            </Link>
+
+            {user && (
+              <Link
+                to="/platform"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  padding: '14px 20px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  color: 'var(--text-2)',
+                  textDecoration: 'none',
+                }}
+              >
+                Try the platform
+                <ArrowRight style={{ width: '14px', height: '14px', color: 'var(--orange)' }} />
+              </Link>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Footer contact */}
+        <div style={{ marginTop: '56px', paddingTop: '24px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+          <Mail style={{ width: '13px', height: '13px', color: 'var(--orange)' }} />
+          <span style={{ fontSize: '13px', color: 'var(--text-4)' }}>Questions?</span>
+          <a href="mailto:team@kelvai.com" style={{ fontSize: '13px', color: 'var(--orange)', textDecoration: 'none' }}>team@kelvai.com</a>
+        </div>
+      </main>
     </div>
   );
 };
