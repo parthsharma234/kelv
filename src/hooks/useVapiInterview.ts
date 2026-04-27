@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Vapi from '@vapi-ai/web';
+import { buildVapiInterviewContext } from '../utils/interviewContext';
 
 export interface TranscriptMessage {
   id: string;
@@ -185,16 +186,26 @@ export function useVapiInterview({
       
       if (!assistantId) throw new Error('No assistant ID found');
 
+      const interviewContext = buildVapiInterviewContext({
+        jobDescription: jd,
+        resumeText: res,
+        sessionPhase: 'opening'
+      });
+
       console.log('[Vapi] Starting call with dynamic variables...');
 
-      // Start with dynamic variables for Vapi template
+      // Start with dynamic variables for the saved Vapi assistant template.
       const call = await vapi.start(assistantId, {
-        variableValues: {
-          user_name: 'Candidate',
-          job_description: jd || 'Not provided',
-          resume: res || 'Not provided'
-        }
+        variableValues: interviewContext.variableValues
       });
+
+      vapi.send({
+        type: 'add-message',
+        message: {
+          role: 'system',
+          content: interviewContext.interviewerSystemPrompt
+        }
+      } as any);
       
       callIdRef.current = call?.id || null;
       console.log('[Vapi] Call initiated');

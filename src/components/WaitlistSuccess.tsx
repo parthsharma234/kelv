@@ -99,7 +99,7 @@ const WaitlistSuccess: React.FC = () => {
               {firstName ? `${firstName}, you're on the list.` : "You're on the list."}
             </h1>
             <p style={{ fontSize: '16px', color: 'var(--text-3)', lineHeight: '1.65', maxWidth: '480px', marginBottom: '48px' }}>
-              Your spot is secured. We invite cohorts in waves so the onboarding stays focused — you'll hear from us when your window opens.
+              Your spot is locked in. We're opening access in small groups so the experience doesn't get rushed — you'll hear from us directly when your turn comes.
             </p>
 
             {/* What happens next */}

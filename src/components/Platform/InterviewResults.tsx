@@ -68,6 +68,9 @@ interface InterviewResultsProps {
       experienceLevel?: string;
       jobDescription?: string;
     };
+    practicePlan?: any[];
+    signalFusion?: any;
+    sessionResultV2?: any;
     processingSource?: string;
   };
   onBack: () => void;
@@ -79,6 +82,14 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ sessionData, onBack
   const postureData = sessionData?.postureData;
   const jobContext = sessionData?.jobContext;
   const perQuestionAnalysis = sessionData?.perQuestionAnalysis || null;
+  const practicePlan = useMemo(
+    () => sessionData?.practicePlan || sessionData?.sessionResultV2?.recommended_drills || [],
+    [sessionData?.practicePlan, sessionData?.sessionResultV2]
+  );
+  const signalFusion = useMemo(
+    () => sessionData?.signalFusion || sessionData?.sessionResultV2?.signal_fusion || null,
+    [sessionData?.signalFusion, sessionData?.sessionResultV2]
+  );
 
   const [activeTab, setActiveTab] = useState<'perQuestion' | 'content' | 'voice' | 'presence'>('perQuestion');
   const [aiFeedback, setAiFeedback] = useState<InterviewFeedback | null>(null);
@@ -115,6 +126,13 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ sessionData, onBack
   const strongestQuestion = perQuestionAnalysis?.strongestQuestion;
   const weakestQuestion = perQuestionAnalysis?.weakestQuestion;
 
+  const coachSignalContext = useMemo(() => ({
+    metrics,
+    perQuestionAnalysis,
+    practicePlan,
+    signalFusion
+  }), [metrics, perQuestionAnalysis, practicePlan, signalFusion]);
+
   useEffect(() => {
     const run = async () => {
       if (activeTab !== 'content' || isLoadingFeedback || aiFeedback || qaPairs.length === 0) {
@@ -125,7 +143,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ sessionData, onBack
       setFeedbackError(null);
 
       try {
-        const feedback = await generateInterviewFeedback(qaPairs, jobContext);
+        const feedback = await generateInterviewFeedback(qaPairs, jobContext, coachSignalContext);
         setAiFeedback(feedback);
       } catch (error) {
         console.error('Failed to generate AI feedback:', error);
@@ -136,7 +154,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ sessionData, onBack
     };
 
     run();
-  }, [activeTab, aiFeedback, isLoadingFeedback, jobContext, qaPairs]);
+  }, [activeTab, aiFeedback, isLoadingFeedback, jobContext, qaPairs, coachSignalContext]);
 
   if (!metrics) {
     return (

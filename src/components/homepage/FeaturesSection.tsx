@@ -228,7 +228,7 @@ const features = [
     label: 'Targeted drills',
     heading: 'Practice the exact gap that cost you the room.',
     description:
-      'After each session Kelv queues focused reps on the single weakness with the highest leverage — and tracks improvement across sessions until the pattern changes.',
+      'After each session Kelv identifies the single gap with the highest leverage and builds a focused session around it — then tracks whether it actually improved.',
     linkText: 'See drill queue',
     mockup: <DrillsMockup />,
   },

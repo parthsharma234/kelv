@@ -16,15 +16,15 @@ const steps = [
   },
   {
     num: '03',
-    title: 'Get your receipts',
+    title: 'Hear what actually happened',
     description:
-      'See exactly what landed, what drifted, and where confidence dropped — timestamped to the second, not just a final score.',
+      'See exactly what landed, what drifted, and where you lost the thread — timestamped to the second, not just a final score.',
   },
   {
     num: '04',
-    title: 'Run the drills',
+    title: 'Close the gap',
     description:
-      'Kelv queues focused reps on the single gap with the highest leverage. Repeat until the pattern changes.',
+      'Kelv surfaces the single thing most worth fixing and queues a focused session around it. Repeat until the pattern changes.',
   },
 ];
 
@@ -52,7 +52,7 @@ const HowItWorksSection: React.FC = () => {
           >
             How it works
           </p>
-          <h2>From setup to receipts in 15 minutes.</h2>
+          <h2>From setup to real feedback in 15 minutes.</h2>
         </motion.div>
 
         {/* Steps grid */}

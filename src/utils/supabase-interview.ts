@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { InterviewHistory, InterviewSetup } from '../types/interview';
+import { extractSessionResultV2 } from './sessionResultAdapter';
 
 const HISTORY_STORAGE_KEY = 'kelv-interview-history';
 const PLATFORM_RESULTS_STORAGE_KEY = 'kelv-platform-results';
@@ -70,12 +71,13 @@ const buildHistoryEntryFromResult = (sessionData: any): InterviewHistory => {
   const transcript = Array.isArray(sessionData?.transcript) ? sessionData.transcript : [];
   const questionsAnswered = transcript.filter((entry: any) => entry.role === 'user').length;
   const savedAt = sessionData?.savedAt || new Date().toISOString();
+  const sessionResultV2 = extractSessionResultV2(sessionData);
 
   return {
     id: sessionData.id,
     date: new Date(savedAt),
     setup: buildInterviewSetupFromResult(sessionData),
-    overallScore: sessionData?.metrics?.overallScore || 0,
+    overallScore: sessionResultV2?.overall_scores?.overall || sessionData?.metrics?.overallScore || 0,
     duration: sessionData?.duration || 0,
     questionsAnswered,
     status: 'completed',
@@ -641,13 +643,14 @@ export const savePlatformInterviewResult = async (sessionData: any): Promise<str
 
     const transcript = Array.isArray(payload.transcript) ? payload.transcript : [];
     const questionsAnswered = transcript.filter((entry: any) => entry.role === 'user').length;
+    const sessionResultV2 = extractSessionResultV2(payload);
 
     const upsertPayload = {
       id: sessionId,
       user_id: user.id,
       interview_type: payload.interviewType,
       setup: buildInterviewSetupFromResult(payload),
-      overall_score: payload?.metrics?.overallScore || 0,
+      overall_score: sessionResultV2?.overall_scores?.overall || payload?.metrics?.overallScore || 0,
       duration: payload?.duration || 0,
       questions_answered: questionsAnswered,
       status: 'completed',
@@ -663,8 +666,13 @@ export const savePlatformInterviewResult = async (sessionData: any): Promise<str
         source: 'vapi-platform',
         processing_source: payload?.processingSource || 'transcript-and-posture',
         job_context: payload?.jobContext || {},
+        voice_metrics: payload?.voiceMetrics || null,
         posture_data: payload?.postureData || null,
-        per_question_analysis: payload?.perQuestionAnalysis || null
+        per_question_analysis: payload?.perQuestionAnalysis || null,
+        practice_plan: payload?.practicePlan || sessionResultV2?.recommended_drills || [],
+        signal_reliability: payload?.signalReliability || sessionResultV2?.signal_reliability || null,
+        signal_fusion: payload?.signalFusion || sessionResultV2?.signal_fusion || null,
+        session_result_v2: sessionResultV2
       },
       created_at: savedAt
     };
@@ -894,13 +902,19 @@ export const getInterviewById = async (interviewId: string) => {
 
   const localPlatformResult = getLocalPlatformResults().find((entry: any) => entry.id === interviewId);
   if (localPlatformResult) {
+    const sessionResultV2 = extractSessionResultV2(localPlatformResult);
     return {
       ...localPlatformResult,
       transcript: localPlatformResult.transcript || [],
       metrics: localPlatformResult.metrics,
       perQuestionAnalysis: localPlatformResult.perQuestionAnalysis || null,
       postureData: localPlatformResult.postureData || undefined,
+      voiceMetrics: localPlatformResult.voiceMetrics || undefined,
       jobContext: localPlatformResult.jobContext || undefined,
+      practicePlan: localPlatformResult.practicePlan || sessionResultV2?.recommended_drills || [],
+      signalReliability: localPlatformResult.signalReliability || sessionResultV2?.signal_reliability || null,
+      signalFusion: localPlatformResult.signalFusion || sessionResultV2?.signal_fusion || null,
+      sessionResultV2,
       processingSource: localPlatformResult.processingSource || 'transcript-and-posture',
       date: new Date(localPlatformResult.savedAt || Date.now())
     };
@@ -959,12 +973,16 @@ export const getInterviewById = async (interviewId: string) => {
         voiceStability: data.speech_metrics.voice?.voiceStability || 0
       } : undefined,
       metrics: data.metrics || undefined,
-      voiceMetrics: data.speech_metrics || undefined,
+      voiceMetrics: data.session_metadata?.voice_metrics || data.speech_metrics || undefined,
       transcript: data.transcript || [],
       voice_metrics_summary: data.voice_metrics_summary || undefined,
       voiceTimeline: data.voice_timeline || undefined,
       postureData: data.session_metadata?.posture_data || undefined,
       perQuestionAnalysis: data.session_metadata?.per_question_analysis || null,
+      practicePlan: data.session_metadata?.practice_plan || data.session_metadata?.session_result_v2?.recommended_drills || [],
+      signalReliability: data.session_metadata?.signal_reliability || data.session_metadata?.session_result_v2?.signal_reliability || null,
+      signalFusion: data.session_metadata?.signal_fusion || data.session_metadata?.session_result_v2?.signal_fusion || null,
+      sessionResultV2: data.session_metadata?.session_result_v2 || null,
       jobContext: data.session_metadata?.job_context || undefined,
       processingSource: data.session_metadata?.processing_source || undefined
     };

@@ -4,7 +4,7 @@ import {
     Mic, MicOff, Video, VideoOff,
     FileText, ArrowLeft, Upload,
     PanelLeftClose, PanelLeftOpen,
-    Sparkles, Loader2, Dumbbell, Check
+    Sparkles, Loader2, Dumbbell, Check, Square
 } from 'lucide-react';
 import { useVapiInterview } from '../../hooks/useVapiInterview';
 import { useInterviewRecorder } from '../../hooks/useInterviewRecorder';
@@ -12,17 +12,14 @@ import { usePoseTracking } from '../../hooks/usePoseTracking';
 import AIInterviewer from './AIInterviewer';
 import InteractiveWarmUp from './InteractiveWarmUp';
 import { extractTextFromPDF, isPDF, isTextFile } from '../../utils/pdfUtils';
+import { buildVapiInterviewContext } from '../../utils/interviewContext';
 
 interface VapiInterviewSessionProps {
     onComplete: (sessionData: any) => void;
     onBack: () => void;
 }
 
-const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
-    onComplete,
-    onBack
-}) => {
-    // Pre-interview state
+const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete, onBack }) => {
     const [previewPhase, setPreviewPhase] = useState(true);
     const [showWarmUp, setShowWarmUp] = useState(false);
     const [completedWarmUp, setCompletedWarmUp] = useState(false);
@@ -34,42 +31,22 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
     const [isParsingResume, setIsParsingResume] = useState(false);
     const [resumeError, setResumeError] = useState<string | null>(null);
 
-    // Refs - must be declared before hooks that use them
     const videoRef = useRef<HTMLVideoElement>(null);
     const previewVideoRef = useRef<HTMLVideoElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
-
-    // Media state
-    // REF ensures cleanup functions always interpret the latest stream, avoiding stale closures
     const streamRef = useRef<MediaStream | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
-
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
-
-    // UI state
     const [showTranscript, setShowTranscript] = useState(true);
 
-    // Initialize Vapi Interview hook first (provides status needed by other hooks)
-    const {
-        status,
-        isAISpeaking,
-        isUserSpeaking,
-        transcript,
-        duration,
-        startInterview,
-        endInterview,
-    } = useVapiInterview({
-        // onComplete intentionally omitted here - we trigger it manually in useEffect below
+    const { status, isAISpeaking, isUserSpeaking, transcript, duration, startInterview, endInterview } = useVapiInterview({
         onError: (err) => setCameraError(err),
     });
 
-    // Initialize Recorder
     const { startRecording, stopRecording, recordedBlob } = useInterviewRecorder({ stream });
-
-    // Initialize Posture Tracking (samples every 10 seconds during interview)
     const { aggregatedData: postureData, currentPosture, isInitialized: poseReady } = usePoseTracking({
         videoRef,
         enabled: status === 'interviewing' && !isVideoOff,
@@ -82,126 +59,75 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Centralized media cleanup
     const stopMedia = useCallback(() => {
         const currentStream = streamRef.current;
         if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-                track.stop();
-                track.enabled = false;
-            });
+            currentStream.getTracks().forEach(track => { track.stop(); track.enabled = false; });
             streamRef.current = null;
             setStream(null);
         }
     }, []);
 
-    // Initial Media Setup and Cleanup
     useEffect(() => {
         let mounted = true;
-
         const setupMedia = async () => {
             try {
                 const mediaStream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
                     audio: true
                 });
-
-                if (mounted) {
-                    streamRef.current = mediaStream;
-                    setStream(mediaStream);
-                    setCameraError(null);
-                } else {
-                    // If unmounted before promise resolved, clean up immediately
-                    mediaStream.getTracks().forEach(t => t.stop());
-                }
-            } catch (err) {
-                if (mounted) {
-                    setCameraError('Please enable camera and microphone access.');
-                }
+                if (mounted) { streamRef.current = mediaStream; setStream(mediaStream); setCameraError(null); }
+                else mediaStream.getTracks().forEach(t => t.stop());
+            } catch {
+                if (mounted) setCameraError('Please enable camera and microphone access.');
             }
         };
-
         setupMedia();
-
-        // Cleanup on unmount
-        return () => {
-            mounted = false;
-            stopMedia();
-        };
+        return () => { mounted = false; stopMedia(); };
     }, [stopMedia]);
 
-    // Handle status completion cleanup
-    useEffect(() => {
-        if (status === 'completed') {
-            stopMedia();
-        }
-    }, [status, stopMedia]);
+    useEffect(() => { if (status === 'completed') stopMedia(); }, [status, stopMedia]);
 
-    // Attach stream to video elements
     useEffect(() => {
         const currentStream = streamRef.current || stream;
         if (!currentStream) return;
-
-        if (previewPhase && previewVideoRef.current) {
-            previewVideoRef.current.srcObject = currentStream;
-        } else if (!previewPhase && videoRef.current) {
-            videoRef.current.srcObject = currentStream;
-        }
+        if (previewPhase && previewVideoRef.current) previewVideoRef.current.srcObject = currentStream;
+        else if (!previewPhase && videoRef.current) videoRef.current.srcObject = currentStream;
     }, [stream, previewPhase]);
 
-    useEffect(() => {
-        transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [transcript]);
+    useEffect(() => { transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [transcript]);
 
     const toggleMute = useCallback(() => {
         const s = streamRef.current;
-        if (s) {
-            s.getAudioTracks().forEach(t => t.enabled = isMuted);
-            setIsMuted(!isMuted);
-        }
+        if (s) { s.getAudioTracks().forEach(t => t.enabled = isMuted); setIsMuted(!isMuted); }
     }, [isMuted]);
 
     const toggleVideo = useCallback(() => {
         const s = streamRef.current;
-        if (s) {
-            s.getVideoTracks().forEach(t => t.enabled = isVideoOff);
-            setIsVideoOff(!isVideoOff);
-        }
+        if (s) { s.getVideoTracks().forEach(t => t.enabled = isVideoOff); setIsVideoOff(!isVideoOff); }
     }, [isVideoOff]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
+        e.preventDefault(); setIsDragging(false);
         const file = e.dataTransfer.files[0];
         if (file) handleResumeFile(file);
     }, []);
 
     const handleResumeFile = async (file: File) => {
-        setResumeFileName(file.name);
-        setResumeError(null);
-        setTempResume('');
-
+        setResumeFileName(file.name); setResumeError(null); setTempResume('');
         try {
             if (isPDF(file)) {
                 setIsParsingResume(true);
-                console.log('[Resume] Extracting text from PDF:', file.name);
                 const extractedText = await extractTextFromPDF(file);
                 setTempResume(extractedText);
-                console.log('[Resume] Successfully extracted', extractedText.length, 'characters');
             } else if (isTextFile(file)) {
-                const text = await file.text();
-                setTempResume(text);
+                setTempResume(await file.text());
             } else {
-                console.warn('[Resume] Unsupported file type, attempting text read:', file.type);
                 const text = await file.text();
-                if (text && text.length > 10) {
-                    setTempResume(text);
-                } else {
-                    throw new Error('Could not extract text from this file format. Please use PDF or TXT.');
-                }
+                if (text && text.length > 10) setTempResume(text);
+                else throw new Error('Could not extract text. Please use PDF or TXT.');
             }
         } catch (error) {
-            console.error('[Resume] Error processing file:', error);
             setResumeError(error instanceof Error ? error.message : 'Failed to process resume');
             setResumeFileName(null);
         } finally {
@@ -209,337 +135,279 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         }
     };
 
-    useEffect(() => {
-        if (status === 'interviewing') {
-            startRecording();
-        }
-    }, [status, startRecording]);
+    useEffect(() => { if (status === 'interviewing') startRecording(); }, [status, startRecording]);
 
-    // Handle call end and pass data to completion handler
     useEffect(() => {
-        // Condition: Interview is marked completed AND we have the recording blob ready
         if (status === 'completed' && recordedBlob) {
-            console.log('[Session] ✅ Completing with blob size:', recordedBlob.size);
-
-            if (recordedBlob.size === 0) {
-                console.error('[Session] ❌ Recorded blob is empty (0 bytes). This will cause analysis failure.');
-            }
-
-            const sessionData = {
-                transcript,
-                duration,
-                recordingBlob: recordedBlob,
-                jobContext: {
-                    role: 'Software Engineer', // Default for now, could be parsed from JD
-                    jobDescription: tempJD
-                },
-                postureData: postureData ? {
-                    shoulderAlignment: postureData.shoulderAlignment,
-                    headPosition: postureData.headPosition,
-                    overallScore: postureData.overallScore,
-                    timeInGoodPosture: postureData.timeInGoodPosture
-                } : undefined
-            };
-
-            onComplete(sessionData);
+            const interviewContext = buildVapiInterviewContext({ jobDescription: tempJD, resumeText: tempResume, sessionPhase: 'close' });
+            onComplete({
+                transcript, duration, recordingBlob: recordedBlob,
+                jobContext: { role: interviewContext.role, industry: interviewContext.industry, experienceLevel: interviewContext.experienceLevel, category: interviewContext.category, jobDescription: tempJD, resumeSummary: interviewContext.promptContext.resume_summary, jdSummary: interviewContext.promptContext.jd_summary, promptContext: interviewContext.promptContext },
+                postureData: postureData ? { shoulderAlignment: postureData.shoulderAlignment, headPosition: postureData.headPosition, overallScore: postureData.overallScore, timeInGoodPosture: postureData.timeInGoodPosture, sampleCount: postureData.sampleCount, samples: postureData.samples } : undefined
+            });
         } else if (status === 'completed' && !recordedBlob) {
-            // If completed but no blob yet, ensure we stopped recording to trigger blob generation
-            console.log('[Session] Status completed, ensuring recorder is stopped...');
             stopRecording();
         }
-    }, [status, recordedBlob, transcript, duration, postureData, onComplete, stopRecording, tempJD]);
+    }, [status, recordedBlob, transcript, duration, postureData, onComplete, stopRecording, tempJD, tempResume]);
 
     const handleStartInterview = async () => {
         if (!tempJD.trim() || !tempResume.trim()) return;
         setIsInjectingContext(true);
-
         await new Promise(resolve => setTimeout(resolve, 800));
-
         setPreviewPhase(false);
         await startInterview(tempJD.trim(), tempResume.trim());
         setIsInjectingContext(false);
     };
 
-    const handleEndInterview = () => {
-        stopMedia();
-        stopRecording();
-        endInterview();
-    };
-
+    const handleEndInterview = () => { stopMedia(); stopRecording(); endInterview(); };
     const isReady = tempJD.trim().length > 0 && tempResume.trim().length > 0 && stream;
 
-    const handleStartWarmUp = () => {
-        setShowWarmUp(true);
-    };
-
-    const handleWarmUpComplete = () => {
-        setShowWarmUp(false);
-        setCompletedWarmUp(true);
-    };
-
-    const handleWarmUpSkip = () => {
-        setShowWarmUp(false);
-    };
-
     if (showWarmUp) {
-        return (
-            <InteractiveWarmUp
-                onComplete={handleWarmUpComplete}
-                onSkip={handleWarmUpSkip}
-            />
-        );
+        return <InteractiveWarmUp onComplete={() => { setShowWarmUp(false); setCompletedWarmUp(true); }} onSkip={() => setShowWarmUp(false)} />;
     }
+
+    const inputStyle: React.CSSProperties = {
+        width: '100%',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        borderRadius: '6px',
+        padding: '10px 14px',
+        fontSize: '13px',
+        color: 'var(--text)',
+        outline: 'none',
+        boxSizing: 'border-box',
+        fontFamily: 'Inter, -apple-system, sans-serif',
+        transition: 'border-color 0.15s',
+    };
 
     if (previewPhase) {
         return (
-            <div className="min-h-screen bg-[#030305] text-white font-sans relative overflow-hidden">
-                <div className="absolute -top-40 -right-32 h-[520px] w-[520px] rounded-full bg-orange-500/10 blur-[140px]" />
-                <div className="absolute -bottom-64 -left-40 h-[560px] w-[560px] rounded-full bg-orange-500/10 blur-[160px]" />
-
-                <header className="fixed top-0 inset-x-0 z-50 h-20 border-b border-white/10 bg-[#030305]/70 backdrop-blur-xl flex items-center justify-between px-10">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => { stopMedia(); onBack(); }} className="p-2 -ml-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                            <ArrowLeft className="w-5 h-5" />
+            <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+                {/* Header */}
+                <header style={{ height: 'var(--header-h)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 50 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <button onClick={() => { stopMedia(); onBack(); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            <ArrowLeft style={{ width: '13px', height: '13px' }} />
+                            Back
                         </button>
-                        <div className="space-y-0.5">
-                            <h1 className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.3em]">Setup</h1>
-                            <p className="text-lg font-semibold">Initial configuration</p>
+                        <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+                        <div>
+                            <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pre-session check</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="px-3 py-1 bg-white/5 border border-white/10 text-gray-300 text-xs font-medium rounded-full uppercase tracking-wider">
-                            System Check
-                        </div>
-                        <div className="px-3 py-1 bg-orange-500/15 border border-orange-500/30 text-orange-200 text-xs font-medium rounded-full uppercase tracking-wider">
-                            Warm-up Ready
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>System check</span>
+                        {completedWarmUp && (
+                            <span style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', padding: '4px 10px', background: 'rgba(232,101,26,0.08)', border: '1px solid rgba(232,101,26,0.25)', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Warm-up done</span>
+                        )}
                     </div>
                 </header>
 
-                <main className="pt-32 pb-16 px-10 max-w-[1700px] mx-auto relative z-10">
-                    <div className="grid lg:grid-cols-[280px,1fr,380px] gap-10">
-                        <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/10 rounded-lg p-5 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase">Steps</p>
-                                    <span className="text-xs text-gray-500">1/3</span>
-                                </div>
-                                <div className="space-y-3">
-                                    {[
-                                        { label: 'Devices', active: true },
-                                        { label: 'Warm-up', active: completedWarmUp },
-                                        { label: 'Context', active: !!tempJD.trim() && !!tempResume.trim() }
-                                    ].map((step) => (
-                                        <div key={step.label} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${step.active ? 'border-orange-500/40 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${step.active ? 'bg-orange-500/20 text-orange-300' : 'bg-white/10 text-gray-500'}`}>
-                                                    <Check className="w-4 h-4" />
-                                                </div>
-                                                <span className={`text-sm ${step.active ? 'text-white' : 'text-gray-400'}`}>{step.label}</span>
-                                            </div>
-                                            <span className={`text-[10px] uppercase tracking-widest ${step.active ? 'text-orange-300' : 'text-gray-600'}`}>
-                                                {step.active ? 'Ready' : 'Next'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="bg-white/5 border border-white/10 rounded-lg p-5 space-y-5">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2.5 rounded-lg ${completedWarmUp ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
-                                            <Dumbbell className={`w-5 h-5 ${completedWarmUp ? 'text-green-400' : 'text-orange-400'}`} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-semibold">Pre-interview warm-up</h3>
-                                            <p className="text-xs text-gray-500">
-                                                {completedWarmUp ? 'Completed - Ready to go' : 'A quick reset for posture and voice'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span className="text-[11px] text-gray-500 uppercase tracking-wider">2 min</span>
-                                </div>
-
-                                <div className="space-y-2">
-                                    {[
-                                        { label: 'Posture alignment', time: '40s' },
-                                        { label: 'Breath pacing', time: '35s' },
-                                        { label: 'Voice warm-up', time: '45s' }
-                                    ].map((item) => (
-                                        <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#0b0b11] border border-white/10">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[11px] uppercase tracking-widest text-orange-300">Step</span>
-                                                <span className="text-sm text-gray-200">{item.label}</span>
-                                            </div>
-                                            <span className="text-xs text-gray-500">{item.time}</span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-4 py-3 text-xs text-orange-200">
-                                    {completedWarmUp ? 'You are cleared. Jump in when ready.' : 'Calm your breathing, then start the session with confidence.'}
-                                </div>
-
-                                <button
-                                    onClick={handleStartWarmUp}
-                                    className={`w-full py-2.5 rounded-lg text-sm font-medium transition-all ${completedWarmUp
-                                        ? 'bg-white/5 text-gray-300 hover:bg-white/10'
-                                        : 'bg-orange-500 text-white hover:bg-orange-400 shadow-lg shadow-orange-500/20'
-                                        }`}
-                                >
-                                    {completedWarmUp ? 'Redo warm-up' : 'Start warm-up'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase tracking-[0.3em]">Camera preview</p>
-                                    <h2 className="text-2xl font-semibold">Look interview-ready</h2>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300">
-                                        1280 x 720
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full border text-xs ${cameraError ? 'border-red-500/40 text-red-300 bg-red-500/10' : 'border-green-500/40 text-green-300 bg-green-500/10'}`}>
-                                        {cameraError ? 'Camera blocked' : 'Camera live'}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="relative aspect-video bg-[#0b0b11] rounded-[28px] border border-white/10 overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-                                {stream && !isVideoOff ? (
-                                    <video ref={previewVideoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
-                                ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-[#080a0f]">
-                                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
-                                            <VideoOff className="w-8 h-8 text-gray-500" />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {cameraError && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-20">
-                                        <p className="text-red-400 font-medium">{cameraError}</p>
-                                    </div>
-                                )}
-
-                                <div className="absolute top-6 left-6 flex items-center gap-2">
-                                    <div className="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-xs text-gray-200 backdrop-blur">
-                                        Center your face
-                                    </div>
-                                    <div className="px-3 py-1 rounded-full bg-black/60 border border-white/10 text-xs text-gray-200 backdrop-blur">
-                                        Eye level
-                                    </div>
-                                </div>
-
-                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-3 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
-                                    <button onClick={toggleMute} className={`p-3 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
-                                        {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                                    </button>
-                                    <button onClick={toggleVideo} className={`p-3 rounded-lg transition-all ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
-                                        {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid md:grid-cols-3 gap-4">
+                <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '48px 32px', display: 'grid', gridTemplateColumns: '256px 1fr 360px', gap: '24px' }}>
+                    {/* Left column: steps + warm-up */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* Steps */}
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+                            <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>Checklist</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
                                 {[
-                                    { label: 'Mic check', value: isMuted ? 'Muted' : 'Active', icon: Mic },
-                                    { label: 'Video check', value: isVideoOff ? 'Off' : 'Active', icon: Video },
-                                    { label: 'Environment', value: 'Quiet zone', icon: Sparkles }
-                                ].map((item) => {
-                                    const Icon = item.icon;
-                                    return (
-                                        <div key={item.label} className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-gray-500 uppercase tracking-[0.3em]">{item.label}</p>
-                                                <p className="text-sm font-semibold mt-1">{item.value}</p>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-300">
-                                                <Icon className="w-5 h-5" />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                    { label: 'Devices', done: true },
+                                    { label: 'Warm-up', done: completedWarmUp },
+                                    { label: 'Context', done: !!tempJD.trim() && !!tempResume.trim() }
+                                ].map((step) => (
+                                    <div key={step.label} style={{ background: 'var(--surface-2)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontSize: '12px', color: step.done ? 'var(--text)' : 'var(--text-4)' }}>{step.label}</span>
+                                        {step.done
+                                            ? <Check style={{ width: '12px', height: '12px', color: 'rgba(74,222,128,0.8)' }} />
+                                            : <span style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase' }}>Pending</span>
+                                        }
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/10 rounded-lg p-6 space-y-6">
-                                <div>
-                                    <h2 className="text-xl font-semibold mb-1">Session context</h2>
-                                    <p className="text-sm text-gray-400">Give Kelv the job details and your background.</p>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Job description</label>
-                                        <textarea
-                                            value={tempJD}
-                                            onChange={(e) => setTempJD(e.target.value)}
-                                            className="w-full h-32 bg-[#080a0f] border border-white/10 rounded-lg p-4 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/40 transition-colors resize-none"
-                                            placeholder="Paste target job description..."
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Resume data</label>
-                                        <div
-                                            onClick={() => fileInputRef.current?.click()}
-                                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                            onDragLeave={() => setIsDragging(false)}
-                                            onDrop={handleDrop}
-                                            className={`border border-dashed rounded-lg p-6 transition-all cursor-pointer ${isDragging ? 'border-orange-500/70 bg-orange-500/5' : resumeFileName ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-white/20 bg-[#080a0f]'
-                                                }`}
-                                        >
-                                            <input ref={fileInputRef} type="file" accept=".pdf,.txt" onChange={(e) => e.target.files?.[0] && handleResumeFile(e.target.files[0])} className="hidden" />
-                                            {isParsingResume ? (
-                                                <div className="flex items-center gap-3">
-                                                    <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
-                                                    <span className="text-sm font-medium text-gray-400">Extracting text from PDF...</span>
-                                                </div>
-                                            ) : resumeError ? (
-                                                <div className="text-center">
-                                                    <FileText className="w-6 h-6 text-red-400 mx-auto mb-2" />
-                                                    <p className="text-sm text-red-400">{resumeError}</p>
-                                                    <p className="text-xs text-gray-500 mt-1">Click to try again</p>
-                                                </div>
-                                            ) : resumeFileName ? (
-                                                <div className="flex items-center gap-3">
-                                                    <FileText className="w-5 h-5 text-green-400" />
-                                                    <div>
-                                                        <span className="text-sm font-medium">{resumeFileName}</span>
-                                                        <p className="text-xs text-gray-500">{tempResume.length} characters extracted</p>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center">
-                                                    <Upload className="w-6 h-6 text-gray-500 mx-auto mb-2" />
-                                                    <p className="text-sm text-gray-400">Upload Resume <span className="text-gray-600">(PDF, TXT)</span></p>
-                                                </div>
-                                            )}
+                        {/* Warm-up */}
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>Warm-up</p>
+                                <span style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>2 min</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '14px' }}>
+                                {[
+                                    { label: 'Posture alignment', time: '40s' },
+                                    { label: 'Breath pacing', time: '35s' },
+                                    { label: 'Voice warm-up', time: '45s' }
+                                ].map((item, i) => (
+                                    <div key={item.label} style={{ background: 'var(--surface-2)', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>0{i + 1}</span>
+                                            <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>{item.label}</span>
                                         </div>
+                                        <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{item.time}</span>
                                     </div>
-                                </div>
+                                ))}
+                            </div>
+                            <button
+                                onClick={() => setShowWarmUp(true)}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    background: completedWarmUp ? 'var(--surface-2)' : 'var(--orange)',
+                                    border: completedWarmUp ? '1px solid var(--border)' : 'none',
+                                    borderRadius: '5px',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    color: completedWarmUp ? 'var(--text-3)' : '#fff',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {completedWarmUp ? 'Redo warm-up' : 'Start warm-up'}
+                            </button>
+                        </div>
+                    </div>
 
-                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 text-sm text-orange-100">
-                                    Strong context makes feedback sharper. You can paste an abbreviated role summary too.
-                                </div>
+                    {/* Center column: camera preview */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <div>
+                                <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Camera preview</p>
+                                <h2 style={{ fontSize: '20px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)' }}>Check your setup</h2>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '3px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px' }}>1280×720</span>
+                                <span style={{ fontSize: '10px', fontFamily: 'IBM Plex Mono, monospace', padding: '3px 8px', border: '1px solid', borderRadius: '3px', ...(cameraError ? { color: '#f87171', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)' } : { color: 'rgba(74,222,128,0.8)', borderColor: 'rgba(74,222,128,0.2)', background: 'rgba(74,222,128,0.06)' }) }}>
+                                    {cameraError ? 'Blocked' : 'Live'}
+                                </span>
+                            </div>
+                        </div>
 
-                                <button
-                                    onClick={handleStartInterview}
-                                    disabled={!isReady || isInjectingContext}
-                                    className={`w-full py-3.5 rounded-sm font-sans font-medium text-sm tracking-wide transition-all duration-200 ${isReady
-                                        ? 'bg-orange-500 text-white hover:bg-orange-400 shadow-[0_0_24px_rgba(232,101,26,0.25)]'
-                                        : 'bg-white/[0.03] text-gray-500 cursor-not-allowed border border-kelv-border'
-                                        }`}
-                                >
-                                    {isInjectingContext ? 'Initializing Session...' : !stream ? 'Waiting for Media...' : !isReady ? 'Complete Requirements' : 'Launch Session'}
+                        {/* Video container */}
+                        <div style={{ position: 'relative', aspectRatio: '16/9', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                            {stream && !isVideoOff
+                                ? <video ref={previewVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                                : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)' }}>
+                                    <VideoOff style={{ width: '32px', height: '32px', color: 'var(--text-4)' }} />
+                                  </div>
+                            }
+                            {cameraError && (
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', zIndex: 20 }}>
+                                    <p style={{ fontSize: '13px', color: '#f87171' }}>{cameraError}</p>
+                                </div>
+                            )}
+                            <div style={{ position: 'absolute', top: '14px', left: '14px', display: 'flex', gap: '6px' }}>
+                                {['Center your face', 'Eye level'].map(tip => (
+                                    <span key={tip} style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)', padding: '3px 8px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', backdropFilter: 'blur(4px)' }}>{tip}</span>
+                                ))}
+                            </div>
+                            <div style={{ position: 'absolute', bottom: '14px', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', backdropFilter: 'blur(8px)' }}>
+                                <button onClick={toggleMute} style={{ width: '32px', height: '32px', borderRadius: '5px', background: isMuted ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                                    {isMuted ? <MicOff style={{ width: '14px', height: '14px' }} /> : <Mic style={{ width: '14px', height: '14px' }} />}
+                                </button>
+                                <button onClick={toggleVideo} style={{ width: '32px', height: '32px', borderRadius: '5px', background: isVideoOff ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                                    {isVideoOff ? <VideoOff style={{ width: '14px', height: '14px' }} /> : <Video style={{ width: '14px', height: '14px' }} />}
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Device status row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                            {[
+                                { label: 'Mic', value: isMuted ? 'Muted' : 'Active' },
+                                { label: 'Camera', value: isVideoOff ? 'Off' : 'Active' },
+                                { label: 'Environment', value: 'Quiet' }
+                            ].map(item => (
+                                <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px', padding: '12px 14px' }}>
+                                    <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>{item.label}</p>
+                                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{item.value}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Right column: context */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Session context</p>
+                                <h2 style={{ fontSize: '16px', fontWeight: 510, color: 'var(--text)', marginBottom: '4px' }}>Give Kelv your details</h2>
+                                <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.6' }}>Sharper context means sharper feedback.</p>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Job description</label>
+                                <textarea
+                                    value={tempJD}
+                                    onChange={(e) => setTempJD(e.target.value)}
+                                    placeholder="Paste the target job description..."
+                                    style={{ ...inputStyle, height: '120px', resize: 'vertical' }}
+                                    onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
+                                    onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Resume</label>
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={handleDrop}
+                                    style={{
+                                        border: `1px dashed ${isDragging ? 'var(--orange)' : resumeFileName ? 'rgba(74,222,128,0.4)' : 'var(--border)'}`,
+                                        borderRadius: '6px',
+                                        padding: '20px',
+                                        cursor: 'pointer',
+                                        background: isDragging ? 'rgba(232,101,26,0.04)' : resumeFileName ? 'rgba(74,222,128,0.04)' : 'var(--surface-2)',
+                                        transition: 'border-color 0.15s',
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    <input ref={fileInputRef} type="file" accept=".pdf,.txt" onChange={(e) => e.target.files?.[0] && handleResumeFile(e.target.files[0])} style={{ display: 'none' }} />
+                                    {isParsingResume ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                            <Loader2 style={{ width: '16px', height: '16px', color: 'var(--orange)', animation: 'spin 0.6s linear infinite' }} />
+                                            <span style={{ fontSize: '12px', color: 'var(--text-4)' }}>Extracting text...</span>
+                                        </div>
+                                    ) : resumeError ? (
+                                        <div>
+                                            <FileText style={{ width: '18px', height: '18px', color: '#f87171', margin: '0 auto 6px' }} />
+                                            <p style={{ fontSize: '12px', color: '#f87171' }}>{resumeError}</p>
+                                            <p style={{ fontSize: '11px', color: 'var(--text-4)', marginTop: '4px' }}>Click to retry</p>
+                                        </div>
+                                    ) : resumeFileName ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                            <FileText style={{ width: '16px', height: '16px', color: 'rgba(74,222,128,0.8)' }} />
+                                            <div style={{ textAlign: 'left' }}>
+                                                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)' }}>{resumeFileName}</p>
+                                                <p style={{ fontSize: '10px', color: 'var(--text-4)' }}>{tempResume.length} chars extracted</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <Upload style={{ width: '18px', height: '18px', color: 'var(--text-4)', margin: '0 auto 6px' }} />
+                                            <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>Upload resume <span style={{ color: 'var(--text-4)', opacity: 0.6 }}>(PDF, TXT)</span></p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div style={{ padding: '12px 14px', background: 'rgba(232,101,26,0.05)', border: '1px solid rgba(232,101,26,0.15)', borderRadius: '5px' }}>
+                                <p style={{ fontSize: '12px', color: 'var(--text-3)', lineHeight: '1.6' }}>Strong context makes feedback sharper. You can paste an abbreviated role summary too.</p>
+                            </div>
+
+                            <button
+                                onClick={handleStartInterview}
+                                disabled={!isReady || isInjectingContext}
+                                className="btn-primary"
+                                style={{ justifyContent: 'center', opacity: isReady && !isInjectingContext ? 1 : 0.4, cursor: isReady && !isInjectingContext ? 'pointer' : 'not-allowed' }}
+                            >
+                                {isInjectingContext ? (
+                                    <>
+                                        <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                                        Initializing...
+                                    </>
+                                ) : !stream ? 'Waiting for media...' : !isReady ? 'Complete setup above' : 'Launch session'}
+                            </button>
                         </div>
                     </div>
                 </main>
@@ -547,36 +415,34 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
         );
     }
 
+    // Live interview screen
     return (
-        <div className="h-screen bg-black text-white flex overflow-hidden font-sans">
+        <div style={{ height: '100vh', background: '#000', color: '#fff', display: 'flex', overflow: 'hidden', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+            {/* Transcript sidebar */}
             <AnimatePresence>
                 {showTranscript && (
                     <motion.aside
                         initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: 380, opacity: 1 }}
+                        animate={{ width: 360, opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}
-                        className="h-full border-r border-gray-800 bg-[#0f0f12] flex flex-col"
+                        style={{ height: '100%', borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0a0b0c', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' }}
                     >
-                        <div className="h-16 px-6 flex items-center justify-between border-b border-gray-800/50">
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-orange-500" />
-                                <span className="text-sm font-semibold text-gray-200">Transcript</span>
-                            </div>
-                            <button onClick={() => setShowTranscript(false)} className="text-gray-500 hover:text-white">
-                                <PanelLeftClose className="w-4 h-4" />
+                        <div style={{ height: '52px', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Live transcript</p>
+                            <button onClick={() => setShowTranscript(false)} style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                                <PanelLeftClose style={{ width: '14px', height: '14px' }} />
                             </button>
                         </div>
-
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {transcript.map((msg, idx) => (
-                                <div key={idx} className="flex flex-col gap-2 animate-fadeIn">
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-xs font-bold uppercase tracking-wider ${msg.role === 'system' ? 'text-green-400' : msg.role === 'assistant' ? 'text-orange-500' : 'text-gray-400'}`}>
+                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '9px', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: msg.role === 'assistant' ? '#E8651A' : msg.role === 'system' ? 'rgba(74,222,128,0.8)' : 'rgba(255,255,255,0.4)' }}>
                                             {msg.role === 'system' ? 'System' : msg.role === 'assistant' ? 'Kelv' : 'You'}
                                         </span>
-                                        <span className="text-[10px] text-gray-600">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                        {msg.timestamp && <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.2)', fontFamily: 'IBM Plex Mono, monospace' }}>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                                     </div>
-                                    <p className={`text-sm leading-relaxed ${msg.role === 'system' ? 'text-green-200 italic' : msg.role === 'assistant' ? 'text-gray-100' : 'text-gray-400'}`}>
+                                    <p style={{ fontSize: '13px', lineHeight: '1.6', color: msg.role === 'assistant' ? 'rgba(255,255,255,0.85)' : msg.role === 'system' ? 'rgba(74,222,128,0.7)' : 'rgba(255,255,255,0.5)' }}>
                                         {msg.content}
                                     </p>
                                 </div>
@@ -587,77 +453,68 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({
                 )}
             </AnimatePresence>
 
-            <div className="flex-1 flex flex-col relative bg-black">
-                <header className="absolute top-6 left-6 right-6 z-20 flex justify-between items-start pointer-events-none">
-                    <div className="pointer-events-auto flex items-center gap-2">
+            {/* Main area */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', background: '#000' }}>
+                {/* Floating header */}
+                <header style={{ position: 'absolute', top: '20px', left: '20px', right: '20px', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', pointerEvents: 'none' }}>
+                    <div style={{ pointerEvents: 'auto' }}>
                         {!showTranscript && (
-                            <button onClick={() => setShowTranscript(true)} className="p-3 bg-white/5 backdrop-blur border border-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
-                                <PanelLeftOpen className="w-5 h-5" />
+                            <button onClick={() => setShowTranscript(true)} style={{ padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex' }}>
+                                <PanelLeftOpen style={{ width: '14px', height: '14px' }} />
                             </button>
                         )}
                     </div>
-
-                    <div className="pointer-events-auto">
-                        <div className="px-4 py-2 bg-white/5 backdrop-blur border border-white/10 rounded-full flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${status === 'interviewing' ? 'bg-red-500 animate-pulse' : 'bg-gray-600'}`} />
-                            <span className="text-xs font-mono text-gray-300">{formatTime(duration)}</span>
-                            <span className="text-gray-600">|</span>
-                            <span className="text-xs text-orange-500 font-semibold tracking-wider">LIVE SESSION</span>
-                        </div>
+                    <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 14px', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', backdropFilter: 'blur(8px)' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: status === 'interviewing' ? '#ef4444' : 'rgba(255,255,255,0.2)', animation: status === 'interviewing' ? 'pulse-dot 2s ease-in-out infinite' : 'none' }} />
+                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'IBM Plex Mono, monospace' }}>{formatTime(duration)}</span>
+                        <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
+                        <span style={{ fontSize: '10px', color: '#E8651A', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Live session</span>
                     </div>
                 </header>
 
-                <main className="flex-1 flex items-center justify-center p-8 relative">
-                    <div className="relative w-full max-w-5xl aspect-video flex flex-col items-center justify-center">
-                        <AIInterviewer
-                            isActive={true}
-                            isSpeaking={isAISpeaking}
-                            isListening={isUserSpeaking}
-                            isProcessing={status === 'connecting'}
-                            size="full"
-                        />
-
-                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center space-y-1">
-                            <h2 className="text-3xl font-bold text-orange-500 tracking-tight glow-text-orange">Kelv</h2>
-                            <p className="text-xs text-gray-500 uppercase tracking-[0.3em]">AI Interviewer</p>
+                {/* AI + user video */}
+                <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', position: 'relative' }}>
+                    <div style={{ position: 'relative', width: '100%', maxWidth: '900px', aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <AIInterviewer isActive={true} isSpeaking={isAISpeaking} isListening={isUserSpeaking} isProcessing={status === 'connecting'} size="full" />
+                        <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+                            <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#E8651A', letterSpacing: '-0.01em' }}>Kelv</h2>
+                            <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '3px' }}>AI Interviewer</p>
                         </div>
                     </div>
 
-                    <div className="absolute bottom-8 right-8 w-[400px] aspect-video bg-[#0f0f12] rounded-lg overflow-hidden border border-white/10 shadow-2xl z-30">
-                        {isVideoOff ? (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <div className="w-20 h-20 rounded-full bg-white/5 text-gray-500 flex items-center justify-center text-2xl font-medium">You</div>
-                            </div>
-                        ) : (
-                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                        )}
-                        <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1 rounded-lg text-xs font-medium text-white/80 backdrop-blur-sm border border-white/5">
-                            Candidate Feed
-                        </div>
+                    {/* Self-cam pip */}
+                    <div style={{ position: 'absolute', bottom: '24px', right: '24px', width: '360px', aspectRatio: '16/9', background: '#0a0b0c', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', zIndex: 30 }}>
+                        {isVideoOff
+                            ? <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>Camera off</span>
+                              </div>
+                            : <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                        }
+                        <div style={{ position: 'absolute', bottom: '8px', left: '10px', fontSize: '9px', color: 'rgba(255,255,255,0.4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 7px', background: 'rgba(0,0,0,0.7)', borderRadius: '3px' }}>You</div>
                         {poseReady && currentPosture && (
-                            <div className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-xs font-medium backdrop-blur-sm border ${currentPosture.isGoodPosture
-                                ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                                : 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
-                                }`}>
-                                {currentPosture.isGoodPosture ? 'Good Posture' : 'Adjust Posture'}
+                            <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '9px', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 7px', borderRadius: '3px', border: '1px solid', ...(currentPosture.isGoodPosture ? { color: 'rgba(74,222,128,0.8)', borderColor: 'rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.08)' } : { color: 'rgba(251,191,36,0.8)', borderColor: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.08)' }) }}>
+                                {currentPosture.isGoodPosture ? 'Good posture' : 'Adjust posture'}
                             </div>
                         )}
                     </div>
                 </main>
 
-                <footer className="h-24 flex items-center justify-center gap-6 relative z-30">
-                    <div className="flex items-center gap-2 p-2 bg-[#0f0f12] border border-white/10 rounded-lg shadow-xl">
-                        <button onClick={toggleMute} className={`p-4 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
-                            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                        </button>
-                        <button onClick={toggleVideo} className={`p-4 rounded-lg transition-all ${isVideoOff ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
-                            {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                        </button>
-                        <div className="w-px h-8 bg-white/10 mx-2" />
-                        <button onClick={handleEndInterview} className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium text-sm transition-all shadow-lg shadow-red-600/20">
-                            End Session
-                        </button>
-                    </div>
+                {/* Controls footer */}
+                <footer style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0a0b0c', flexShrink: 0, zIndex: 30 }}>
+                    <button onClick={toggleMute} style={{ width: '36px', height: '36px', borderRadius: '6px', background: isMuted ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isMuted ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isMuted ? '#f87171' : 'rgba(255,255,255,0.5)' }}>
+                        {isMuted ? <MicOff style={{ width: '14px', height: '14px' }} /> : <Mic style={{ width: '14px', height: '14px' }} />}
+                    </button>
+                    <button onClick={toggleVideo} style={{ width: '36px', height: '36px', borderRadius: '6px', background: isVideoOff ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isVideoOff ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isVideoOff ? '#f87171' : 'rgba(255,255,255,0.5)' }}>
+                        {isVideoOff ? <VideoOff style={{ width: '14px', height: '14px' }} /> : <Video style={{ width: '14px', height: '14px' }} />}
+                    </button>
+                    <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
+                    <button
+                        onClick={handleEndInterview}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', fontSize: '12px', color: '#f87171', cursor: 'pointer', fontFamily: 'IBM Plex Mono, monospace' }}
+                    >
+                        <Square style={{ width: '10px', height: '10px' }} />
+                        End session
+                    </button>
                 </footer>
             </div>
         </div>

@@ -63,6 +63,7 @@
 - `Problem`: Interviewer behavior is not consistently role-aware, category-aware, and phase-aware.
 - `User Outcome`: Interview sessions feel realistic and context-aware across behavioral, technical, situational, leadership, and communication categories.
 - `Current Status`: `partial`
+- `Implementation note`: `buildInterviewPromptContext`, `buildInterviewerSystemPrompt`, and `buildVapiInterviewContext` now produce Vapi-ready prompt variables from JD/resume context.
 - `Acceptance Criteria`:
   - Prompt spec defines global contract, category overlays, and session phase logic.
   - Runtime context includes role, industry, level, resume summary, JD summary, category, and phase.
@@ -75,6 +76,8 @@
 - `Problem`: Scoring and coaching are not schema-locked across per-question and session outputs.
 - `User Outcome`: Every completed session returns consistent, machine-safe scoring and coaching payloads.
 - `Current Status`: `partial`
+- `Implementation note`: `SessionResultV2` now has runtime validation before processing output is returned and when saved records are hydrated.
+- `Implementation note`: The feedback prompt now consumes scoring context, practice plans, and LENS signals; local deterministic coaching is used as a fallback if the API call fails.
 - `Acceptance Criteria`:
   - Question and session outputs validate against explicit schemas before persistence.
   - Invalid model output triggers controlled retry and explicit error state (no silent partial save).
@@ -146,7 +149,8 @@
 - `Feature ID`: `P0-F08`
 - `Problem`: CV and voice signals are computed independently and can overreact to noisy frames/chunks.
 - `User Outcome`: Users get reliability-aware feedback that is stable and actionable under real interview conditions.
-- `Current Status`: `missing`
+- `Current Status`: `partial`
+- `Implementation note`: `buildKelvLensSignals` now fuses recording-backed audio metrics when available, transcript-derived voice fallbacks, local posture/CV sample coverage, tracking-loss diagnostics, and reliability flags into `SessionResultV2.signal_fusion`.
 - `Acceptance Criteria`:
   - Introduce reliability-weighted fusion for each scoring window (`content`, `delivery`, `presence`).
   - Emit per-window confidence score and reason flags (`low_light`, `mic_noise`, `short_utterance`, `tracking_loss`).

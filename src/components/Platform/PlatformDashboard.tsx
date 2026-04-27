@@ -336,8 +336,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Focused labs</p>
-                <h3 className="text-base font-medium text-white mt-1">Dial in one behaviour at a time</h3>
+                <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Focused sessions</p>
+                <h3 className="text-base font-medium text-white mt-1">Work on one thing at a time</h3>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -414,7 +414,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         <section className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Next reps from Kelv</p>
+              <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>What to practice next</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
               {recommendations.slice(0, 4).map((rec, idx) => (

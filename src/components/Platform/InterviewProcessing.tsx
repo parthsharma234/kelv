@@ -4,6 +4,8 @@ import { Brain, Mic, BarChart3, FileText, CheckCircle, Loader2, AlertCircle } fr
 import RedPandaLogo from '../RedPandaLogo';
 import { AnalyticsEngine } from '../../utils/analyticsEngine';
 import { PerQuestionAnalytics } from '../../utils/perQuestionAnalytics';
+import { buildSessionResultV2 } from '../../utils/sessionResultAdapter';
+import { analyzeEnhancedVoiceMetrics } from '../../utils/enhancedSpeech';
 
 interface InterviewProcessingProps {
   sessionData: any; // Contains { transcript, duration, recordingBlob }
@@ -71,6 +73,28 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
           postureData: sessionData?.postureData,
           overallMetrics: metrics
         });
+        const userTranscript = transcript
+          .filter((entry: any) => entry.role === 'user')
+          .map((entry: any) => entry.content)
+          .join(' ');
+        const voiceMetrics = sessionData?.recordingBlob
+          ? await analyzeEnhancedVoiceMetrics(
+            sessionData.recordingBlob,
+            userTranscript,
+            sessionData?.duration || 0
+          )
+          : undefined;
+        const sessionResultV2 = buildSessionResultV2({
+          id: sessionData?.id,
+          transcript,
+          duration: sessionData?.duration || 0,
+          metrics,
+          voiceMetrics,
+          perQuestionAnalysis,
+          postureData: sessionData?.postureData,
+          jobContext: sessionData?.jobContext,
+          processingSource: 'transcript-and-posture'
+        });
 
         // 4. Finalize output
         setCurrentStep(3);
@@ -82,8 +106,13 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
             transcript,
             duration: sessionData?.duration,
             postureData: sessionData?.postureData,
+            voiceMetrics,
             jobContext: sessionData?.jobContext,
             perQuestionAnalysis,
+            practicePlan: sessionResultV2.recommended_drills,
+            signalReliability: sessionResultV2.signal_reliability,
+            signalFusion: sessionResultV2.signal_fusion,
+            sessionResultV2,
             processingSource: 'transcript-and-posture'
           });
         }, 800);

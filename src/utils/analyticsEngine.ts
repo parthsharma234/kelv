@@ -12,6 +12,18 @@ export interface PostureAnalysisData {
   headPosition: 'centered' | 'forward' | 'tilted';
   overallScore: number;
   timeInGoodPosture: number;
+  sampleCount?: number;
+  samples?: Array<{
+    timestamp: number;
+    elapsedSeconds: number;
+    metrics: {
+      shoulderAlignment: number;
+      headPosition: 'centered' | 'forward' | 'tilted';
+      isGoodPosture: boolean;
+      confidence: number;
+      timestamp: number;
+    };
+  }>;
 }
 
 export interface AnalyticsInput {

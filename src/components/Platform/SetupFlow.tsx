@@ -86,12 +86,13 @@ const stepTips: Record<StepId, string> = {
 };
 
 const buildSetupNarrative = (setup: Partial<InterviewSetup>) => {
-  const role = setup.jobType || 'your next role';
-  const industry = setup.industry || 'the companies you care about';
-  const experience = setup.experienceLevel ? setup.experienceLevel.split('(')[0].trim().toLowerCase() : 'growing';
-  const mode = setup.interviewMode === 'text' ? 'text drills' : 'voice reps';
-  const emphasis = setup.interviewMode === 'text' ? 'precision and structure' : 'confidence, pacing, and receipts';
-  return `Kelv is lining up ${mode} for a ${experience} ${role} interview in ${industry}. Expect follow-ups that stress ${emphasis}.`;
+  const role = setup.jobType || 'your target role';
+  const industry = setup.industry || 'your industry';
+  const experience = setup.experienceLevel ? setup.experienceLevel.split('(')[0].trim().toLowerCase() : '';
+  const mode = setup.interviewMode === 'text' ? 'a text-based session' : 'a live voice interview';
+  const emphasis = setup.interviewMode === 'text' ? 'structure and content quality' : 'confidence, delivery, and how your answers actually land';
+  const expStr = experience ? `${experience} ` : '';
+  return `Kelv will run ${mode} tailored for a ${expStr}${role} in ${industry}. It will focus feedback on ${emphasis}.`;
 };
 
 export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initialSetup }) => {
@@ -311,7 +312,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '48px' }}>
           <div>
             <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Setup</p>
-            <h1 style={{ fontSize: '28px', fontWeight: 510, letterSpacing: '-0.018em', color: 'var(--text)' }}>Configure your session</h1>
+            <h1 style={{ fontSize: '28px', fontWeight: 510, letterSpacing: '-0.018em', color: 'var(--text)' }}>Set up your interview</h1>
           </div>
           <button
             onClick={onBack}
@@ -410,7 +411,7 @@ export const SetupFlow: React.FC<SetupFlowProps> = ({ onComplete, onBack, initia
 
             {/* Kelv briefing */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
-              <p style={{ fontSize: '9px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Session preview</p>
+              <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>What Kelv will do</p>
               <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.65' }}>{dynamicNarrative}</p>
             </div>
 

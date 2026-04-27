@@ -119,18 +119,18 @@ const LoginPage: React.FC = () => {
               Interview intelligence
             </p>
             <h1 style={{ fontSize: 'clamp(32px, 3vw, 48px)', fontWeight: 510, letterSpacing: '-0.022em', lineHeight: 1.08, color: 'var(--text)', marginBottom: '20px' }}>
-              The coaching layer for career-defining interviews.
+              Honest feedback before the real interview.
             </h1>
             <p style={{ fontSize: '16px', color: 'var(--text-3)', lineHeight: '1.65', marginBottom: '48px', maxWidth: '440px' }}>
-              Kelv watches, listens, and scores in real time so you can rehearse the moments that matter.
+              Kelv asks the hard questions, listens the way a hiring manager does, and tells you exactly what it heard.
             </p>
 
             {/* Signal rows */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', maxWidth: '440px' }}>
               {[
-                { num: '01', label: 'Voice analysis', desc: 'Pace, fillers, hesitation — timestamped.' },
-                { num: '02', label: 'Story scoring', desc: 'STAR structure graded per answer.' },
-                { num: '03', label: 'Targeted drills', desc: 'Next rep queued on your actual weak point.' },
+                { num: '01', label: 'Voice analysis', desc: 'Pace, fillers, hesitation — flagged and timestamped.' },
+                { num: '02', label: 'Story structure', desc: 'STAR scoring applied to every answer.' },
+                { num: '03', label: 'Targeted practice', desc: 'Focused sessions built around your actual weak point.' },
               ].map((item) => (
                 <div key={item.num} style={{ background: 'var(--surface)', padding: '16px 20px', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '2px', flexShrink: 0 }}>{item.num}</span>
@@ -186,7 +186,7 @@ const LoginPage: React.FC = () => {
                 {isSignUp ? 'Join the waitlist' : 'Welcome back'}
               </h2>
               <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>
-                {isSignUp ? 'Get early access and launch updates.' : 'Sign in to review your progress.'}
+                {isSignUp ? 'Get early access before the public launch.' : 'Continue where you left off.'}
               </p>
             </div>
 
