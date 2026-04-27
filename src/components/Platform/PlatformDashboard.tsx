@@ -240,7 +240,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
       <div className="max-w-[1500px] mx-auto px-6 lg:px-12 py-14 space-y-14">
         <section className="grid gap-8 lg:grid-cols-[1.25fr,0.75fr] items-start">
-          <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }} className2="">
+          <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }}>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Live timeline</p>
@@ -282,7 +282,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }} className2="">
+            <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }}>
               <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Streak</p>
               <h3 className="font-mono text-3xl font-medium mt-3 text-white">{streakData.currentStreak} days</h3>
               <p className="text-gray-400 text-sm">Longest streak: {streakData.longestStreak} days</p>
@@ -302,7 +302,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               </div>
             </div>
 
-            <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }} className2="">
+            <div className="rounded-lg p-6 bg-white/[0.03]" style={{ border: "1px solid var(--border)" }}>
               <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Signal scan</p>
               <div className="mt-4 grid grid-cols-1 gap-4">
                 <div>

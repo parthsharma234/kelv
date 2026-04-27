@@ -12,8 +12,8 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
 
   if (!analysis || analysis.questions.length === 0) {
     return (
-      <div className="bg-[#0f0f12] border border-white/5 rounded-lg p-8 text-center">
-        <p className="text-gray-400">No question-level data available</p>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '40px 24px', textAlign: 'center' }}>
+        <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>No question-level data available</p>
       </div>
     );
   }
@@ -23,46 +23,40 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
   };
 
   return (
-    <div className="space-y-6">
-      {/* Summary Header */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Summary bar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
         <SummaryCard label="Communication" value={analysis.averageScores.content} />
         <SummaryCard label="Delivery" value={analysis.averageScores.delivery} />
         <SummaryCard label="Presence" value={analysis.averageScores.presence} />
         <SummaryCard label="Overall" value={analysis.averageScores.overall} />
       </div>
 
-      {/* Strongest/Weakest Highlights */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Strongest/Weakest */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         {analysis.strongestQuestion && (
-          <HighlightCard
-            type="strongest"
-            question={analysis.strongestQuestion}
-          />
+          <HighlightCard type="strongest" question={analysis.strongestQuestion} />
         )}
         {analysis.weakestQuestion && (
-          <HighlightCard
-            type="weakest"
-            question={analysis.weakestQuestion}
-          />
+          <HighlightCard type="weakest" question={analysis.weakestQuestion} />
         )}
       </div>
 
       {/* Per-Question List */}
-      <div className="bg-[#0f0f12] border border-white/5 rounded-lg overflow-hidden">
-        <div className="p-6 border-b border-white/5">
-          <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">
-            Question-by-Question Breakdown ({analysis.questions.length} Questions)
-          </h3>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+          <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Question-by-question breakdown ({analysis.questions.length} questions)
+          </p>
         </div>
-
-        <div className="divide-y divide-white/5">
-          {analysis.questions.map((question) => (
+        <div>
+          {analysis.questions.map((question, idx) => (
             <QuestionCard
               key={question.questionId}
               question={question}
               isExpanded={expandedQuestion === question.questionNumber}
               onToggle={() => toggleQuestion(question.questionNumber)}
+              isLast={idx === analysis.questions.length - 1}
             />
           ))}
         </div>
@@ -71,130 +65,154 @@ const PerQuestionBreakdown: React.FC<PerQuestionBreakdownProps> = ({ analysis })
   );
 };
 
-// --- SUBCOMPONENTS ---
-
 const SummaryCard: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="bg-white/[0.02] border border-white/[0.05] rounded-lg p-6 transition-all hover:bg-white/[0.04]">
-    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-medium">{label}</p>
-    <p className="text-2xl font-light text-white/90 tracking-tight">{value}%</p>
+  <div style={{ background: 'var(--surface)', padding: '18px 20px' }}>
+    <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+      {label}
+    </p>
+    <p style={{ fontSize: '24px', fontWeight: 400, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '-0.02em', lineHeight: 1 }}>
+      {value}
+    </p>
   </div>
 );
 
-const HighlightCard: React.FC<{ type: 'strongest' | 'weakest'; question: QuestionMetrics }> = ({ type, question }) => (
-  <div className={`bg-white/[0.02] border ${type === 'strongest' ? 'border-green-500/10' : 'border-red-500/10'} rounded-lg p-5 relative overflow-hidden`}>
-    {/* Subtlest background tint */}
-    <div className={`absolute inset-0 opacity-[0.03] ${type === 'strongest' ? 'bg-green-500' : 'bg-red-500'}`} />
-
-    <div className="relative z-10">
-      <h4 className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${type === 'strongest' ? 'text-green-400/80' : 'text-red-400/80'}`}>
-        {type === 'strongest' ? 'Strongest answer' : 'Proof gap — revisit this'}
-      </h4>
-      <p className="text-sm text-gray-300 font-medium mb-3 line-clamp-2">"{question.questionText}"</p>
-      <div className="flex items-center gap-4 text-[10px] text-gray-500 font-serif italic">
-        <span>Score: {question.overallScore}%</span>
-        <div className="w-1 h-1 rounded-full bg-gray-700" />
+const HighlightCard: React.FC<{ type: 'strongest' | 'weakest'; question: QuestionMetrics }> = ({ type, question }) => {
+  const isStrong = type === 'strongest';
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: `1px solid ${isStrong ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)'}`,
+      borderRadius: '6px',
+      padding: '20px',
+    }}>
+      <p style={{
+        fontSize: '10px',
+        fontWeight: 600,
+        color: isStrong ? 'rgba(74,222,128,0.8)' : 'rgba(248,113,113,0.8)',
+        fontFamily: 'IBM Plex Mono, monospace',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        marginBottom: '10px',
+      }}>
+        {isStrong ? 'Strongest answer' : 'Proof gap — revisit this'}
+      </p>
+      <p style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500, marginBottom: '12px', lineHeight: '1.4' }}>
+        "{question.questionText}"
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+        <span>{question.overallScore}%</span>
+        <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--border)' }} />
         <span>{question.responseLength} words</span>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const QuestionCard: React.FC<{
   question: QuestionMetrics;
   isExpanded: boolean;
   onToggle: () => void;
-}> = ({ question, isExpanded, onToggle }) => {
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-400';
-    if (score >= 60) return 'text-yellow-400';
-    return 'text-red-400';
-  };
+  isLast: boolean;
+}> = ({ question, isExpanded, onToggle, isLast }) => {
+  const scoreColor = question.overallScore >= 80 ? 'rgba(34,197,94,0.8)' : question.overallScore >= 60 ? 'var(--orange)' : '#ef4444';
 
   return (
-    <div className="transition-all hover:bg-white/[0.01] border-b border-white/[0.04] last:border-0">
-      {/* Collapsed Header */}
+    <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
       <button
         onClick={onToggle}
-        className="w-full p-8 flex items-center justify-between text-left group"
+        style={{ width: '100%', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
       >
-        <div className="flex-1">
-          <div className="flex items-center gap-4 mb-3">
-            <span className="text-[10px] font-medium text-gray-600 uppercase tracking-widest px-2 py-0.5 border border-white/5 rounded">Part {question.questionNumber}</span>
-            <p className="text-sm text-white/90 font-medium flex-1">{question.questionText}</p>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: '3px' }}>
+              Q{question.questionNumber}
+            </span>
+            <p style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>{question.questionText}</p>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-xl font-light ${getScoreColor(question.overallScore)}`}>
-                {question.overallScore}%
-              </span>
-              <span className="text-[10px] text-gray-600 font-serif italic">overall quality</span>
-            </div>
-            <div className="h-4 w-px bg-white/5" />
-            <span className="text-xs text-gray-500 font-medium">{question.responseLength} words</span>
-            <span className="text-xs text-gray-500 font-medium">{question.wpm} WPM</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '18px', fontWeight: 500, color: scoreColor, fontFamily: 'IBM Plex Mono, monospace' }}>
+              {question.overallScore}%
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              {question.responseLength} words
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              {question.wpm} wpm
+            </span>
           </div>
         </div>
-        <div className={`transition-all duration-300 ${isExpanded ? 'rotate-180 opacity-40' : 'opacity-20 group-hover:opacity-60'}`}>
-          <ChevronDown className="w-5 h-5 text-gray-400" />
-        </div>
+        <ChevronDown style={{
+          width: '14px', height: '14px', color: 'var(--text-4)',
+          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s',
+          flexShrink: 0,
+        }} />
       </button>
 
-      {/* Expanded Content */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="overflow-hidden"
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            style={{ overflow: 'hidden' }}
           >
-            <div className="px-8 pb-10 space-y-10">
-              {/* Answer Text */}
-              <div className="space-y-3">
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">Recorded Transcript</p>
-                <div className="text-base text-gray-400 font-light leading-relaxed max-w-4xl italic">
-                  <HighlightedText text={question.answerText} />
-                </div>
+            <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+              {/* Transcript */}
+              <div>
+                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                  Recorded transcript
+                </p>
+                <HighlightedText text={question.answerText} />
               </div>
 
-              {/* Score Breakdown - Simplified */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <ScorePill label="Logic & Flow" score={question.contentScore} />
-                <ScorePill label="Voice Clarity" score={question.deliveryScore} />
-                <ScorePill label="Physical Presence" score={question.presenceScore} />
-                <ScorePill label="Tonal Resonance" score={question.tonalVariety} />
+              {/* Scores */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <ScorePill label="Logic & flow" score={question.contentScore} />
+                <ScorePill label="Voice clarity" score={question.deliveryScore} />
+                <ScorePill label="Presence" score={question.presenceScore} />
+                <ScorePill label="Tonal variety" score={question.tonalVariety} />
               </div>
 
-              {/* Personal Observations */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/[0.04]">
+              {/* Observations */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                 <div>
-                  <h5 className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-4">What worked well</h5>
-                  <div className="space-y-4">
+                  <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                    What worked
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {question.strengths.length > 0 ? question.strengths.map((item, i) => (
-                      <div key={i} className="flex gap-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500/20 mt-1.5 flex-shrink-0" />
+                      <div key={i} style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(34,197,94,0.4)', marginTop: '5px', flexShrink: 0 }} />
                         <div>
-                          <p className="text-sm text-white/80 font-medium mb-1">{item.area}</p>
-                          <p className="text-sm text-gray-500 leading-relaxed font-light">{item.description}</p>
+                          <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)', marginBottom: '2px' }}>{item.area}</p>
+                          <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.5' }}>{item.description}</p>
                         </div>
                       </div>
-                    )) : <p className="text-sm text-gray-600 italic font-light">Natural delivery without major highlights.</p>}
+                    )) : (
+                      <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>Natural delivery without major highlights.</p>
+                    )}
                   </div>
                 </div>
 
                 <div>
-                  <h5 className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-4">Gentle adjustments</h5>
-                  <div className="space-y-4">
+                  <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                    To improve
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {question.weaknesses.length > 0 ? question.weaknesses.map((item, i) => (
-                      <div key={i} className="flex gap-4">
-                        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${item.severity === 'critical' ? 'bg-orange-500/20' : 'bg-yellow-500/10'}`} />
+                      <div key={i} style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.severity === 'critical' ? 'rgba(232,101,26,0.5)' : 'rgba(234,179,8,0.4)', marginTop: '5px', flexShrink: 0 }} />
                         <div>
-                          <p className="text-sm text-white/80 font-medium mb-1">{item.area}</p>
-                          <p className="text-sm text-gray-500 leading-relaxed font-light">{item.description}</p>
+                          <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)', marginBottom: '2px' }}>{item.area}</p>
+                          <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.5' }}>{item.description}</p>
                         </div>
                       </div>
-                    )) : <p className="text-sm text-gray-600 italic font-light">Consistent and polished throughout.</p>}
+                    )) : (
+                      <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>Consistent and polished throughout.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -206,36 +224,36 @@ const QuestionCard: React.FC<{
   );
 };
 
-const ScorePill: React.FC<{
-  label: string;
-  score: number;
-}> = ({ label, score }) => (
-  <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4">
-    <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5 font-medium">{label}</p>
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-1.5 rounded-full bg-white/20" />
-      <p className="text-lg font-light text-white/80">{score}%</p>
+const ScorePill: React.FC<{ label: string; score: number }> = ({ label, score }) => {
+  const color = score >= 80 ? 'rgba(34,197,94,0.8)' : score >= 60 ? 'var(--orange)' : '#ef4444';
+  return (
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px' }}>
+      <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+        {label}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <p style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>{score}%</p>
+        <div style={{ flex: 1, height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${score}%`, background: color, borderRadius: '1px' }} />
+        </div>
+      </div>
     </div>
-  </div>
-);
-
-
+  );
+};
 
 const HighlightedText = ({ text }: { text: string }) => {
   const fillers = ['um', 'uh', 'like', 'actually', 'basically', 'really', 'just'];
   const weak = ['maybe', 'i think', 'sort of', 'kind of', 'might'];
-
   const words = text.split(/(\s+)/);
-
   return (
-    <p className="leading-relaxed">
+    <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.65' }}>
       {words.map((word, i) => {
         const cleanWord = word.toLowerCase().replace(/[^a-z]/g, '');
         if (fillers.includes(cleanWord)) {
-          return <span key={i} className="text-white decoration-red-500/40 underline underline-offset-4 decoration-1">{word}</span>;
+          return <span key={i} style={{ color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(239,68,68,0.4)', textUnderlineOffset: '3px' }}>{word}</span>;
         }
         if (weak.includes(cleanWord)) {
-          return <span key={i} className="text-white decoration-yellow-500/40 underline underline-offset-4 decoration-1">{word}</span>;
+          return <span key={i} style={{ color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(234,179,8,0.4)', textUnderlineOffset: '3px', fontStyle: 'italic' }}>{word}</span>;
         }
         return <span key={i}>{word}</span>;
       })}
