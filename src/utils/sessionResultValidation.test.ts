@@ -49,7 +49,7 @@ const validResult: SessionResultV2 = {
   },
   processing_metadata: {
     pipeline_version: 'kelv-session-v2.0.0',
-    transcript_vendor: 'vapi',
+    transcript_vendor: 'elevenlabs',
     used_fallback: false,
     reliability_flags: [],
     processing_source: 'test'

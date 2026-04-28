@@ -3,7 +3,20 @@ import { PerQuestionAnalysis } from '../utils/perQuestionAnalytics';
 import { VoiceMetrics } from './interview';
 
 export type InterviewLevel = 'entry' | 'mid' | 'senior' | 'executive';
-export type InterviewCategory = 'behavioral' | 'technical' | 'situational' | 'leadership' | 'communication';
+export type InterviewCategory =
+  | 'behavioral'
+  | 'technical'
+  | 'technical_depth'
+  | 'coding'
+  | 'system_design'
+  | 'product_case'
+  | 'data_case'
+  | 'situational'
+  | 'leadership'
+  | 'communication'
+  | 'resume_deep_dive'
+  | 'company_fit'
+  | 'candidate_questions';
 export type SessionPhase = 'opening' | 'calibration' | 'core' | 'pressure' | 'candidate_questions' | 'close';
 
 export interface InterviewPromptContext {
@@ -118,7 +131,7 @@ export interface SessionResultV2 {
   signal_fusion?: VoiceCvSignalFusion;
   processing_metadata: {
     pipeline_version: string;
-    transcript_vendor: 'openai' | 'self_hosted_whisper' | 'hybrid' | 'vapi';
+    transcript_vendor: 'openai' | 'self_hosted_whisper' | 'hybrid' | 'vapi' | 'elevenlabs';
     used_fallback: boolean;
     reliability_flags: string[];
     processing_source: string;
@@ -141,4 +154,5 @@ export interface SessionResultBuildInput {
     resumeSummary?: string;
   };
   processingSource?: string;
+  transcriptVendor?: SessionResultV2['processing_metadata']['transcript_vendor'];
 }

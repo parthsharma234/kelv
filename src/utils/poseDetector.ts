@@ -1,4 +1,5 @@
 import * as poseDetection from '@tensorflow-models/pose-detection';
+import * as tf from '@tensorflow/tfjs-core';
 import '@tensorflow/tfjs-backend-webgl';
 
 // MoveNet keypoint indices
@@ -69,6 +70,8 @@ class MoveNetPoseDetector implements PoseDetector {
   private async doInitialize(): Promise<boolean> {
     try {
       console.log('[PoseDetector] Initializing MoveNet Lightning...');
+      await tf.setBackend('webgl');
+      await tf.ready();
 
       const model = poseDetection.SupportedModels.MoveNet;
       this.detector = await poseDetection.createDetector(model, {

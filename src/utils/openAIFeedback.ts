@@ -183,7 +183,7 @@ export function buildDeterministicInterviewFeedback(
     overallSummary:
       transcriptPairs.length === 0
         ? 'Kelv needs at least one complete question-answer exchange before it can coach the session.'
-        : `For ${role}, the current signal is strongest when the answer includes concrete action and weakest when evidence or structure stays thin. The highest-leverage next rep is ${primaryDrill ? primaryDrill.weak_point.toLowerCase() : weakest ? `question ${weakest.questionNumber}` : 'adding measurable proof to the weakest answer'}.`,
+        : `For ${role}, the current signal is strongest when the answer includes concrete action and weakest when evidence or structure stays thin. The highest-leverage next rep is ${primaryDrill?.weak_point ? primaryDrill.weak_point.toLowerCase() : weakest ? `question ${weakest.questionNumber}` : 'adding measurable proof to the weakest answer'}.`,
     topStrengths: uniqueFirst([
       strongest ? `Q${strongest.questionNumber}: strongest answer by score because it gave the clearest hiring signal.` : '',
       ...questionFeedback.flatMap((feedback) => feedback.contentAnalysis.strengths),

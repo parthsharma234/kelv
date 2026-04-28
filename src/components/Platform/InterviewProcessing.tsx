@@ -1,88 +1,62 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Brain, Mic, BarChart3, FileText, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
-import RedPandaLogo from '../RedPandaLogo';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertCircle, Check } from 'lucide-react';
 import { AnalyticsEngine } from '../../utils/analyticsEngine';
 import { PerQuestionAnalytics } from '../../utils/perQuestionAnalytics';
 import { buildSessionResultV2 } from '../../utils/sessionResultAdapter';
 import { analyzeEnhancedVoiceMetrics } from '../../utils/enhancedSpeech';
 
 interface InterviewProcessingProps {
-  sessionData: any; // Contains { transcript, duration, recordingBlob }
+  sessionData: any;
   onComplete: (results: any) => void;
 }
 
-const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
-  sessionData,
-  onComplete
-}) => {
+const steps = [
+  { label: 'Normalizing session', detail: 'Transcript, timing, context' },
+  { label: 'Scoring answer quality', detail: 'Structure, specificity, STAR coverage' },
+  { label: 'Building delivery signals', detail: 'Cadence, hesitation, filler load' },
+  { label: 'Finalizing report', detail: 'Compiling results and practice targets' },
+];
+
+const InterviewProcessing: React.FC<InterviewProcessingProps> = ({ sessionData, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-
-  // Ref to prevent double-firing
-  const joyRef = useRef(false);
-
-  // Processing Steps (Visuals)
-  const processingSteps = [
-    { icon: FileText, title: 'Normalizing Session', description: 'Cleaning transcript, timing, and context data' },
-    { icon: Brain, title: 'Scoring Answer Quality', description: 'Breaking down structure, specificity, and pacing' },
-    { icon: Mic, title: 'Building Delivery Signals', description: 'Estimating cadence, hesitation, and presence' },
-    { icon: BarChart3, title: 'Finalizing Report', description: 'Compiling your results and next practice targets' }
-  ];
+  const didRun = useRef(false);
 
   useEffect(() => {
-    if (joyRef.current) return;
-    joyRef.current = true;
+    if (didRun.current) return;
+    didRun.current = true;
 
-    const processInterview = async () => {
+    const run = async () => {
       try {
-        console.log('[Processing] Starting analysis pipeline...');
-
-        // 1. Normalize session data
-        setCurrentStep(0);
-        setProgress(10);
+        setCurrentStep(0); setProgress(10);
         const transcript = Array.isArray(sessionData?.transcript)
-          ? sessionData.transcript.filter((entry: any) => entry && !entry.isPartial)
+          ? sessionData.transcript.filter((e: any) => e && !e.isPartial)
           : [];
+        if (transcript.length === 0) throw new Error('No completed transcript captured for this session.');
+        await delay(320);
 
-        if (transcript.length === 0) {
-          throw new Error('No completed transcript was captured for this session.');
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 250));
-
-        // 2. Score overall interview metrics
-        setCurrentStep(1);
-        setProgress(35);
-
+        setCurrentStep(1); setProgress(35);
         const metrics = AnalyticsEngine.process({
           durationSecs: sessionData?.duration || 60,
           transcript,
           role: sessionData?.jobContext?.role,
-          postureData: sessionData?.postureData
+          postureData: sessionData?.postureData,
         });
+        await delay(320);
 
-        await new Promise((resolve) => setTimeout(resolve, 250));
-
-        // 3. Build per-question analysis from owned data
-        setCurrentStep(2);
-        setProgress(72);
-
+        setCurrentStep(2); setProgress(72);
         const perQuestionAnalysis = PerQuestionAnalytics.process(transcript, {
           postureData: sessionData?.postureData,
-          overallMetrics: metrics
+          overallMetrics: metrics,
         });
         const userTranscript = transcript
-          .filter((entry: any) => entry.role === 'user')
-          .map((entry: any) => entry.content)
+          .filter((e: any) => e.role === 'user')
+          .map((e: any) => e.content)
           .join(' ');
         const voiceMetrics = sessionData?.recordingBlob
-          ? await analyzeEnhancedVoiceMetrics(
-            sessionData.recordingBlob,
-            userTranscript,
-            sessionData?.duration || 0
-          )
+          ? await analyzeEnhancedVoiceMetrics(sessionData.recordingBlob, userTranscript, sessionData?.duration || 0)
           : undefined;
         const sessionResultV2 = buildSessionResultV2({
           id: sessionData?.id,
@@ -93,51 +67,55 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
           perQuestionAnalysis,
           postureData: sessionData?.postureData,
           jobContext: sessionData?.jobContext,
-          processingSource: 'transcript-and-posture'
+          processingSource: 'transcript-and-posture',
+          transcriptVendor: sessionData?.voiceProvider || 'elevenlabs',
         });
 
-        // 4. Finalize output
-        setCurrentStep(3);
-        setProgress(100);
+        setCurrentStep(3); setProgress(100);
+        await delay(900);
 
-        setTimeout(() => {
-          onComplete({
-            metrics,
-            transcript,
-            duration: sessionData?.duration,
-            postureData: sessionData?.postureData,
-            voiceMetrics,
-            jobContext: sessionData?.jobContext,
-            perQuestionAnalysis,
-            practicePlan: sessionResultV2.recommended_drills,
-            signalReliability: sessionResultV2.signal_reliability,
-            signalFusion: sessionResultV2.signal_fusion,
-            sessionResultV2,
-            processingSource: 'transcript-and-posture'
-          });
-        }, 800);
-
+        onComplete({
+          metrics,
+          transcript,
+          duration: sessionData?.duration,
+          postureData: sessionData?.postureData,
+          voiceMetrics,
+          jobContext: sessionData?.jobContext,
+          voiceProvider: sessionData?.voiceProvider || 'elevenlabs',
+          whiteboardRequests: sessionData?.whiteboardRequests || [],
+          perQuestionAnalysis,
+          practicePlan: sessionResultV2.recommended_drills,
+          signalReliability: sessionResultV2.signal_reliability,
+          signalFusion: sessionResultV2.signal_fusion,
+          sessionResultV2,
+          processingSource: 'transcript-and-posture',
+        });
       } catch (err) {
-        console.error('[Processing] Error:', err);
-        setError(err instanceof Error ? err.message : 'Analysis failed');
+        setError(err instanceof Error ? err.message : 'Analysis failed.');
       }
     };
 
-    processInterview();
+    run();
   }, [sessionData, onComplete]);
 
   if (error) {
     return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-dark-800 border border-red-500/20 rounded-lg p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Processing Failed</h2>
-          <p className="text-gray-400 mb-6">{error}</p>
-          <div className="flex gap-4 justify-center">
-            <button onClick={() => window.location.reload()} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors">
-              Retry Session
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ maxWidth: '420px', width: '100%', background: 'var(--surface)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '40px', textAlign: 'center' }}>
+          <AlertCircle style={{ width: '32px', height: '32px', color: '#f87171', margin: '0 auto 20px' }} />
+          <p style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', marginBottom: '8px' }}>Processing failed</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-4)', lineHeight: '1.6', marginBottom: '28px' }}>{error}</p>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: '8px 20px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-3)', fontSize: '13px', cursor: 'pointer' }}
+            >
+              Retry
             </button>
-            <button onClick={() => onComplete(null)} className="px-6 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors border border-red-500/30">
+            <button
+              onClick={() => onComplete(null)}
+              style={{ padding: '8px 20px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#f87171', fontSize: '13px', cursor: 'pointer' }}
+            >
               Cancel
             </button>
           </div>
@@ -147,102 +125,160 @@ const InterviewProcessing: React.FC<InterviewProcessingProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
-      <div className="max-w-2xl w-full text-center">
-        {/* Logo */}
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '480px' }}>
+
+        {/* Animated orb */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '48px' }}>
+          <div style={{ position: 'relative', width: '72px', height: '72px' }}>
+            {/* Outer rings */}
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  border: '1px solid var(--orange)',
+                  opacity: 0,
+                }}
+                animate={{ scale: [1, 2.2 + i * 0.4], opacity: [0.4, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.5, ease: 'easeOut' }}
+              />
+            ))}
+            {/* Core */}
+            <motion.div
+              style={{
+                position: 'absolute', inset: '12px', borderRadius: '50%',
+                background: 'var(--orange)',
+              }}
+              animate={{ scale: [0.92, 1.04, 0.92] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </div>
+        </div>
+
+        {/* Title */}
         <motion.div
-          className="flex justify-center mb-8"
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
+          style={{ textAlign: 'center', marginBottom: '40px' }}
         >
-          <RedPandaLogo className="w-16 h-16" />
+          <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '10px' }}>
+            Kelv · Analysis running
+          </p>
+          <h1 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.018em', color: 'var(--text)', marginBottom: '6px' }}>
+            Building your coaching report
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-4)', lineHeight: '1.55' }}>
+            Transcript, timing, and posture signals are being fused into actionable feedback.
+          </p>
         </motion.div>
 
-        {/* Main Title */}
-        <motion.h1
-          className="text-4xl font-bold text-white mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          Analyzing Your Performance
-        </motion.h1>
+        {/* Progress bar */}
+        <div style={{ marginBottom: '36px' }}>
+          <div style={{ height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden' }}>
+            <motion.div
+              style={{ height: '100%', background: 'var(--orange)', borderRadius: '1px' }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              {steps[Math.min(currentStep, steps.length - 1)].label.toLowerCase()}
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              {progress}%
+            </span>
+          </div>
+        </div>
 
-        <motion.p
-          className="text-xl text-gray-400 mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          Turning transcript, timing, and posture signals into a usable coaching report...
-        </motion.p>
-
-        {/* Progress Bar */}
-        <motion.div
-          className="w-full bg-dark-700 rounded-full h-3 mb-12 relative overflow-hidden"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          <motion.div
-            className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </motion.div>
-
-        {/* Processing Steps */}
-        <div className="space-y-6">
-          {processingSteps.map((step, index) => {
-            const Icon = step.icon;
+        {/* Steps */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+          {steps.map((step, index) => {
             const isActive = index === currentStep;
-            const isCompleted = index < currentStep;
+            const isDone = index < currentStep;
+            const isPending = index > currentStep;
 
             return (
               <motion.div
                 key={index}
-                className={`flex items-center p-6 rounded-xl border transition-all duration-500 ${isActive
-                  ? 'bg-orange-500/10 border-orange-500/30 text-white scale-105 shadow-xl shadow-orange-500/10'
-                  : isCompleted
-                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                    : 'bg-dark-800 border-dark-600 text-gray-600 opacity-60'
-                  }`}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.8 + (index * 0.1) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px',
+                  background: isActive ? 'rgba(232,101,26,0.06)' : 'var(--surface)',
+                  transition: 'background 0.3s',
+                }}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: isPending ? 0.35 : 1, x: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.08 }}
               >
-                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center mr-4 transition-all duration-500 ${isActive
-                  ? 'bg-orange-500/20 text-orange-400'
-                  : isCompleted
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-dark-700 text-gray-500'
-                  }`}>
-                  {isCompleted ? (
-                    <CheckCircle className="w-6 h-6" />
-                  ) : isActive ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <Icon className="w-6 h-6" />
-                  )}
+                {/* Status indicator */}
+                <div style={{ width: '20px', height: '20px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AnimatePresence mode="wait">
+                    {isDone ? (
+                      <motion.div
+                        key="done"
+                        initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                        style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Check style={{ width: '9px', height: '9px', color: 'rgba(74,222,128,0.9)' }} />
+                      </motion.div>
+                    ) : isActive ? (
+                      <motion.div
+                        key="active"
+                        initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                      >
+                        <motion.div
+                          style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--orange)' }}
+                          animate={{ scale: [1, 1.3, 1] }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="pending"
+                        style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--border)' }}
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                <div className="text-left">
-                  <h3 className={`text-lg font-semibold mb-1 ${isActive ? 'text-white' : isCompleted ? 'text-green-400' : 'text-gray-500'
-                    }`}>
-                    {step.title}
-                  </h3>
-                  <p className={`text-sm ${isActive ? 'text-gray-300' : isCompleted ? 'text-green-300' : 'text-gray-600'
-                    }`}>
-                    {step.description}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    fontSize: '13px',
+                    fontWeight: isActive ? 500 : 400,
+                    color: isDone ? 'rgba(74,222,128,0.8)' : isActive ? 'var(--text)' : 'var(--text-4)',
+                    marginBottom: '1px',
+                    transition: 'color 0.3s',
+                  }}>
+                    {step.label}
+                  </p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+                    {step.detail}
                   </p>
                 </div>
+
+                {isDone && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{ fontSize: '10px', color: 'rgba(74,222,128,0.6)', fontFamily: 'IBM Plex Mono, monospace' }}
+                  >
+                    done
+                  </motion.span>
+                )}
               </motion.div>
             );
           })}
         </div>
+
       </div>
     </div>
   );
 };
+
+function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 export default InterviewProcessing;

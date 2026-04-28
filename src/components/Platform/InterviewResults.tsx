@@ -1,85 +1,41 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Activity,
-  ArrowLeft,
-  ChevronDown,
-  LineChart,
-  List,
-  Loader2,
-  MessageSquare,
-  Mic,
-  Target,
-  User,
-  Video,
-  Zap,
-  CheckCircle,
-  AlertTriangle
+  ArrowLeft, ChevronDown, Loader2, Mic, User, Zap, AlertTriangle,
 } from 'lucide-react';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, Title, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Bar, Line } from 'react-chartjs-2';
-import { AnalyticsEngine, InterviewMetrics } from '../../utils/analyticsEngine';
+import { Line } from 'react-chartjs-2';
+import { InterviewMetrics } from '../../utils/analyticsEngine';
 import { generateInterviewFeedback, InterviewFeedback } from '../../utils/openAIFeedback';
 import { PerQuestionAnalysis } from '../../utils/perQuestionAnalytics';
 import EnhancedCharts, { PostureAnalysisDisplay } from './EnhancedCharts';
 import PerQuestionBreakdown from './PerQuestionBreakdown';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
 interface InterviewResultsProps {
   sessionData: {
     metrics: InterviewMetrics;
-    transcript: Array<{
-      role: 'user' | 'assistant' | 'system';
-      content: string;
-      timestamp: Date | string;
-      isPartial?: boolean;
-    }>;
+    transcript: Array<{ role: 'user' | 'assistant' | 'system'; content: string; timestamp: Date | string; isPartial?: boolean }>;
     duration: number;
     perQuestionAnalysis?: PerQuestionAnalysis | null;
-    postureData?: {
-      shoulderAlignment: number;
-      headPosition: 'centered' | 'forward' | 'tilted';
-      overallScore: number;
-      timeInGoodPosture: number;
-    };
-    jobContext?: {
-      role?: string;
-      industry?: string;
-      experienceLevel?: string;
-      jobDescription?: string;
-    };
+    postureData?: { shoulderAlignment: number; headPosition: 'centered' | 'forward' | 'tilted'; overallScore: number; timeInGoodPosture: number };
+    jobContext?: { role?: string; industry?: string; experienceLevel?: string; jobDescription?: string };
     practicePlan?: any[];
     signalFusion?: any;
     signalReliability?: any;
     sessionResultV2?: any;
-    processingSource?: string;
   };
   onBack: () => void;
 }
 
-type TabId = 'perQuestion' | 'content' | 'voice' | 'presence' | 'lens';
+type Tab = 'report' | 'signals';
+
+const fmt = (v: number | null | undefined): string => v == null ? '--' : Math.round(v).toString();
+const sc = (s: number) => s >= 80 ? 'rgba(34,197,94,0.85)' : s >= 60 ? 'var(--orange)' : '#f87171';
 
 const InterviewResults: React.FC<InterviewResultsProps> = ({ sessionData, onBack }) => {
   const metrics = sessionData?.metrics;
@@ -90,1070 +46,641 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ sessionData, onBack
 
   const practicePlan = useMemo(
     () => sessionData?.practicePlan || sessionData?.sessionResultV2?.recommended_drills || [],
-    [sessionData?.practicePlan, sessionData?.sessionResultV2]
+    [sessionData]
   );
-
   const signalFusion = useMemo(
     () => sessionData?.signalFusion || sessionData?.sessionResultV2?.signal_fusion || null,
-    [sessionData?.signalFusion, sessionData?.sessionResultV2]
+    [sessionData]
   );
-
   const signalReliability = useMemo(
     () => sessionData?.signalReliability || sessionData?.sessionResultV2?.signal_reliability || null,
-    [sessionData?.signalReliability, sessionData?.sessionResultV2]
+    [sessionData]
   );
 
-  // Prefer V2 overall score; fall back to legacy
-  const overallScore = useMemo(
-    () => sessionData?.sessionResultV2?.overall_scores?.overall ?? metrics?.overallScore ?? 0,
-    [sessionData?.sessionResultV2, metrics]
-  );
+  const v2 = sessionData?.sessionResultV2?.overall_scores ?? null;
+  const overallScore: number | null = v2?.overall ?? metrics?.overallScore ?? null;
+  const readiness: 'strong' | 'developing' | 'limited' | null = signalFusion?.fused?.interview_readiness_signal ?? null;
+  const grade = getGrade(overallScore);
 
-  const v2Scores = sessionData?.sessionResultV2?.overall_scores ?? null;
-  const readinessSignal: 'strong' | 'developing' | 'limited' | null =
-    signalFusion?.fused?.interview_readiness_signal ?? null;
-
-  const [activeTab, setActiveTab] = useState<TabId>('perQuestion');
+  const [tab, setTab] = useState<Tab>('report');
   const [aiFeedback, setAiFeedback] = useState<InterviewFeedback | null>(null);
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
-  const [feedbackError, setFeedbackError] = useState<string | null>(null);
-
-  const benchmarks = useMemo(
-    () => AnalyticsEngine.getBenchmarks(jobContext?.role),
-    [jobContext?.role]
-  );
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const qaPairs = useMemo(() => {
     const pairs: Array<{ question: string; answer: string; questionNumber: number }> = [];
-    for (let index = 0; index < transcript.length - 1; index += 1) {
-      const current = transcript[index];
-      const next = transcript[index + 1];
-      if (current.role === 'assistant' && next?.role === 'user') {
-        pairs.push({ question: current.content, answer: next.content, questionNumber: pairs.length + 1 });
-      }
+    for (let i = 0; i < transcript.length - 1; i++) {
+      const cur = transcript[i], nxt = transcript[i + 1];
+      if (cur.role === 'assistant' && nxt?.role === 'user')
+        pairs.push({ question: cur.content, answer: nxt.content, questionNumber: pairs.length + 1 });
     }
     return pairs;
   }, [transcript]);
 
-  const strengths = metrics?.strengths || [];
-  const weaknesses = metrics?.weaknesses || [];
-  const strongestQuestion = perQuestionAnalysis?.strongestQuestion;
-  const weakestQuestion = perQuestionAnalysis?.weakestQuestion;
+  const coachCtx = useMemo(() => ({ metrics, perQuestionAnalysis, practicePlan, signalFusion }), [metrics, perQuestionAnalysis, practicePlan, signalFusion]);
 
-  const coachSignalContext = useMemo(() => ({
-    metrics,
-    perQuestionAnalysis,
-    practicePlan,
-    signalFusion
-  }), [metrics, perQuestionAnalysis, practicePlan, signalFusion]);
-
+  // Load AI feedback as soon as we're on the report tab
   useEffect(() => {
+    if (tab !== 'report' || loadingAI || aiFeedback || qaPairs.length === 0) return;
     const run = async () => {
-      if (activeTab !== 'content' || isLoadingFeedback || aiFeedback || qaPairs.length === 0) return;
-      setIsLoadingFeedback(true);
-      setFeedbackError(null);
-      try {
-        const feedback = await generateInterviewFeedback(qaPairs, jobContext, coachSignalContext);
-        setAiFeedback(feedback);
-      } catch (error) {
-        console.error('Failed to generate AI feedback:', error);
-        setFeedbackError('Coaching synthesis unavailable. Showing local analysis below.');
-      } finally {
-        setIsLoadingFeedback(false);
-      }
+      setLoadingAI(true); setAiError(null);
+      try { setAiFeedback(await generateInterviewFeedback(qaPairs, jobContext, coachCtx)); }
+      catch { setAiError('Coaching synthesis unavailable — showing signal-based analysis.'); }
+      finally { setLoadingAI(false); }
     };
     run();
-  }, [activeTab, aiFeedback, isLoadingFeedback, jobContext, qaPairs, coachSignalContext]);
+  }, [tab, aiFeedback, loadingAI, qaPairs, jobContext, coachCtx]);
 
   if (!metrics) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: '16px', fontWeight: 500, color: '#f87171', marginBottom: '8px' }}>Results unavailable</p>
-          <p style={{ fontSize: '14px', color: 'var(--text-4)', marginBottom: '24px' }}>Kelv could not load the processed session data.</p>
-          <button
-            onClick={onBack}
-            style={{ padding: '10px 20px', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: '14px' }}
-          >
-            Return to dashboard
-          </button>
+          <p style={{ fontSize: '15px', fontWeight: 500, color: '#f87171', marginBottom: '8px' }}>Results unavailable</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-4)', marginBottom: '24px' }}>Session data could not be loaded.</p>
+          <button onClick={onBack} style={{ padding: '9px 20px', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: '13px' }}>Back</button>
         </div>
       </div>
     );
   }
 
-  const grade = getGrade(overallScore);
-  const scoreBreakdown = Object.entries(metrics.expressionBreakdown || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
+  const dur = sessionData?.duration || 0;
+  const durStr = dur >= 60 ? `${Math.floor(dur / 60)}m ${dur % 60}s` : `${dur}s`;
+  const topDrill = practicePlan?.[0] ?? null;
+  const strengths = metrics.strengths || [];
+  const weaknesses = metrics.weaknesses || [];
 
-  const commonChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
+  const chartOpts = {
+    responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        grid: { color: 'rgba(255,255,255,0.03)' },
-        ticks: { color: '#62666d', font: { size: 10 } }
-      },
-      x: {
-        grid: { display: false },
-        ticks: { color: '#62666d', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
-      }
-    }
+      y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#62666d', font: { size: 10 } } },
+      x: { grid: { display: false }, ticks: { color: '#62666d', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } },
+    },
   };
-
-  const timelineChart = (label: string, key: 'voiceConfidence' | 'faceConfidence', color: string) => ({
-    labels: metrics.timeline.map((point) => point.timestamp),
-    datasets: [{
-      label,
-      data: metrics.timeline.map((point) => point[key] * 100),
-      borderColor: color,
-      backgroundColor: `${color}1A`,
-      fill: true,
-      tension: 0.35,
-      pointRadius: 0,
-      borderWidth: 2
-    }]
-  });
-
-  const tabs: Array<{ id: TabId; label: string; icon: any }> = [
-    { id: 'perQuestion', label: 'Storyline', icon: List },
-    { id: 'content', label: 'Content', icon: MessageSquare },
-    { id: 'voice', label: 'Delivery', icon: Mic },
-    { id: 'presence', label: 'Presence', icon: User },
-    { id: 'lens', label: 'Kelv LENS', icon: Zap },
-  ];
-
-  const topDrill = practicePlan?.[0] ?? null;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Header */}
-      <header style={{
-        height: '64px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 32px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 20,
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button
-            onClick={onBack}
-            style={{ padding: '6px', marginLeft: '-6px', borderRadius: '6px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+      {/* ── Header ── */}
+      <header style={{ height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 20, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-4)')}
-          >
-            <ArrowLeft style={{ width: '16px', height: '16px' }} />
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-4)')}>
+            <ArrowLeft style={{ width: '14px', height: '14px' }} />
+            Back
           </button>
-          <div>
-            <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Interview Review</p>
-            <p style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
-              {jobContext?.role || 'Session'} {jobContext?.experienceLevel ? `· ${jobContext.experienceLevel}` : ''}
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          {readinessSignal && (
-            <ReadinessTag signal={readinessSignal} />
-          )}
-          {signalReliability?.overall_confidence != null && (
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Confidence</p>
-              <p style={{ fontSize: '13px', color: 'var(--text-3)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                {Math.round(signalReliability.overall_confidence * 100)}%
-              </p>
-            </div>
-          )}
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Score</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '20px', fontWeight: 500, color: grade.color, fontFamily: 'IBM Plex Mono, monospace' }}>{overallScore}</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-4)' }}>{grade.label}</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Tab bar */}
-      <div style={{ borderBottom: '1px solid var(--border)', padding: '0 32px', background: 'var(--bg)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
-          {tabs.map((tab) => (
-            <FlatTabButton
-              key={tab.id}
-              id={tab.id}
-              label={tab.label}
-              icon={tab.icon}
-              active={activeTab}
-              onClick={setActiveTab}
-            />
-          ))}
-          {benchmarks && (
-            <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
-              benchmarks · <span style={{ color: 'var(--orange)' }}>{benchmarks.roleName}</span>
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>Interview Review</span>
+          {jobContext?.role && (
+            <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              · {jobContext.role}{jobContext.experienceLevel ? ` · ${jobContext.experienceLevel}` : ''}
             </span>
           )}
         </div>
-      </div>
-
-      {/* Score summary bar */}
-      {(v2Scores || metrics) && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
-        }}>
-          {[
-            { label: 'Overall', score: v2Scores?.overall ?? overallScore },
-            { label: 'Content', score: v2Scores?.content ?? metrics.contentScore },
-            { label: 'Delivery', score: v2Scores?.delivery ?? metrics.deliveryScore },
-            { label: 'Presence', score: v2Scores?.presence ?? metrics.presenceScore },
-          ].map((item, i) => (
-            <div
-              key={item.label}
-              style={{
-                padding: '14px 24px',
-                borderRight: i < 3 ? '1px solid var(--border)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span style={{ fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                {item.label}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '48px', height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${item.score}%`, background: getScoreColor(item.score), borderRadius: '2px' }} />
-                </div>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                  {item.score}
-                </span>
-              </div>
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {(['report', 'signals'] as Tab[]).map((t) => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 500, borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s', border: '1px solid', background: tab === t ? 'var(--surface-2)' : 'transparent', color: tab === t ? 'var(--text)' : 'var(--text-4)', borderColor: tab === t ? 'var(--border)' : 'transparent' }}>
+              {t === 'report' ? 'Report' : 'Signals'}
+            </button>
           ))}
         </div>
-      )}
+      </header>
 
-      {/* Main content */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+      <main style={{ flex: 1, overflowY: 'auto' }}>
         <AnimatePresence mode="wait">
 
-          {/* Storyline tab */}
-          {activeTab === 'perQuestion' && (
-            <motion.div
-              key="perQuestion"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              style={{ maxWidth: '1120px', margin: '0 auto' }}
-            >
-              {perQuestionAnalysis && perQuestionAnalysis.questions.length > 0 ? (
-                <PerQuestionBreakdown analysis={perQuestionAnalysis} />
-              ) : (
-                <FlatEmptyPanel
-                  title="Question-level breakdown unavailable"
-                  description="Kelv needs a complete back-and-forth transcript to build question-by-question scoring."
-                />
-              )}
-            </motion.div>
-          )}
+          {/* ══════════════════════════════════
+               REPORT TAB
+          ══════════════════════════════════ */}
+          {tab === 'report' && (
+            <motion.div key="report" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
 
-          {/* Content tab */}
-          {activeTab === 'content' && (
-            <motion.div
-              key="content"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              style={{ maxWidth: '1120px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}
-            >
+              {/* Score hero */}
+              <div style={{ borderBottom: '1px solid var(--border)', padding: '48px 40px 40px', background: 'var(--surface)' }}>
+                <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '48px', alignItems: 'center' }}>
 
-              {/* Next Practice — surface practicePlan[0] prominently */}
-              {topDrill && (
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div>
-                      <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-                        Next practice
-                      </p>
-                      <p style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px' }}>{topDrill.drillType?.replace(/-/g, ' ') || 'Focused drill'}</p>
-                      {topDrill.weakPoint && (
-                        <p style={{ fontSize: '13px', color: 'var(--text-3)' }}>Focus: {topDrill.weakPoint}</p>
+                  {/* Big score */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Overall</p>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ fontSize: '72px', fontWeight: 300, letterSpacing: '-0.04em', fontFamily: 'IBM Plex Mono, monospace', color: overallScore != null ? grade.color : 'var(--text-4)', lineHeight: 1 }}>
+                        {fmt(overallScore)}
+                      </span>
+                      {overallScore != null && (
+                        <span style={{ position: 'absolute', bottom: '8px', right: '-28px', fontSize: '14px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>/100</span>
                       )}
                     </div>
-                    {topDrill.repetitionTarget && (
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '24px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1 }}>{topDrill.repetitionTarget}</p>
-                        <p style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: '2px' }}>reps target</p>
-                      </div>
+                    {grade.label && (
+                      <span style={{ fontSize: '11px', color: grade.color, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.04em' }}>{grade.label}</span>
                     )}
+                    {readiness && <ReadinessTag signal={readiness} />}
                   </div>
-                  {topDrill.completionCriteria && (
-                    <div style={{ padding: '12px 16px', background: 'var(--surface-2)', borderRadius: '4px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <CheckCircle style={{ width: '13px', height: '13px', color: 'var(--orange)', marginTop: '1px', flexShrink: 0 }} />
-                      <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
-                        <span style={{ color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pass: </span>
-                        {topDrill.completionCriteria}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* Score row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                <FlatScoreCard
-                  title="Content Score"
-                  score={v2Scores?.content ?? metrics.contentScore}
-                  benchmark={benchmarks?.content}
-                  tooltip="Measures answer depth, structure, and proof of impact."
-                />
-                <FlatStatCard
-                  label="Questions Answered"
-                  value={qaPairs.length.toString()}
-                  subtext={qaPairs.length > 0 ? 'Completed exchanges' : 'No transcript'}
-                  icon={LineChart}
-                />
-                <FlatStatCard
-                  label="Strongest Answer"
-                  value={strongestQuestion ? `${strongestQuestion.overallScore}%` : '--'}
-                  subtext={strongestQuestion ? `Q${strongestQuestion.questionNumber}` : 'Unavailable'}
-                  icon={Target}
-                />
-              </div>
-
-              {/* Strengths / weaknesses */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <FlatSignalPanel
-                  title="What landed"
-                  items={strengths.slice(0, 4).map((item) => ({ title: item.area, description: item.description }))}
-                  emptyCopy="Kelv did not detect standout strengths in this run."
-                  tone="positive"
-                />
-                <FlatSignalPanel
-                  title="What to tighten"
-                  items={weaknesses.slice(0, 4).map((item) => ({ title: item.area, description: item.description }))}
-                  emptyCopy="No major issues were detected in the core scoring categories."
-                  tone="warning"
-                />
-              </div>
-
-              {/* Coach Synthesis */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '28px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                    Coach synthesis
-                  </p>
-                  <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-                </div>
-
-                {isLoadingFeedback && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0' }}>
-                    <Loader2 style={{ width: '16px', height: '16px', color: 'var(--text-4)', marginRight: '10px' }} className="animate-spin" />
-                    <span style={{ fontSize: '13px', color: 'var(--text-4)' }}>Synthesizing coaching notes…</span>
-                  </div>
-                )}
-
-                {feedbackError && (
-                  <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)', borderRadius: '6px', fontSize: '13px', color: 'rgba(253,224,71,0.8)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertTriangle style={{ width: '13px', height: '13px', flexShrink: 0 }} />
-                    {feedbackError}
-                  </div>
-                )}
-
-                {aiFeedback && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <p style={{ fontSize: '16px', color: 'var(--text-2)', lineHeight: '1.65', maxWidth: '680px' }}>
-                      "{aiFeedback.overallSummary}"
-                    </p>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-                      <FlatSimpleList title="Top strengths" items={aiFeedback.topStrengths} accent="green" />
-                      <FlatSimpleList title="Critical improvements" items={aiFeedback.criticalImprovements} accent="orange" />
+                  {/* Stats + score bars */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Score dimensions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {[
+                        { label: 'Content', score: v2?.content ?? metrics.contentScore ?? null },
+                        { label: 'Delivery', score: v2?.delivery ?? metrics.deliveryScore ?? null },
+                        { label: 'Presence', score: v2?.presence ?? metrics.presenceScore ?? null },
+                      ].map((d) => (
+                        <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ width: '56px', fontSize: '11px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', flexShrink: 0 }}>{d.label}</span>
+                          <div style={{ flex: 1, height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                            {d.score != null && <div style={{ height: '100%', width: `${d.score}%`, background: sc(d.score), borderRadius: '2px', transition: 'width 0.8s ease' }} />}
+                          </div>
+                          <span style={{ width: '28px', fontSize: '12px', color: d.score != null ? 'var(--text)' : 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textAlign: 'right' }}>
+                            {fmt(d.score)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
 
-                    {aiFeedback.questionFeedback.length > 0 && (
-                      <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
-                        <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
-                          Answer-by-answer coaching
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {aiFeedback.questionFeedback.map((feedback, index) => (
-                            <QuestionFeedbackCard key={`${feedback.questionNumber}-${index}`} feedback={feedback} />
-                          ))}
+                    {/* Quick facts */}
+                    <div style={{ display: 'flex', gap: '24px', paddingTop: '4px' }}>
+                      {[
+                        { label: 'Duration', value: durStr },
+                        { label: 'Questions', value: `${qaPairs.length}` },
+                        { label: 'Pace', value: metrics.wpm > 0 ? `${Math.round(metrics.wpm)} wpm` : '--' },
+                        { label: 'Fillers', value: fmt(metrics.fillerWordCount) },
+                      ].map((f) => (
+                        <div key={f.label}>
+                          <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{f.label}</p>
+                          <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>{f.value}</p>
                         </div>
-                      </div>
-                    )}
-
-                    {aiFeedback.nextSteps.length > 0 && (
-                      <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px 24px' }}>
-                        <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
-                          Next practice moves
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-                          {aiFeedback.nextSteps.map((step, index) => (
-                            <div key={index} style={{ display: 'flex', gap: '16px', padding: '12px 16px', background: 'var(--surface)' }}>
-                              <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '2px', flexShrink: 0 }}>
-                                {String(index + 1).padStart(2, '0')}
-                              </span>
-                              <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>{step}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                )}
-
-                {/* Fallback when no feedback and not loading */}
-                {!isLoadingFeedback && !aiFeedback && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {signalFusion?.fused?.coaching_focus && (
-                      <div style={{ padding: '16px', background: 'var(--surface-2)', borderRadius: '6px', borderLeft: '2px solid var(--orange)' }}>
-                        <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-                          Coaching focus
-                        </p>
-                        <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: '1.55' }}>{signalFusion.fused.coaching_focus}</p>
-                      </div>
-                    )}
-                    {qaPairs.length === 0 && (
-                      <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>
-                        Complete a full session to unlock coaching synthesis.
-                      </p>
-                    )}
-                  </div>
-                )}
+                </div>
               </div>
 
-              {/* Callout panels */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <FlatCalloutPanel
-                  label="Bright spot"
-                  title={strongestQuestion ? `Q${strongestQuestion.questionNumber} was your cleanest answer.` : 'Kelv needs more transcript data.'}
-                  body={strongestQuestion ? strongestQuestion.questionText : 'Run a fuller session to surface your best and weakest answers clearly.'}
-                />
-                <FlatCalloutPanel
-                  label="Practice target"
-                  title={weakestQuestion ? `Q${weakestQuestion.questionNumber} is the first rep to revisit.` : 'No weak-point target yet.'}
-                  body={weakestQuestion ? weakestQuestion.questionText : 'Once a full exchange is captured, Kelv will identify the most valuable follow-up drill.'}
-                />
-              </div>
+              {/* Body */}
+              <div style={{ maxWidth: '860px', margin: '0 auto', padding: '40px', display: 'flex', flexDirection: 'column', gap: '40px' }}>
 
-              {/* Transcript excerpts */}
-              {qaPairs.length > 0 && (
-                <div>
-                  <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
-                    Transcript excerpts
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    {qaPairs.slice(0, 4).map((pair) => (
-                      <div key={pair.questionNumber} style={{ padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '10px' }}>Q{pair.questionNumber}</p>
-                        <p style={{ fontSize: '12px', color: 'var(--text-4)', marginBottom: '10px' }}>{pair.question}</p>
-                        <HighlightedText text={pair.answer} />
+                {/* ── Coaching summary ── */}
+                <section>
+                  <SectionLabel>What Kelv heard</SectionLabel>
+
+                  {/* Signal snapshot — data-backed context row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', marginBottom: '28px' }}>
+                    {[
+                      {
+                        dim: 'Content',
+                        score: fmt(v2?.content ?? metrics.contentScore ?? null),
+                        note: (() => {
+                          const s = v2?.content ?? metrics.contentScore ?? null;
+                          if (s == null) return 'Not scored';
+                          if (s >= 80) return 'Strong structure and specificity';
+                          if (s >= 65) return 'Needs sharper evidence';
+                          return 'Structure and proof are thin';
+                        })(),
+                      },
+                      {
+                        dim: 'Delivery',
+                        score: fmt(v2?.delivery ?? metrics.deliveryScore ?? null),
+                        note: metrics.wpm > 0
+                          ? `${Math.round(metrics.wpm)} wpm · ${metrics.fillerWordCount ?? 0} fillers`
+                          : 'Voice signals not captured',
+                      },
+                      {
+                        dim: 'Presence',
+                        score: fmt(v2?.presence ?? metrics.presenceScore ?? null),
+                        note: postureData
+                          ? `${postureData.timeInGoodPosture}% good posture · head ${postureData.headPosition}`
+                          : 'Camera tracking not enabled',
+                      },
+                    ].map((d) => (
+                      <div key={d.dim} style={{ background: 'var(--surface)', padding: '16px 18px' }}>
+                        <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{d.dim}</p>
+                        <p style={{ fontSize: '20px', fontWeight: 400, color: d.score === '--' ? 'var(--text-4)' : 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '4px' }}>{d.score}</p>
+                        <p style={{ fontSize: '11px', color: 'var(--text-4)', lineHeight: '1.4' }}>{d.note}</p>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </motion.div>
-          )}
 
-          {/* Delivery tab */}
-          {activeTab === 'voice' && (
-            <motion.div
-              key="voice"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              style={{ maxWidth: '1120px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}
-            >
-              <div>
-                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
-                  Delivery
-                </p>
-                <h2 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)', marginBottom: '4px' }}>
-                  How steady, clear, and controlled the session felt
-                </h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>
-                  These signals come from transcript timing, filler-word load, and cadence estimates.
-                </p>
-              </div>
+                  {/* AI coaching narrative */}
+                  {loadingAI && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                      <Loader2 style={{ width: '12px', height: '12px', color: 'var(--text-4)', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                      <span style={{ fontSize: '12px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>reading session…</span>
+                    </div>
+                  )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                <FlatScoreCard
-                  title="Delivery Score"
-                  score={v2Scores?.delivery ?? metrics.deliveryScore}
-                  benchmark={benchmarks?.delivery}
-                  tooltip="Measures pace control, clarity, fillers, and cadence consistency."
-                />
-                <FlatStatCard
-                  label="Pace Estimate"
-                  value={`${Math.round(metrics.wpm)} WPM`}
-                  subtext="Target: 110–160"
-                  icon={Mic}
-                />
-                <FlatStatCard
-                  label="Filler Words"
-                  value={metrics.fillerWordCount.toString()}
-                  subtext={metrics.fillerWordCount > 5 ? 'Needs cleanup' : 'Under control'}
-                  icon={Activity}
-                />
-                <FlatStatCard
-                  label="Cadence Variety"
-                  value={`${metrics.tonalVariety}/100`}
-                  subtext={metrics.tonalVariety >= 70 ? 'Varied' : metrics.tonalVariety >= 50 ? 'Stable' : 'Flat'}
-                  icon={LineChart}
-                />
-              </div>
+                  {aiError && (
+                    <div style={{ marginBottom: '16px', padding: '9px 13px', background: 'rgba(234,179,8,0.05)', border: '1px solid rgba(234,179,8,0.12)', borderRadius: '5px', fontSize: '11px', color: 'rgba(253,224,71,0.7)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <AlertTriangle style={{ width: '11px', height: '11px', flexShrink: 0, marginTop: '1px' }} />
+                      {aiError}
+                    </div>
+                  )}
 
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                <EnhancedCharts metrics={metrics} />
-              </div>
-            </motion.div>
-          )}
+                  {aiFeedback && (
+                    <p style={{ fontSize: '15px', color: 'var(--text-2)', lineHeight: '1.75', marginBottom: '28px' }}>
+                      {aiFeedback.overallSummary}
+                    </p>
+                  )}
 
-          {/* Presence tab */}
-          {activeTab === 'presence' && (
-            <motion.div
-              key="presence"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              style={{ maxWidth: '1120px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}
-            >
-              <div>
-                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
-                  Presence
-                </p>
-                <h2 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)', marginBottom: '4px' }}>
-                  How grounded and composed you looked on screen
-                </h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>
-                  {postureData
-                    ? 'Presence score is supported by posture samples captured during the session.'
-                    : 'No posture samples were captured — presence leans on transcript timing and hesitation proxies.'}
-                </p>
-              </div>
+                  {!aiFeedback && !loadingAI && Array.isArray(signalFusion?.fused?.coaching_focus) && signalFusion.fused.coaching_focus.length > 0 && (
+                    <div style={{ marginBottom: '28px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {signalFusion.fused.coaching_focus.map((note: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '3px', flexShrink: 0 }}>{String(i + 1).padStart(2, '0')}</span>
+                          <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: '1.6' }}>{note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                <FlatScoreCard
-                  title="Presence Score"
-                  score={v2Scores?.presence ?? metrics.presenceScore}
-                  benchmark={benchmarks?.presence}
-                  tooltip="Combines posture steadiness with hesitation penalties during answers."
-                />
-                <FlatStatCard
-                  label="Visual Steadiness"
-                  value={`${metrics.eyeContactEstimate}%`}
-                  subtext={postureData ? 'Posture-backed' : 'Estimated'}
-                  icon={Video}
-                />
-                <FlatStatCard
-                  label="Hesitation Level"
-                  value={metrics.anxietyLevel > 40 ? 'High' : metrics.anxietyLevel > 20 ? 'Moderate' : 'Low'}
-                  subtext={`${metrics.anxietyLevel}/100`}
-                  icon={Activity}
-                />
-                <FlatStatCard
-                  label="Good Posture Time"
-                  value={postureData ? `${postureData.timeInGoodPosture}%` : '--'}
-                  subtext={postureData ? 'Tracked live' : 'Not captured'}
-                  icon={User}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                  <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>
-                    Presence trend
-                  </p>
-                  <div style={{ height: '240px' }}>
-                    <Line options={commonChartOptions} data={timelineChart('Presence Trend', 'faceConfidence', '#10b981')} />
-                  </div>
-                </div>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                  <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>
-                    Posture snapshot
-                  </p>
-                  <div style={{ height: '240px' }}>
-                    <PostureAnalysisDisplay postureData={postureData} />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>
-                  Signal breakdown
-                </p>
-                <div style={{ height: '220px' }}>
-                  <Bar
-                    options={{
-                      indexAxis: 'y' as const,
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        x: {
-                          display: true,
-                          max: 100,
-                          grid: { color: 'rgba(255,255,255,0.03)' },
-                          ticks: { color: '#62666d', callback: (value: any) => `${value}%` }
-                        },
-                        y: {
-                          ticks: { color: '#8a8f98', font: { size: 11 } },
-                          grid: { display: false }
-                        }
-                      }
-                    }}
-                    data={{
-                      labels: scoreBreakdown.map(([label]) => label),
-                      datasets: [{
-                        data: scoreBreakdown.map(([, value]) => value),
-                        backgroundColor: ['rgba(16,185,129,0.5)', 'rgba(59,130,246,0.5)', 'rgba(245,158,11,0.5)', 'rgba(232,101,26,0.5)', 'rgba(139,92,246,0.5)', 'rgba(239,68,68,0.5)'],
-                        borderRadius: 3
-                      }]
-                    }}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Kelv LENS tab */}
-          {activeTab === 'lens' && (
-            <motion.div
-              key="lens"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              style={{ maxWidth: '1120px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}
-            >
-              <div>
-                <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
-                  Kelv LENS · Local Evidence-Normalized Signals
-                </p>
-                <h2 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)', marginBottom: '4px' }}>
-                  Voice and camera signal fusion
-                </h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>
-                  No external AI APIs. All signal is derived locally from your audio and camera feed.
-                </p>
-              </div>
-
-              {!signalFusion ? (
-                <FlatEmptyPanel
-                  title="LENS data unavailable"
-                  description="Signal fusion was not computed for this session. This typically means the session ended before enough samples were collected."
-                />
-              ) : (
-                <>
-                  {/* Readiness + Coaching focus */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-                        Readiness signal
+                  {/* #1 thing to fix — prominent */}
+                  {(aiFeedback?.criticalImprovements?.[0] || weaknesses[0]?.description) && (
+                    <div style={{ marginBottom: '28px', padding: '16px 20px', background: 'rgba(232,101,26,0.04)', border: '1px solid rgba(232,101,26,0.12)', borderRadius: '6px' }}>
+                      <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Biggest lever</p>
+                      <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: '1.6' }}>
+                        {aiFeedback?.criticalImprovements?.[0] ?? weaknesses[0]?.description}
                       </p>
-                      {readinessSignal && <ReadinessTag signal={readinessSignal} large />}
-                      {signalFusion.fused?.delivery_presence_score != null && (
-                        <div style={{ marginTop: '16px' }}>
-                          <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
-                            Delivery + presence
-                          </p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ flex: 1, height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${signalFusion.fused.delivery_presence_score}%`, background: 'var(--orange)', borderRadius: '2px' }} />
+                    </div>
+                  )}
+
+                  {/* Strengths / remaining gaps side by side */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <p style={{ fontSize: '10px', color: 'rgba(74,222,128,0.7)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>What's working</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+                        {(aiFeedback?.topStrengths?.length ? aiFeedback.topStrengths : strengths.slice(0, 3).map(s => s.description)).length > 0
+                          ? (aiFeedback?.topStrengths?.length ? aiFeedback.topStrengths : strengths.slice(0, 3).map(s => s.description)).map((item, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(34,197,94,0.5)', marginTop: '8px', flexShrink: 0 }} />
+                              <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>{item}</p>
                             </div>
-                            <span style={{ fontSize: '13px', color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                              {signalFusion.fused.delivery_presence_score}
-                            </span>
-                          </div>
+                          ))
+                          : <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>No standout strengths detected yet.</p>
+                        }
+                      </div>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Also to fix</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+                        {(aiFeedback?.criticalImprovements?.slice(1)?.length ? aiFeedback.criticalImprovements.slice(1) : weaknesses.slice(1, 4).map(w => w.description)).length > 0
+                          ? (aiFeedback?.criticalImprovements?.slice(1)?.length ? aiFeedback.criticalImprovements.slice(1) : weaknesses.slice(1, 4).map(w => w.description)).map((item, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(155,155,155,0.3)', marginTop: '8px', flexShrink: 0 }} />
+                              <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>{item}</p>
+                            </div>
+                          ))
+                          : <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>No additional issues flagged.</p>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <Divider />
+
+                {/* ── Question by question ── */}
+                <section>
+                  <SectionLabel>Question by question</SectionLabel>
+                  {perQuestionAnalysis && perQuestionAnalysis.questions.length > 0 ? (
+                    <PerQuestionBreakdown analysis={perQuestionAnalysis} />
+                  ) : qaPairs.length > 0 ? (
+                    /* Fallback: show raw QA pairs with transcript highlighting */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                      {qaPairs.map((pair, i) => (
+                        <RawQACard key={i} pair={pair} isLast={i === qaPairs.length - 1}
+                          coaching={aiFeedback?.questionFeedback?.find(f => f.questionNumber === pair.questionNumber)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '48px 24px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                      <p style={{ fontSize: '14px', color: 'var(--text-4)' }}>Complete a full session to see question-by-question feedback.</p>
+                    </div>
+                  )}
+                </section>
+
+                {/* ── AI question coaching (if available) ── */}
+                {aiFeedback && aiFeedback.questionFeedback.length > 0 && !perQuestionAnalysis && (
+                  <>
+                    <Divider />
+                    <section>
+                      <SectionLabel>Answer-by-answer coaching</SectionLabel>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {aiFeedback.questionFeedback.map((fb, i) => (
+                          <QuestionFeedbackCard key={i} feedback={fb} />
+                        ))}
+                      </div>
+                    </section>
+                  </>
+                )}
+
+                <Divider />
+
+                {/* ── Next session ── */}
+                <section>
+                  <SectionLabel>For your next session</SectionLabel>
+
+                  {aiFeedback?.nextSteps && aiFeedback.nextSteps.length > 0 && (
+                    <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                      {aiFeedback.nextSteps.map((step, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '16px', padding: '12px 16px', background: 'var(--surface)', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', paddingTop: '3px', flexShrink: 0 }}>{String(i + 1).padStart(2, '0')}</span>
+                          <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>{step}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {topDrill && (
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+                      <div>
+                        <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Recommended drill</p>
+                        <p style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px' }}>{(topDrill.drill_type || topDrill.drillType)?.replace(/-/g, ' ') || 'Focused practice'}</p>
+                        {(topDrill.weak_point || topDrill.weakPoint) && <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>Focus: {topDrill.weak_point || topDrill.weakPoint}</p>}
+                        {(topDrill.completion_criteria || topDrill.completionCriteria) && <p style={{ fontSize: '12px', color: 'var(--text-4)', marginTop: '6px', lineHeight: '1.5' }}>Pass when: {topDrill.completion_criteria || topDrill.completionCriteria}</p>}
+                      </div>
+                      {(topDrill.repetition_target || topDrill.repetitionTarget) && (
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <p style={{ fontSize: '32px', fontWeight: 300, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1 }}>{topDrill.repetition_target || topDrill.repetitionTarget}×</p>
+                          <p style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: '2px' }}>reps target</p>
                         </div>
                       )}
                     </div>
+                  )}
 
-                    {signalFusion.fused?.coaching_focus && (
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                        <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-                          Coaching focus
-                        </p>
-                        <p style={{ fontSize: '15px', color: 'var(--text-2)', lineHeight: '1.6' }}>
-                          {signalFusion.fused.coaching_focus}
-                        </p>
+                  {!topDrill && !aiFeedback?.nextSteps?.length && (
+                    <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>Complete a full session to unlock personalized practice recommendations.</p>
+                  )}
+                </section>
+
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════
+               SIGNALS TAB
+          ══════════════════════════════════ */}
+          {tab === 'signals' && (
+            <motion.div key="signals" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
+              style={{ maxWidth: '860px', margin: '0 auto', padding: '40px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+
+              {/* Delivery */}
+              <section>
+                <SectionLabel icon={<Mic style={{ width: '12px', height: '12px' }} />}>Delivery</SectionLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                  {[
+                    { label: 'Delivery score', value: fmt(v2?.delivery ?? metrics.deliveryScore ?? null), sub: 'Pace, clarity, fillers' },
+                    { label: 'Pace', value: metrics.wpm > 0 ? `${Math.round(metrics.wpm)} wpm` : '--', sub: 'Target: 110–160 wpm' },
+                    { label: 'Filler words', value: fmt(metrics.fillerWordCount), sub: (metrics.fillerWordCount ?? 0) > 5 ? 'Needs cleanup' : 'Under control' },
+                    { label: 'Cadence variety', value: metrics.tonalVariety > 0 ? `${metrics.tonalVariety}/100` : '--', sub: metrics.tonalVariety >= 70 ? 'Good range' : metrics.tonalVariety > 0 ? 'Flat — vary your pace' : 'Not measured' },
+                  ].map((d) => <SignalTile key={d.label} {...d} />)}
+                </div>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+                  <EnhancedCharts metrics={metrics} />
+                </div>
+              </section>
+
+              <Divider />
+
+              {/* Presence */}
+              <section>
+                <SectionLabel icon={<User style={{ width: '12px', height: '12px' }} />}>Presence</SectionLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                  {[
+                    { label: 'Presence score', value: fmt(v2?.presence ?? metrics.presenceScore ?? null), sub: postureData ? 'Posture-backed' : 'Proxy estimate' },
+                    { label: 'Good posture time', value: postureData ? `${postureData.timeInGoodPosture}%` : '--', sub: postureData ? 'Tracked live' : 'Not captured' },
+                    { label: 'Posture score', value: postureData ? `${postureData.overallScore}%` : '--', sub: postureData ? `Head: ${postureData.headPosition}` : 'Camera tracking off' },
+                    { label: 'Hesitation', value: metrics.anxietyLevel > 0 ? (metrics.anxietyLevel > 40 ? 'High' : metrics.anxietyLevel > 20 ? 'Moderate' : 'Low') : '--', sub: metrics.anxietyLevel > 0 ? `${metrics.anxietyLevel}/100 · proxy` : 'Not measured' },
+                  ].map((d) => <SignalTile key={d.label} {...d} />)}
+                </div>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
+                  <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>Presence trend</p>
+                  <div style={{ height: '180px' }}>
+                    <Line options={chartOpts} data={{
+                      labels: metrics.timeline.map(p => p.timestamp),
+                      datasets: [{ label: 'Presence', data: metrics.timeline.map(p => p.faceConfidence * 100), borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2 }],
+                    }} />
+                  </div>
+                  {postureData && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)', height: '160px' }}>
+                      <PostureAnalysisDisplay postureData={postureData} />
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* LENS / voice fusion */}
+              {signalFusion && (
+                <>
+                  <Divider />
+                  <section>
+                    <SectionLabel icon={<Zap style={{ width: '12px', height: '12px' }} />}>LENS · Local signal fusion</SectionLabel>
+
+                    {signalFusion.voice && (
+                      <div style={{ marginBottom: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Voice analysis</p>
+                          {signalFusion.voice.audio_source && (
+                            <span style={{ fontSize: '10px', color: signalFusion.voice.audio_source === 'recording_blob' ? 'rgba(74,222,128,0.8)' : 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 8px', background: signalFusion.voice.audio_source === 'recording_blob' ? 'rgba(34,197,94,0.08)' : 'var(--surface-2)', border: `1px solid ${signalFusion.voice.audio_source === 'recording_blob' ? 'rgba(34,197,94,0.2)' : 'var(--border)'}`, borderRadius: '3px' }}>
+                              {signalFusion.voice.audio_source === 'recording_blob' ? 'recording-backed' : 'transcript proxy'}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border)' }}>
+                          {[
+                            { label: 'Pace', value: signalFusion.voice.pace_score },
+                            { label: 'Filler control', value: signalFusion.voice.filler_control },
+                            { label: 'Pause control', value: signalFusion.voice.pause_control },
+                            { label: 'Articulation', value: signalFusion.voice.articulation_proxy },
+                            { label: 'Clarity', value: signalFusion.voice.clarity_score },
+                            { label: 'Fluency', value: signalFusion.voice.fluency_score },
+                          ].filter(m => m.value != null).map(m => (
+                            <LensCell key={m.label} label={m.label} value={m.value} />
+                          ))}
+                        </div>
                       </div>
                     )}
-                  </div>
 
-                  {/* Voice signals */}
-                  {signalFusion.voice && (
-                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <Mic style={{ width: '13px', height: '13px', color: 'var(--orange)' }} />
-                        <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                          Voice analysis
-                        </p>
-                        {signalFusion.voice.audio_source && (
-                          <span style={{ marginLeft: 'auto', fontSize: '10px', color: signalFusion.voice.audio_source === 'recording_blob' ? 'rgba(34,197,94,0.8)' : 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 8px', background: signalFusion.voice.audio_source === 'recording_blob' ? 'rgba(34,197,94,0.08)' : 'var(--surface-2)', border: `1px solid ${signalFusion.voice.audio_source === 'recording_blob' ? 'rgba(34,197,94,0.2)' : 'var(--border)'}`, borderRadius: '3px' }}>
-                            {signalFusion.voice.audio_source === 'recording_blob' ? 'recording-backed' : 'transcript proxy'}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-                        {[
-                          { label: 'Pace score', value: signalFusion.voice.pace_score, fmt: (v: number) => `${v}/100` },
-                          { label: 'Filler control', value: signalFusion.voice.filler_control, fmt: (v: number) => `${v}/100` },
-                          { label: 'Pause control', value: signalFusion.voice.pause_control, fmt: (v: number) => `${v}/100` },
-                          { label: 'Articulation', value: signalFusion.voice.articulation_proxy, fmt: (v: number) => `${v}/100` },
-                          { label: 'Clarity', value: signalFusion.voice.clarity_score, fmt: (v: number) => `${v}/100` },
-                          { label: 'Fluency', value: signalFusion.voice.fluency_score, fmt: (v: number) => `${v}/100` },
-                        ].filter(m => m.value != null).map((m) => (
-                          <div key={m.label} style={{ background: 'var(--surface)', padding: '16px 20px' }}>
-                            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{m.label}</p>
-                            <p style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>{m.fmt(m.value)}</p>
-                            <div style={{ height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${m.value}%`, background: m.value >= 70 ? 'rgba(34,197,94,0.7)' : m.value >= 50 ? 'var(--orange)' : '#ef4444', borderRadius: '1px' }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Vision signals */}
-                  {signalFusion.vision && (
-                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <Video style={{ width: '13px', height: '13px', color: 'var(--orange)' }} />
-                        <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                          Camera analysis
-                        </p>
-                        {signalFusion.vision.sample_count != null && (
-                          <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                            {signalFusion.vision.sample_count} samples
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-                        {[
-                          { label: 'Posture score', value: signalFusion.vision.posture_score, fmt: (v: number) => `${v}/100` },
-                          { label: 'Head centering', value: signalFusion.vision.head_centering, fmt: (v: number) => `${v}/100` },
-                          { label: 'Visual stability', value: signalFusion.vision.visual_stability, fmt: (v: number) => `${v}/100` },
-                          { label: 'Sample coverage', value: signalFusion.vision.sample_coverage != null ? Math.round(signalFusion.vision.sample_coverage * 100) : null, fmt: (v: number) => `${v}%` },
-                          { label: 'Tracking loss', value: signalFusion.vision.tracking_loss_rate != null ? Math.round(signalFusion.vision.tracking_loss_rate * 100) : null, fmt: (v: number) => `${v}%`, invert: true },
-                        ].filter(m => m.value != null).map((m) => (
-                          <div key={m.label} style={{ background: 'var(--surface)', padding: '16px 20px' }}>
-                            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{m.label}</p>
-                            <p style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>{m.fmt(m.value!)}</p>
-                            <div style={{ height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden' }}>
-                              <div style={{
-                                height: '100%',
-                                width: `${m.value}%`,
-                                background: (m as any).invert
-                                  ? (m.value! <= 10 ? 'rgba(34,197,94,0.7)' : m.value! <= 30 ? 'var(--orange)' : '#ef4444')
-                                  : (m.value! >= 70 ? 'rgba(34,197,94,0.7)' : m.value! >= 50 ? 'var(--orange)' : '#ef4444'),
-                                borderRadius: '1px'
-                              }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Signal Quality */}
-                  {signalReliability && (
-                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <AlertTriangle style={{ width: '13px', height: '13px', color: 'var(--text-4)' }} />
-                        <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                          Signal quality
-                        </p>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-                        {[
-                          { label: 'Overall confidence', value: signalReliability.overall_confidence },
-                          { label: 'Content confidence', value: signalReliability.content_confidence },
-                          { label: 'Delivery confidence', value: signalReliability.delivery_confidence },
-                          { label: 'Presence confidence', value: signalReliability.presence_confidence },
-                        ].filter(m => m.value != null).map((m) => (
-                          <div key={m.label} style={{ padding: '14px 16px', background: 'var(--surface-2)', borderRadius: '4px' }}>
-                            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
-                              {m.label}
-                            </p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ flex: 1, height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${m.value * 100}%`, background: m.value >= 0.7 ? 'rgba(34,197,94,0.7)' : m.value >= 0.5 ? 'var(--orange)' : '#ef4444', borderRadius: '2px' }} />
-                              </div>
-                              <span style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                                {Math.round(m.value * 100)}%
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {signalReliability.reason_flags?.length > 0 && (
-                        <div>
-                          <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>
-                            Reason flags
-                          </p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                            {signalReliability.reason_flags.map((flag: string) => (
-                              <span key={flag} style={{ fontSize: '11px', color: 'var(--text-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '3px', padding: '3px 10px', fontFamily: 'IBM Plex Mono, monospace' }}>
-                                {flag.replace(/_/g, ' ')}
-                              </span>
-                            ))}
-                          </div>
+                    {signalFusion.vision && (
+                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Camera analysis</p>
+                          {signalFusion.vision.sample_count != null && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{signalFusion.vision.sample_count} samples</span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border)' }}>
+                          {[
+                            { label: 'Posture', value: signalFusion.vision.posture_score, invert: false },
+                            { label: 'Head centering', value: signalFusion.vision.head_centering, invert: false },
+                            { label: 'Visual stability', value: signalFusion.vision.visual_stability, invert: false },
+                            { label: 'Sample coverage', value: signalFusion.vision.sample_coverage != null ? Math.round(signalFusion.vision.sample_coverage * 100) : null, invert: false },
+                            { label: 'Tracking loss', value: signalFusion.vision.tracking_loss_rate != null ? Math.round(signalFusion.vision.tracking_loss_rate * 100) : null, invert: true },
+                          ].filter(m => m.value != null).map(m => (
+                            <LensCell key={m.label} label={m.label} value={m.value!} invert={m.invert} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </section>
                 </>
               )}
+
+              {/* Signal reliability */}
+              {signalReliability && (
+                <>
+                  <Divider />
+                  <section>
+                    <SectionLabel>Signal reliability</SectionLabel>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                      {[
+                        { label: 'Overall', value: signalReliability.overall_confidence },
+                        { label: 'Content', value: signalReliability.content_confidence },
+                        { label: 'Delivery', value: signalReliability.delivery_confidence },
+                        { label: 'Presence', value: signalReliability.presence_confidence },
+                      ].filter(m => m.value != null).map(m => (
+                        <div key={m.label} style={{ padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px' }}>
+                          <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{m.label}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1, height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${m.value * 100}%`, background: m.value >= 0.7 ? 'rgba(34,197,94,0.7)' : m.value >= 0.5 ? 'var(--orange)' : '#f87171' }} />
+                            </div>
+                            <span style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>{Math.round(m.value * 100)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {signalReliability.reason_flags?.length > 0 && (
+                      <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {signalReliability.reason_flags.map((flag: string) => (
+                          <span key={flag} style={{ fontSize: '11px', color: 'var(--text-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px', padding: '3px 10px', fontFamily: 'IBM Plex Mono, monospace' }}>
+                            {flag.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+
             </motion.div>
           )}
+
         </AnimatePresence>
       </main>
     </div>
   );
 };
 
-/* ── Sub-components ─────────────────────────────────────────────────── */
+/* ── Layout primitives ── */
 
-const FlatTabButton = ({ id, label, icon: Icon, active, onClick }: any) => {
-  const isActive = active === id;
+const SectionLabel = ({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+    {icon && <span style={{ color: 'var(--text-4)' }}>{icon}</span>}
+    <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.12em' }}>{children}</p>
+    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+  </div>
+);
+
+const Divider = () => <div style={{ height: '1px', background: 'var(--border)' }} />;
+
+/* ── Signal tile (signals tab) ── */
+const SignalTile = ({ label, value, sub }: { label: string; value: string; sub: string }) => (
+  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '16px 18px' }}>
+    <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{label}</p>
+    <p style={{ fontSize: '22px', fontWeight: 400, color: value === '--' ? 'var(--text-4)' : 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '-0.01em', lineHeight: 1, marginBottom: '4px' }}>{value}</p>
+    <p style={{ fontSize: '11px', color: 'var(--text-4)' }}>{sub}</p>
+  </div>
+);
+
+/* ── LENS metric cell ── */
+const LensCell = ({ label, value, invert }: { label: string; value: number; invert?: boolean }) => {
+  const barColor = invert
+    ? (value <= 10 ? 'rgba(34,197,94,0.7)' : value <= 30 ? 'var(--orange)' : '#f87171')
+    : (value >= 70 ? 'rgba(34,197,94,0.7)' : value >= 50 ? 'var(--orange)' : '#f87171');
   return (
-    <button
-      onClick={() => onClick(id)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '12px 16px',
-        fontSize: '13px',
-        fontWeight: isActive ? 500 : 400,
-        color: isActive ? 'var(--text)' : 'var(--text-4)',
-        background: 'none',
-        border: 'none',
-        borderBottom: isActive ? '2px solid var(--orange)' : '2px solid transparent',
-        cursor: 'pointer',
-        transition: 'color 0.15s, border-color 0.15s',
-        marginBottom: '-1px',
-      }}
-      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--text-3)'; }}
-      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--text-4)'; }}
-    >
-      <Icon style={{ width: '13px', height: '13px', color: isActive ? 'var(--orange)' : 'inherit' }} />
-      {label}
-    </button>
+    <div style={{ background: 'var(--surface)', padding: '14px 16px' }}>
+      <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{label}</p>
+      <p style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace', marginBottom: '6px' }}>{value}/100</p>
+      <div style={{ height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${value}%`, background: barColor }} />
+      </div>
+    </div>
   );
 };
 
-const ReadinessTag = ({ signal, large }: { signal: 'strong' | 'developing' | 'limited'; large?: boolean }) => {
-  const config = {
+/* ── Readiness tag ── */
+const ReadinessTag = ({ signal }: { signal: 'strong' | 'developing' | 'limited' }) => {
+  const cfg = {
     strong: { label: 'Interview ready', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', color: 'rgba(74,222,128,0.9)' },
     developing: { label: 'Developing', bg: 'rgba(234,179,8,0.08)', border: 'rgba(234,179,8,0.2)', color: 'rgba(253,224,71,0.9)' },
     limited: { label: 'Limited signal', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.15)', color: '#f87171' },
   }[signal];
-
   return (
-    <div style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: large ? '8px 16px' : '4px 10px',
-      background: config.bg,
-      border: `1px solid ${config.border}`,
-      borderRadius: '4px',
-      fontSize: large ? '13px' : '11px',
-      color: config.color,
-      fontFamily: 'IBM Plex Mono, monospace',
-      letterSpacing: '0.04em',
-    }}>
-      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: config.color, flexShrink: 0 }} />
-      {config.label}
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: '4px', fontSize: '11px', color: cfg.color, fontFamily: 'IBM Plex Mono, monospace' }}>
+      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: cfg.color }} />
+      {cfg.label}
     </div>
   );
 };
 
-const FlatScoreCard = ({ title, score, benchmark }: any) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
-    <div>
-      <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>{title}</p>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-        <span style={{ fontSize: '36px', fontWeight: 400, color: 'var(--text)', letterSpacing: '-0.02em', fontFamily: 'IBM Plex Mono, monospace', lineHeight: 1 }}>{score}</span>
-        {benchmark && (
-          <span style={{ fontSize: '11px', color: 'var(--text-4)' }}>goal: {benchmark}</span>
+/* ── Raw QA card (fallback when no per-question analysis) ── */
+const RawQACard = ({ pair, isLast, coaching }: { pair: any; isLast: boolean; coaching?: any }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ background: 'var(--surface)', borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
+      <button onClick={() => setOpen(!open)} style={{ width: '100%', padding: '16px 20px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 7px', border: '1px solid var(--border)', borderRadius: '3px', flexShrink: 0, marginTop: '2px' }}>Q{pair.questionNumber}</span>
+          <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>{pair.question}</p>
+        </div>
+        <ChevronDown style={{ width: '13px', height: '13px', color: 'var(--text-4)', flexShrink: 0, marginTop: '3px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '0 20px 20px 20px', borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Your answer</p>
+                <HighlightedText text={pair.answer} />
+              </div>
+              {coaching && (
+                <div style={{ padding: '12px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Coaching note</p>
+                  <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>{coaching.overallAssessment}</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
-    <div>
-      <div style={{ height: '2px', background: 'var(--border)', borderRadius: '1px', overflow: 'hidden', marginBottom: '4px' }}>
-        <div style={{ height: '100%', width: `${score}%`, background: getScoreColor(score), borderRadius: '1px' }} />
-      </div>
-      <p style={{ fontSize: '10px', color: 'var(--text-4)' }}>
-        {benchmark ? (score >= benchmark ? 'Meeting target' : 'Below target') : 'Performance'}
-      </p>
-    </div>
-  </div>
-);
-
-const FlatStatCard = ({ label, value, subtext, icon: Icon }: any) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px', position: 'relative', overflow: 'hidden' }}>
-    <div style={{ position: 'absolute', right: '16px', bottom: '16px', opacity: 0.12 }}>
-      <Icon style={{ width: '18px', height: '18px', color: 'var(--text)' }} />
-    </div>
-    <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>{label}</p>
-    <p style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px', letterSpacing: '-0.01em' }}>{value}</p>
-    <p style={{ fontSize: '11px', color: 'var(--text-4)' }}>{subtext}</p>
-  </div>
-);
-
-const FlatSignalPanel = ({
-  title, items, emptyCopy, tone
-}: {
-  title: string;
-  items: Array<{ title: string; description: string }>;
-  emptyCopy: string;
-  tone: 'positive' | 'warning';
-}) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-    <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
-      {title}
-    </p>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {items.length === 0 && <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>{emptyCopy}</p>}
-      {items.map((item, index) => (
-        <div key={`${item.title}-${index}`} style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: tone === 'positive' ? 'rgba(34,197,94,0.5)' : 'rgba(232,101,26,0.5)', marginTop: '6px', flexShrink: 0 }} />
-          <div>
-            <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '2px' }}>{item.title}</p>
-            <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.5' }}>{item.description}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const FlatSimpleList = ({ title, items, accent }: { title: string; items: string[]; accent: 'green' | 'orange' }) => (
-  <div>
-    <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
-      {title}
-    </p>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {items.map((item, index) => (
-        <div key={index} style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: accent === 'green' ? 'rgba(34,197,94,0.4)' : 'rgba(232,101,26,0.4)', marginTop: '6px', flexShrink: 0 }} />
-          <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>{item}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const FlatCalloutPanel = ({ label, title, body }: { label: string; title: string; body: string }) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>
-    <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
-      {label}
-    </p>
-    <p style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', lineHeight: '1.4', marginBottom: '8px' }}>{title}</p>
-    <p style={{ fontSize: '13px', color: 'var(--text-4)', lineHeight: '1.55' }}>{body}</p>
-  </div>
-);
-
-const FlatEmptyPanel = ({ title, description }: { title: string; description: string }) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '48px 24px', textAlign: 'center' }}>
-    <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '8px' }}>{title}</p>
-    <p style={{ fontSize: '13px', color: 'var(--text-4)' }}>{description}</p>
-  </div>
-);
-
-const HighlightedText = ({ text }: { text: string }) => {
-  const fillers = ['um', 'uh', 'like', 'actually', 'basically', 'really', 'just'];
-  const weak = ['maybe', 'i think', 'sort of', 'kind of', 'might'];
-  const words = text.split(/(\s+)/);
-  return (
-    <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.6' }}>
-      {words.map((word, index) => {
-        const cleanWord = word.toLowerCase().replace(/[^a-z]/g, '');
-        if (fillers.includes(cleanWord)) {
-          return <span key={index} style={{ color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(239,68,68,0.4)', textUnderlineOffset: '3px', fontWeight: 500 }}>{word}</span>;
-        }
-        if (weak.includes(cleanWord)) {
-          return <span key={index} style={{ color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(234,179,8,0.4)', textUnderlineOffset: '3px', fontStyle: 'italic' }}>{word}</span>;
-        }
-        return <span key={index}>{word}</span>;
-      })}
-    </p>
   );
 };
 
+/* ── Question feedback card (AI coaching per question) ── */
 const QuestionFeedbackCard = ({ feedback }: { feedback: any }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const score = feedback.contentAnalysis?.score ?? 0;
-
+  const [open, setOpen] = useState(false);
+  const score: number | null = feedback.contentAnalysis?.score ?? null;
   return (
-    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', transition: 'border-color 0.15s' }}>
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{ width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: '3px' }}>
-            Q{feedback.questionNumber}
-          </span>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+      <button onClick={() => setOpen(!open)} style={{ width: '100%', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '2px 7px', border: '1px solid var(--border)', borderRadius: '3px' }}>Q{feedback.questionNumber}</span>
           <span style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>{feedback.overallAssessment}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 500, color: getScoreColor(score), fontFamily: 'IBM Plex Mono, monospace' }}>
-            {score}%
-          </span>
-          <ChevronDown style={{ width: '14px', height: '14px', color: 'var(--text-4)', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {score != null && <span style={{ fontSize: '13px', color: sc(score), fontFamily: 'IBM Plex Mono, monospace' }}>{score}%</span>}
+          <ChevronDown style={{ width: '13px', height: '13px', color: 'var(--text-4)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         </div>
       </button>
-
       <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            style={{ overflow: 'hidden' }}
-          >
-            <div style={{ padding: '16px 18px 18px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
-                  Delivery note
-                </p>
-                <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.55' }}>"{feedback.deliveryNotes}"</p>
-              </div>
-
-              <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Coach suggestion</p>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px 16px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Coaching suggestion</p>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.55' }}>{feedback.suggestedAnswer}</p>
               </div>
-
-              <div style={{ padding: '12px 16px', background: 'rgba(232,101,26,0.04)', border: '1px solid rgba(232,101,26,0.12)', borderRadius: '4px' }}>
+              <div style={{ padding: '10px 14px', background: 'rgba(232,101,26,0.04)', border: '1px solid rgba(232,101,26,0.12)', borderRadius: '4px' }}>
                 <p style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Key takeaway</p>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>{feedback.keyTakeaway}</p>
               </div>
@@ -1165,18 +692,30 @@ const QuestionFeedbackCard = ({ feedback }: { feedback: any }) => {
   );
 };
 
-function getScoreColor(score: number): string {
-  if (score >= 80) return 'rgba(34,197,94,0.8)';
-  if (score >= 60) return 'var(--orange)';
-  return '#ef4444';
-}
+/* ── Filler word highlighter ── */
+const HighlightedText = ({ text }: { text: string }) => {
+  const fillers = new Set(['um', 'uh', 'like', 'actually', 'basically', 'really', 'just']);
+  const weak = new Set(['maybe', 'sort', 'kind', 'might']);
+  return (
+    <p style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: '1.65' }}>
+      {text.split(/(\s+)/).map((word, i) => {
+        const clean = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (fillers.has(clean)) return <span key={i} style={{ color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(239,68,68,0.4)', textUnderlineOffset: '3px', fontWeight: 500 }}>{word}</span>;
+        if (weak.has(clean)) return <span key={i} style={{ color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(234,179,8,0.4)', textUnderlineOffset: '3px', fontStyle: 'italic' }}>{word}</span>;
+        return <span key={i}>{word}</span>;
+      })}
+    </p>
+  );
+};
 
-function getGrade(score: number): { color: string; label: string } {
+/* ── Helpers ── */
+function getGrade(score: number | null): { color: string; label: string } {
+  if (score == null) return { color: 'var(--text-4)', label: '' };
   if (score >= 90) return { color: 'rgba(34,197,94,0.9)', label: 'Offer-ready' };
   if (score >= 80) return { color: 'rgba(59,130,246,0.9)', label: 'Strong signal' };
   if (score >= 70) return { color: 'rgba(234,179,8,0.9)', label: 'Getting there' };
   if (score >= 60) return { color: 'var(--orange)', label: 'Gap identified' };
-  return { color: '#ef4444', label: 'Not yet' };
+  return { color: '#f87171', label: 'Needs work' };
 }
 
 export default InterviewResults;

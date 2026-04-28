@@ -3,6 +3,8 @@ import {
   buildInterviewerSystemPrompt
 } from './promptArchitecture';
 import { InterviewCategory, InterviewLevel, InterviewPromptContext } from '../types/sessionResult';
+import { InterviewBlueprint } from '../types/interviewIntelligence';
+import { buildInterviewBlueprint, summarizeBlueprintForPrompt } from './interviewBlueprint';
 
 interface InterviewContextInput {
   role?: string;
@@ -14,20 +16,23 @@ interface InterviewContextInput {
   sessionPhase?: string;
 }
 
-export interface VapiInterviewContext {
+export interface VoiceInterviewContext {
   role: string;
   industry: string;
   experienceLevel: InterviewLevel;
   category: InterviewCategory;
   promptContext: InterviewPromptContext;
+  blueprint: InterviewBlueprint;
   interviewerSystemPrompt: string;
-  variableValues: Record<string, string>;
+  dynamicVariables: Record<string, string>;
+  firstMessage: string;
 }
 
 const ROLE_KEYWORDS: Array<[string, string[]]> = [
   ['Software Engineer', ['software engineer', 'frontend', 'backend', 'full stack', 'developer', 'programmer']],
   ['Data Scientist', ['data scientist', 'machine learning', 'ml engineer', 'analytics', 'modeling']],
   ['Product Manager', ['product manager', 'product management', 'roadmap', 'user stories']],
+  ['Financial Adviser', ['financial adviser', 'financial advisor', 'wealth advisor', 'wealth adviser', 'investment advisor', 'investment adviser']],
   ['UX Designer', ['ux designer', 'product designer', 'user research', 'figma']],
   ['Marketing Manager', ['marketing manager', 'campaign', 'brand', 'growth marketing']],
   ['Sales Representative', ['sales representative', 'account executive', 'pipeline', 'quota']],
@@ -45,7 +50,7 @@ const INDUSTRY_KEYWORDS: Array<[string, string[]]> = [
   ['Government', ['government', 'public sector', 'policy']]
 ];
 
-export function buildVapiInterviewContext(input: InterviewContextInput): VapiInterviewContext {
+export function buildVoiceInterviewContext(input: InterviewContextInput): VoiceInterviewContext {
   const role = input.role?.trim() || inferRole(input.jobDescription, input.resumeText);
   const industry = input.industry?.trim() || inferIndustry(input.jobDescription, input.resumeText);
   const experienceLevel = input.experienceLevel || inferExperienceLevel(input.jobDescription, input.resumeText);
@@ -59,7 +64,8 @@ export function buildVapiInterviewContext(input: InterviewContextInput): VapiInt
     jobDescription: input.jobDescription,
     sessionPhase: input.sessionPhase || 'opening'
   });
-  const interviewerSystemPrompt = buildInterviewerSystemPrompt(promptContext);
+  const blueprint = buildInterviewBlueprint(promptContext);
+  const interviewerSystemPrompt = buildInterviewerSystemPrompt(promptContext, blueprint);
 
   return {
     role: promptContext.role,
@@ -67,8 +73,10 @@ export function buildVapiInterviewContext(input: InterviewContextInput): VapiInt
     experienceLevel: promptContext.level,
     category: promptContext.category,
     promptContext,
+    blueprint,
     interviewerSystemPrompt,
-    variableValues: {
+    firstMessage: buildFirstMessage(promptContext),
+    dynamicVariables: {
       user_name: 'Candidate',
       role: promptContext.role,
       industry: promptContext.industry,
@@ -77,16 +85,41 @@ export function buildVapiInterviewContext(input: InterviewContextInput): VapiInt
       session_phase: promptContext.session_phase,
       job_description: promptContext.jd_summary,
       resume: promptContext.resume_summary,
-      interviewer_system_prompt: interviewerSystemPrompt
+      interviewer_system_prompt: interviewerSystemPrompt,
+      interview_blueprint: summarizeBlueprintForPrompt(blueprint),
+      question_plan: JSON.stringify(blueprint.question_plan),
+      follow_up_policy: JSON.stringify(blueprint.follow_up_policy),
+      whiteboard_policy: JSON.stringify(blueprint.whiteboard_policy),
+      kelv_voice_model_recommendation: 'eleven_flash_v2'
     }
   };
 }
 
+function buildFirstMessage(context: InterviewPromptContext): string {
+  return [
+    `Hi, I'm Kelv. We'll run this like a real ${context.role} interview.`,
+    "I'll keep it to one question at a time and ask follow-ups when I need clearer evidence.",
+    'To start, walk me through one experience that best shows you can do this role. What did you personally own?'
+  ].join(' ');
+}
+
 function inferRole(jobDescription?: string, resumeText?: string): string {
-  const source = normalize(`${jobDescription || ''} ${resumeText || ''}`);
   const explicitRole = extractExplicitRole(jobDescription);
 
   if (explicitRole) return explicitRole;
+
+  const jdRole = inferRoleFromText(jobDescription);
+  if (jdRole) return jdRole;
+
+  const resumeRole = inferRoleFromText(resumeText);
+  if (resumeRole) return resumeRole;
+
+  return 'Professional Candidate';
+}
+
+function inferRoleFromText(text?: string): string | null {
+  const source = normalize(text || '');
+  if (!source) return null;
 
   for (const [role, keywords] of ROLE_KEYWORDS) {
     if (keywords.some((keyword) => source.includes(keyword))) {
@@ -94,7 +127,7 @@ function inferRole(jobDescription?: string, resumeText?: string): string {
     }
   }
 
-  return 'Professional Candidate';
+  return null;
 }
 
 function inferIndustry(jobDescription?: string, resumeText?: string): string {
@@ -139,7 +172,7 @@ function extractExplicitRole(jobDescription?: string): string | null {
 function cleanRole(value: string): string {
   return value
     .replace(/\s+/g, ' ')
-    .replace(/\b(to join|who will|with experience|for our team).*$/i, '')
+    .replace(/\b(to join|to build|to support|to manage|to lead|who will|with experience|for our team).*$/i, '')
     .trim()
     .slice(0, 70);
 }

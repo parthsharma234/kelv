@@ -119,7 +119,7 @@ export function buildSessionResultV2(input: SessionResultBuildInput): SessionRes
     signal_fusion: signalFusion,
     processing_metadata: {
       pipeline_version: PIPELINE_VERSION,
-      transcript_vendor: 'vapi',
+      transcript_vendor: input.transcriptVendor || 'elevenlabs',
       used_fallback: signalReliability.reason_flags.length > 0,
       reliability_flags: signalReliability.reason_flags,
       processing_source: input.processingSource || 'transcript-and-posture'

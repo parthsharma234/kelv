@@ -47,7 +47,7 @@ const EMOTION_COLORS: Record<string, { bg: string; border: string }> = {
 // Delivery Trend - Built from transcript-based confidence proxies
 export const EmotionTimeline: React.FC<{ metrics: InterviewMetrics }> = ({ metrics }) => {
   // Get top signal categories with actual data
-  const topEmotions = Object.entries(metrics.expressionBreakdown)
+  const topEmotions = Object.entries(metrics.expressionBreakdown ?? {})
     .filter(([_, value]) => value > 5) // Only emotions above 5%
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
@@ -72,7 +72,7 @@ export const EmotionTimeline: React.FC<{ metrics: InterviewMetrics }> = ({ metri
           return t.emotionIntensity * 100;
         }
         // Keep a reduced baseline to show recurring signal strength
-        const emotionScore = metrics.expressionBreakdown[emotion] || 0;
+        const emotionScore = metrics.expressionBreakdown?.[emotion] || 0;
         return emotionScore * 0.3; // Show a baseline level
       }),
       backgroundColor: colors.bg,

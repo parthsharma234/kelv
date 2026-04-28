@@ -4,8 +4,8 @@
 
 Kelv now ships on a single active path:
 
-1. `PlatformDashboard` launches the Vapi interview flow.
-2. `VapiInterviewSession` collects transcript, duration, and posture samples.
+1. `PlatformDashboard` launches the ElevenLabs interview flow.
+2. `VoiceInterviewSession` collects transcript, duration, posture samples, local recording, and whiteboard tool requests.
 3. `InterviewProcessing` builds:
    - overall interview metrics
    - per-question analysis
@@ -24,6 +24,26 @@ What replaced it:
 
 The old Hume/realtime interview files were removed from the active codebase.
 
+## ElevenLabs voice runtime
+
+ElevenLabs is now the active live interviewer runtime.
+
+What it owns:
+
+- realtime agent conversation
+- user and agent transcript events
+- first interviewer message
+- runtime prompt override
+- client-tool calls for whiteboard surfaces
+
+What remains local:
+
+- Kelv LENS audio/posture analysis
+- recording capture for local voice metrics
+- per-question scoring
+- session result normalization
+- Supabase/local persistence
+
 ## Saved session contract
 
 Saved platform sessions now persist:
@@ -35,6 +55,8 @@ Saved platform sessions now persist:
 - posture data
 - job context
 - processing source
+- voice provider
+- whiteboard requests
 
 Local storage keys:
 

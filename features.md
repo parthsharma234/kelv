@@ -13,7 +13,7 @@
 - CV and voice feature expansion should not introduce new paid third-party APIs.
 
 ### Assumptions and Defaults
-- Active architecture baseline remains: Vapi for live interviewer, Supabase for auth/storage, transcript and posture driven analytics.
+- Active architecture baseline is ElevenLabs for the live interviewer, Supabase for auth/storage, and transcript/posture/local-audio driven analytics.
 - Hume stays excluded from active roadmap and runtime.
 - Production readiness is blocked until browser exposed LLM secrets are removed.
 - CV default stack remains local/on-device: pose and face landmarks run in-client.
@@ -22,13 +22,14 @@
 ## 2. Current State Baseline (Implemented / Partial / Missing)
 
 ### Implemented
-- Live interview flow with Vapi (`setup -> interview -> processing -> results`).
+- Live interview flow with ElevenLabs (`setup -> interview -> processing -> results`).
+- Role-aware `InterviewBlueprint` generation with technical, behavioral, situational, resume, fit, and case tracks.
 - Transcript and posture based processing pipeline.
 - Per-question analytics and saved session retrieval path.
 - Local plus Supabase persistence fallback for session history.
 
 ### Partial
-- Prompt architecture is not fully category and phase driven.
+- Prompt architecture is category and phase driven, but still needs prompt/scoring regression gates before it is production-stable.
 - Scoring outputs are not schema locked end-to-end.
 - Drill recommendations exist but are not tightly bound to weakest question and repeated gap patterns.
 - Presence/CV coverage exists but stack is not formally consolidated to one supported path with reliability SLOs.
@@ -63,7 +64,7 @@
 - `Problem`: Interviewer behavior is not consistently role-aware, category-aware, and phase-aware.
 - `User Outcome`: Interview sessions feel realistic and context-aware across behavioral, technical, situational, leadership, and communication categories.
 - `Current Status`: `partial`
-- `Implementation note`: `buildInterviewPromptContext`, `buildInterviewerSystemPrompt`, and `buildVapiInterviewContext` now produce Vapi-ready prompt variables from JD/resume context.
+- `Implementation note`: `buildInterviewPromptContext`, `buildInterviewerSystemPrompt`, `buildVoiceInterviewContext`, and `buildInterviewBlueprint` now produce ElevenLabs-ready prompt overrides, dynamic variables, follow-up policy, question plans, and whiteboard policy from JD/resume context.
 - `Acceptance Criteria`:
   - Prompt spec defines global contract, category overlays, and session phase logic.
   - Runtime context includes role, industry, level, resume summary, JD summary, category, and phase.
@@ -387,7 +388,7 @@ export interface FairnessAuditRecord {
 
 #### Consistency Checks Against Current Repo State
 - Hume remains excluded from active feature roadmap.
-- Vapi plus transcript/posture baseline remains default until benchmarked decision changes it.
+- ElevenLabs plus transcript/posture/local-audio baseline is now the active default.
 - Existing architecture assumptions align with `ARCHITECTURE.md`.
 
 ## 7. Definition of Done by Phase

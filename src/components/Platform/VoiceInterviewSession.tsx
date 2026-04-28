@@ -1,28 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
     Mic, MicOff, Video, VideoOff,
-    FileText, ArrowLeft, Upload,
+    ArrowLeft, Upload,
     PanelLeftClose, PanelLeftOpen,
-    Sparkles, Loader2, Dumbbell, Check, Square
+    Loader2, Check, Square
 } from 'lucide-react';
-import { useVapiInterview } from '../../hooks/useVapiInterview';
-import { useInterviewRecorder } from '../../hooks/useInterviewRecorder';
+import { useElevenLabsInterview } from '../../hooks/useElevenLabsInterview';
 import { usePoseTracking } from '../../hooks/usePoseTracking';
 import AIInterviewer from './AIInterviewer';
-import InteractiveWarmUp from './InteractiveWarmUp';
 import { extractTextFromPDF, isPDF, isTextFile } from '../../utils/pdfUtils';
-import { buildVapiInterviewContext } from '../../utils/interviewContext';
+import { buildVoiceInterviewContext } from '../../utils/interviewContext';
 
-interface VapiInterviewSessionProps {
+interface VoiceInterviewSessionProps {
     onComplete: (sessionData: any) => void;
     onBack: () => void;
 }
 
-const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete, onBack }) => {
+const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplete, onBack }) => {
     const [previewPhase, setPreviewPhase] = useState(true);
-    const [showWarmUp, setShowWarmUp] = useState(false);
-    const [completedWarmUp, setCompletedWarmUp] = useState(false);
     const [tempJD, setTempJD] = useState('');
     const [tempResume, setTempResume] = useState('');
     const [resumeFileName, setResumeFileName] = useState<string | null>(null);
@@ -36,17 +32,20 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
     const fileInputRef = useRef<HTMLInputElement>(null);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const micAudioContextRef = useRef<AudioContext | null>(null);
+    const micAnimationRef = useRef<number | null>(null);
+    const didCompleteRef = useRef(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [showTranscript, setShowTranscript] = useState(true);
+    const [localMicVolume, setLocalMicVolume] = useState(0);
 
-    const { status, isAISpeaking, isUserSpeaking, transcript, duration, startInterview, endInterview } = useVapiInterview({
+    const { status, isAISpeaking, isUserSpeaking, transcript, duration, inputVolume, connectionTransport, debugMessages, speechFallbackActive, whiteboardRequests, startInterview, endInterview, setMicMuted } = useElevenLabsInterview({
         onError: (err) => setCameraError(err),
     });
 
-    const { startRecording, stopRecording, recordedBlob } = useInterviewRecorder({ stream });
     const { aggregatedData: postureData, currentPosture, isInitialized: poseReady } = usePoseTracking({
         videoRef,
         enabled: status === 'interviewing' && !isVideoOff,
@@ -66,6 +65,30 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
             streamRef.current = null;
             setStream(null);
         }
+    }, []);
+
+    const releasePreviewMicrophone = useCallback(() => {
+        const currentStream = streamRef.current;
+        if (!currentStream) return undefined;
+
+        const inputDeviceId = currentStream.getAudioTracks()[0]?.getSettings().deviceId;
+        if (micAnimationRef.current) {
+            window.cancelAnimationFrame(micAnimationRef.current);
+            micAnimationRef.current = null;
+        }
+        micAudioContextRef.current?.close().catch(() => undefined);
+        micAudioContextRef.current = null;
+        setLocalMicVolume(0);
+
+        currentStream.getAudioTracks().forEach(track => {
+            track.stop();
+            currentStream.removeTrack(track);
+        });
+
+        const videoOnlyStream = new MediaStream(currentStream.getVideoTracks());
+        streamRef.current = videoOnlyStream;
+        setStream(videoOnlyStream);
+        return inputDeviceId;
     }, []);
 
     useEffect(() => {
@@ -95,12 +118,100 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
         else if (!previewPhase && videoRef.current) videoRef.current.srcObject = currentStream;
     }, [stream, previewPhase]);
 
+    useEffect(() => {
+        if (!stream || stream.getAudioTracks().length === 0) {
+            setLocalMicVolume(0);
+            return;
+        }
+
+        const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextConstructor) return;
+
+        let disposed = false;
+        const audioContext = new AudioContextConstructor();
+        const analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(stream);
+
+        micAudioContextRef.current = audioContext;
+        analyser.fftSize = 512;
+        const samples = new Uint8Array(analyser.fftSize);
+        source.connect(analyser);
+
+        const tick = () => {
+            if (disposed) return;
+            analyser.getByteTimeDomainData(samples);
+            let sum = 0;
+            for (const sample of samples) {
+                const centered = (sample - 128) / 128;
+                sum += centered * centered;
+            }
+            setLocalMicVolume(Math.min(1, Math.sqrt(sum / samples.length) * 3));
+            micAnimationRef.current = window.requestAnimationFrame(tick);
+        };
+
+        tick();
+
+        return () => {
+            disposed = true;
+            if (micAnimationRef.current) window.cancelAnimationFrame(micAnimationRef.current);
+            source.disconnect();
+            audioContext.close().catch(() => undefined);
+            if (micAudioContextRef.current === audioContext) micAudioContextRef.current = null;
+            setLocalMicVolume(0);
+        };
+    }, [stream]);
+
     useEffect(() => { transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [transcript]);
+
+    useEffect(() => {
+        const writeDiagnostics = (event: string, detail?: unknown) => {
+            try {
+                window.localStorage.setItem('kelv.lastInterviewRuntime', JSON.stringify({
+                    event,
+                    detail: detail instanceof Error ? detail.message : detail,
+                    timestamp: new Date().toISOString(),
+                    status,
+                    duration,
+                    transcriptCount: transcript.length,
+                    userMessageCount: transcript.filter((entry) => entry.role === 'user').length,
+                    assistantMessageCount: transcript.filter((entry) => entry.role === 'assistant').length,
+                    inputVolume,
+                    connectionTransport,
+                    speechFallbackActive,
+                    isAISpeaking,
+                    isUserSpeaking,
+                    cameraError,
+                    debugMessages,
+                    postureSamples: postureData?.sampleCount || 0
+                }));
+            } catch {
+                // Diagnostics should never interfere with the interview.
+            }
+        };
+
+        const handleError = (event: ErrorEvent) => writeDiagnostics('window_error', event.message);
+        const handleRejection = (event: PromiseRejectionEvent) => writeDiagnostics('unhandled_rejection', String(event.reason));
+        const handlePageHide = () => writeDiagnostics('page_hide');
+
+        writeDiagnostics('state_update');
+        window.addEventListener('error', handleError);
+        window.addEventListener('unhandledrejection', handleRejection);
+        window.addEventListener('pagehide', handlePageHide);
+
+        return () => {
+            window.removeEventListener('error', handleError);
+            window.removeEventListener('unhandledrejection', handleRejection);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
+    }, [cameraError, connectionTransport, debugMessages, duration, inputVolume, isAISpeaking, isUserSpeaking, postureData?.sampleCount, speechFallbackActive, status, transcript]);
 
     const toggleMute = useCallback(() => {
         const s = streamRef.current;
-        if (s) { s.getAudioTracks().forEach(t => t.enabled = isMuted); setIsMuted(!isMuted); }
-    }, [isMuted]);
+        const nextMuted = !isMuted;
+        if (s) s.getAudioTracks().forEach(t => { t.enabled = !nextMuted; });
+        setMicMuted(nextMuted);
+        setIsMuted(nextMuted);
+    }, [isMuted, setMicMuted]);
 
     const toggleVideo = useCallback(() => {
         const s = streamRef.current;
@@ -135,154 +246,82 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
         }
     };
 
-    useEffect(() => { if (status === 'interviewing') startRecording(); }, [status, startRecording]);
-
     useEffect(() => {
-        if (status === 'completed' && recordedBlob) {
-            const interviewContext = buildVapiInterviewContext({ jobDescription: tempJD, resumeText: tempResume, sessionPhase: 'close' });
+        if (status === 'completed' && !didCompleteRef.current) {
+            didCompleteRef.current = true;
+            const interviewContext = buildVoiceInterviewContext({ jobDescription: tempJD, resumeText: tempResume, sessionPhase: 'close' });
             onComplete({
-                transcript, duration, recordingBlob: recordedBlob,
-                jobContext: { role: interviewContext.role, industry: interviewContext.industry, experienceLevel: interviewContext.experienceLevel, category: interviewContext.category, jobDescription: tempJD, resumeSummary: interviewContext.promptContext.resume_summary, jdSummary: interviewContext.promptContext.jd_summary, promptContext: interviewContext.promptContext },
+                transcript, duration,
+                jobContext: { role: interviewContext.role, industry: interviewContext.industry, experienceLevel: interviewContext.experienceLevel, category: interviewContext.category, jobDescription: tempJD, resumeSummary: interviewContext.promptContext.resume_summary, jdSummary: interviewContext.promptContext.jd_summary, promptContext: interviewContext.promptContext, blueprint: interviewContext.blueprint },
+                voiceProvider: 'elevenlabs',
+                whiteboardRequests,
                 postureData: postureData ? { shoulderAlignment: postureData.shoulderAlignment, headPosition: postureData.headPosition, overallScore: postureData.overallScore, timeInGoodPosture: postureData.timeInGoodPosture, sampleCount: postureData.sampleCount, samples: postureData.samples } : undefined
             });
-        } else if (status === 'completed' && !recordedBlob) {
-            stopRecording();
         }
-    }, [status, recordedBlob, transcript, duration, postureData, onComplete, stopRecording, tempJD, tempResume]);
+    }, [status, transcript, duration, postureData, onComplete, tempJD, tempResume, whiteboardRequests]);
 
     const handleStartInterview = async () => {
         if (!tempJD.trim() || !tempResume.trim()) return;
+        didCompleteRef.current = false;
         setIsInjectingContext(true);
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const inputDeviceId = releasePreviewMicrophone();
+        setIsMuted(false);
         setPreviewPhase(false);
-        await startInterview(tempJD.trim(), tempResume.trim());
-        setIsInjectingContext(false);
+        try {
+            await startInterview(tempJD.trim(), tempResume.trim(), inputDeviceId);
+        } finally {
+            setIsInjectingContext(false);
+        }
     };
 
-    const handleEndInterview = () => { stopMedia(); stopRecording(); endInterview(); };
+    const handleEndInterview = () => { stopMedia(); endInterview(); };
     const isReady = tempJD.trim().length > 0 && tempResume.trim().length > 0 && stream;
+    const latestOpenWhiteboard = whiteboardRequests.filter((request) => request.tool_name === 'openWhiteboard').slice(-1)[0];
+    const latestCloseWhiteboard = whiteboardRequests.filter((request) => request.tool_name === 'closeWhiteboard').slice(-1)[0];
+    const activeWhiteboard = latestOpenWhiteboard && (!latestCloseWhiteboard || latestCloseWhiteboard.timestamp < latestOpenWhiteboard.timestamp)
+      ? latestOpenWhiteboard
+      : null;
 
-    if (showWarmUp) {
-        return <InteractiveWarmUp onComplete={() => { setShowWarmUp(false); setCompletedWarmUp(true); }} onSkip={() => setShowWarmUp(false)} />;
-    }
-
-    const inputStyle: React.CSSProperties = {
-        width: '100%',
-        background: 'var(--surface-2)',
-        border: '1px solid var(--border)',
-        borderRadius: '6px',
-        padding: '10px 14px',
-        fontSize: '13px',
-        color: 'var(--text)',
-        outline: 'none',
-        boxSizing: 'border-box',
-        fontFamily: 'Inter, -apple-system, sans-serif',
-        transition: 'border-color 0.15s',
+    const fieldStyle: React.CSSProperties = {
+        width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)',
+        borderRadius: '6px', padding: '10px 14px', fontSize: '13px', color: 'var(--text)',
+        outline: 'none', boxSizing: 'border-box', resize: 'vertical' as const, transition: 'border-color 0.15s',
     };
 
     if (previewPhase) {
         return (
-            <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+            <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
                 {/* Header */}
-                <header style={{ height: 'var(--header-h)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 50 }}>
+                <header style={{ height: 'var(--header-h)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 50, background: 'var(--bg)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <button onClick={() => { stopMedia(); onBack(); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            <ArrowLeft style={{ width: '13px', height: '13px' }} />
+                            <ArrowLeft style={{ width: '14px', height: '14px' }} />
                             Back
                         </button>
                         <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
-                        <div>
-                            <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pre-session check</p>
-                        </div>
+                        <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pre-session</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>System check</span>
-                        {completedWarmUp && (
-                            <span style={{ fontSize: '10px', color: 'var(--orange)', fontFamily: 'IBM Plex Mono, monospace', padding: '4px 10px', background: 'rgba(232,101,26,0.08)', border: '1px solid rgba(232,101,26,0.25)', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Warm-up done</span>
-                        )}
-                    </div>
+                    <span style={{
+                        fontSize: '10px', fontFamily: 'IBM Plex Mono, monospace', padding: '4px 10px',
+                        border: '1px solid', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.08em',
+                        ...(cameraError
+                            ? { color: '#f87171', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)' }
+                            : { color: 'rgba(74,222,128,0.8)', borderColor: 'rgba(74,222,128,0.2)', background: 'rgba(74,222,128,0.06)' })
+                    }}>
+                        {cameraError ? 'Camera blocked' : `Camera live / Mic ${Math.round(localMicVolume * 100)}`}
+                    </span>
                 </header>
 
-                <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '48px 32px', display: 'grid', gridTemplateColumns: '256px 1fr 360px', gap: '24px' }}>
-                    {/* Left column: steps + warm-up */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {/* Steps */}
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
-                            <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>Checklist</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-                                {[
-                                    { label: 'Devices', done: true },
-                                    { label: 'Warm-up', done: completedWarmUp },
-                                    { label: 'Context', done: !!tempJD.trim() && !!tempResume.trim() }
-                                ].map((step) => (
-                                    <div key={step.label} style={{ background: 'var(--surface-2)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span style={{ fontSize: '12px', color: step.done ? 'var(--text)' : 'var(--text-4)' }}>{step.label}</span>
-                                        {step.done
-                                            ? <Check style={{ width: '12px', height: '12px', color: 'rgba(74,222,128,0.8)' }} />
-                                            : <span style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase' }}>Pending</span>
-                                        }
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 40px', display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'start' }}>
 
-                        {/* Warm-up */}
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '20px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>Warm-up</p>
-                                <span style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>2 min</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '14px' }}>
-                                {[
-                                    { label: 'Posture alignment', time: '40s' },
-                                    { label: 'Breath pacing', time: '35s' },
-                                    { label: 'Voice warm-up', time: '45s' }
-                                ].map((item, i) => (
-                                    <div key={item.label} style={{ background: 'var(--surface-2)', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>0{i + 1}</span>
-                                            <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>{item.label}</span>
-                                        </div>
-                                        <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace' }}>{item.time}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button
-                                onClick={() => setShowWarmUp(true)}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: completedWarmUp ? 'var(--surface-2)' : 'var(--orange)',
-                                    border: completedWarmUp ? '1px solid var(--border)' : 'none',
-                                    borderRadius: '5px',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    color: completedWarmUp ? 'var(--text-3)' : '#fff',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                {completedWarmUp ? 'Redo warm-up' : 'Start warm-up'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Center column: camera preview */}
+                    {/* Left: camera */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <div>
-                                <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Camera preview</p>
-                                <h2 style={{ fontSize: '20px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)' }}>Check your setup</h2>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', padding: '3px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px' }}>1280×720</span>
-                                <span style={{ fontSize: '10px', fontFamily: 'IBM Plex Mono, monospace', padding: '3px 8px', border: '1px solid', borderRadius: '3px', ...(cameraError ? { color: '#f87171', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)' } : { color: 'rgba(74,222,128,0.8)', borderColor: 'rgba(74,222,128,0.2)', background: 'rgba(74,222,128,0.06)' }) }}>
-                                    {cameraError ? 'Blocked' : 'Live'}
-                                </span>
-                            </div>
+                        <div>
+                            <p style={{ fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Camera preview</p>
+                            <h2 style={{ fontSize: '22px', fontWeight: 510, letterSpacing: '-0.018em', color: 'var(--text)' }}>Look interview-ready</h2>
                         </div>
 
-                        {/* Video container */}
-                        <div style={{ position: 'relative', aspectRatio: '16/9', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                        <div style={{ position: 'relative', aspectRatio: '16/9', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
                             {stream && !isVideoOff
                                 ? <video ref={previewVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                                 : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)' }}>
@@ -290,56 +329,37 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
                                   </div>
                             }
                             {cameraError && (
-                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', zIndex: 20 }}>
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(3,3,5,0.9)', zIndex: 20 }}>
                                     <p style={{ fontSize: '13px', color: '#f87171' }}>{cameraError}</p>
                                 </div>
                             )}
-                            <div style={{ position: 'absolute', top: '14px', left: '14px', display: 'flex', gap: '6px' }}>
-                                {['Center your face', 'Eye level'].map(tip => (
-                                    <span key={tip} style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)', padding: '3px 8px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', backdropFilter: 'blur(4px)' }}>{tip}</span>
-                                ))}
-                            </div>
-                            <div style={{ position: 'absolute', bottom: '14px', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', backdropFilter: 'blur(8px)' }}>
-                                <button onClick={toggleMute} style={{ width: '32px', height: '32px', borderRadius: '5px', background: isMuted ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                            <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px' }}>
+                                <button onClick={toggleMute} style={{ width: '36px', height: '36px', borderRadius: '6px', background: isMuted ? 'rgba(239,68,68,0.85)' : 'rgba(3,3,5,0.7)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', backdropFilter: 'blur(8px)' }}>
                                     {isMuted ? <MicOff style={{ width: '14px', height: '14px' }} /> : <Mic style={{ width: '14px', height: '14px' }} />}
                                 </button>
-                                <button onClick={toggleVideo} style={{ width: '32px', height: '32px', borderRadius: '5px', background: isVideoOff ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                                <button onClick={toggleVideo} style={{ width: '36px', height: '36px', borderRadius: '6px', background: isVideoOff ? 'rgba(239,68,68,0.85)' : 'rgba(3,3,5,0.7)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', backdropFilter: 'blur(8px)' }}>
                                     {isVideoOff ? <VideoOff style={{ width: '14px', height: '14px' }} /> : <Video style={{ width: '14px', height: '14px' }} />}
                                 </button>
                             </div>
                         </div>
-
-                        {/* Device status row */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                            {[
-                                { label: 'Mic', value: isMuted ? 'Muted' : 'Active' },
-                                { label: 'Camera', value: isVideoOff ? 'Off' : 'Active' },
-                                { label: 'Environment', value: 'Quiet' }
-                            ].map(item => (
-                                <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px', padding: '12px 14px' }}>
-                                    <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>{item.label}</p>
-                                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{item.value}</p>
-                                </div>
-                            ))}
-                        </div>
                     </div>
 
-                    {/* Right column: context */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div>
-                                <p style={{ fontSize: '9px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Session context</p>
-                                <h2 style={{ fontSize: '16px', fontWeight: 510, color: 'var(--text)', marginBottom: '4px' }}>Give Kelv your details</h2>
-                                <p style={{ fontSize: '12px', color: 'var(--text-4)', lineHeight: '1.6' }}>Sharper context means sharper feedback.</p>
-                            </div>
+                    {/* Right: context form */}
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div>
+                            <h2 style={{ fontSize: '18px', fontWeight: 510, letterSpacing: '-0.015em', color: 'var(--text)', marginBottom: '4px' }}>Session context</h2>
+                            <p style={{ fontSize: '13px', color: 'var(--text-4)', lineHeight: '1.5' }}>Give Kelv the job details and your background.</p>
+                        </div>
 
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div>
                                 <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-4)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Job description</label>
                                 <textarea
                                     value={tempJD}
                                     onChange={(e) => setTempJD(e.target.value)}
-                                    placeholder="Paste the target job description..."
-                                    style={{ ...inputStyle, height: '120px', resize: 'vertical' }}
+                                    placeholder="Paste target job description..."
+                                    rows={5}
+                                    style={fieldStyle}
                                     onFocus={(e) => { e.target.style.borderColor = 'rgba(232,101,26,0.4)'; }}
                                     onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; }}
                                 />
@@ -354,61 +374,53 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
                                     onDrop={handleDrop}
                                     style={{
                                         border: `1px dashed ${isDragging ? 'var(--orange)' : resumeFileName ? 'rgba(74,222,128,0.4)' : 'var(--border)'}`,
-                                        borderRadius: '6px',
-                                        padding: '20px',
-                                        cursor: 'pointer',
+                                        borderRadius: '6px', padding: '20px', cursor: 'pointer', textAlign: 'center',
                                         background: isDragging ? 'rgba(232,101,26,0.04)' : resumeFileName ? 'rgba(74,222,128,0.04)' : 'var(--surface-2)',
                                         transition: 'border-color 0.15s',
-                                        textAlign: 'center',
                                     }}
                                 >
                                     <input ref={fileInputRef} type="file" accept=".pdf,.txt" onChange={(e) => e.target.files?.[0] && handleResumeFile(e.target.files[0])} style={{ display: 'none' }} />
                                     {isParsingResume ? (
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                            <Loader2 style={{ width: '16px', height: '16px', color: 'var(--orange)', animation: 'spin 0.6s linear infinite' }} />
+                                            <Loader2 style={{ width: '14px', height: '14px', color: 'var(--orange)', animation: 'spin 0.6s linear infinite' }} />
                                             <span style={{ fontSize: '12px', color: 'var(--text-4)' }}>Extracting text...</span>
                                         </div>
                                     ) : resumeError ? (
                                         <div>
-                                            <FileText style={{ width: '18px', height: '18px', color: '#f87171', margin: '0 auto 6px' }} />
                                             <p style={{ fontSize: '12px', color: '#f87171' }}>{resumeError}</p>
                                             <p style={{ fontSize: '11px', color: 'var(--text-4)', marginTop: '4px' }}>Click to retry</p>
                                         </div>
                                     ) : resumeFileName ? (
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                            <FileText style={{ width: '16px', height: '16px', color: 'rgba(74,222,128,0.8)' }} />
+                                            <Check style={{ width: '13px', height: '13px', color: 'rgba(74,222,128,0.8)' }} />
                                             <div style={{ textAlign: 'left' }}>
                                                 <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)' }}>{resumeFileName}</p>
-                                                <p style={{ fontSize: '10px', color: 'var(--text-4)' }}>{tempResume.length} chars extracted</p>
+                                                <p style={{ fontSize: '11px', color: 'var(--text-4)' }}>{tempResume.length} chars extracted</p>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div>
-                                            <Upload style={{ width: '18px', height: '18px', color: 'var(--text-4)', margin: '0 auto 6px' }} />
-                                            <p style={{ fontSize: '12px', color: 'var(--text-4)' }}>Upload resume <span style={{ color: 'var(--text-4)', opacity: 0.6 }}>(PDF, TXT)</span></p>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                            <Upload style={{ width: '14px', height: '14px', color: 'var(--text-4)' }} />
+                                            <span style={{ fontSize: '12px', color: 'var(--text-4)' }}>Upload resume <span style={{ opacity: 0.5 }}>(PDF or TXT)</span></span>
                                         </div>
                                     )}
                                 </div>
                             </div>
-
-                            <div style={{ padding: '12px 14px', background: 'rgba(232,101,26,0.05)', border: '1px solid rgba(232,101,26,0.15)', borderRadius: '5px' }}>
-                                <p style={{ fontSize: '12px', color: 'var(--text-3)', lineHeight: '1.6' }}>Strong context makes feedback sharper. You can paste an abbreviated role summary too.</p>
-                            </div>
-
-                            <button
-                                onClick={handleStartInterview}
-                                disabled={!isReady || isInjectingContext}
-                                className="btn-primary"
-                                style={{ justifyContent: 'center', opacity: isReady && !isInjectingContext ? 1 : 0.4, cursor: isReady && !isInjectingContext ? 'pointer' : 'not-allowed' }}
-                            >
-                                {isInjectingContext ? (
-                                    <>
-                                        <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-                                        Initializing...
-                                    </>
-                                ) : !stream ? 'Waiting for media...' : !isReady ? 'Complete setup above' : 'Launch session'}
-                            </button>
                         </div>
+
+                        <button
+                            onClick={handleStartInterview}
+                            disabled={!isReady || isInjectingContext}
+                            className="btn-primary"
+                            style={{ justifyContent: 'center', opacity: isReady && !isInjectingContext ? 1 : 0.35, cursor: isReady && !isInjectingContext ? 'pointer' : 'not-allowed' }}
+                        >
+                            {isInjectingContext ? (
+                                <>
+                                    <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                                    Initializing...
+                                </>
+                            ) : !stream ? 'Waiting for camera...' : !isReady ? 'Add JD and resume' : 'Launch session'}
+                        </button>
                     </div>
                 </main>
             </div>
@@ -453,6 +465,18 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
                 )}
             </AnimatePresence>
 
+            {activeWhiteboard && (
+                <div style={{ position: 'absolute', top: '76px', right: '24px', zIndex: 45, width: '320px', padding: '16px', borderRadius: '8px', border: '1px solid rgba(232,101,26,0.25)', background: 'rgba(10,11,12,0.92)', backdropFilter: 'blur(12px)', boxShadow: '0 18px 50px rgba(0,0,0,0.35)' }}>
+                    <p style={{ fontSize: '10px', color: '#E8651A', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Whiteboard requested</p>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.78)', lineHeight: '1.5' }}>
+                        {activeWhiteboard.prompt || 'Use the whiteboard to structure your thinking.'}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.38)', lineHeight: '1.5', marginTop: '10px' }}>
+                        UI handoff: render a drawable/explainer surface here for {activeWhiteboard.mode || 'structured reasoning'}.
+                    </p>
+                </div>
+            )}
+
             {/* Main area */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', background: '#000' }}>
                 {/* Floating header */}
@@ -469,11 +493,45 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
                         <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'IBM Plex Mono, monospace' }}>{formatTime(duration)}</span>
                         <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
                         <span style={{ fontSize: '10px', color: '#E8651A', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Live session</span>
+                        <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
+                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            {connectionTransport}
+                        </span>
+                        <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
+                        <span style={{ fontSize: '10px', color: inputVolume > 0.01 ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.35)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            EL {Math.round(inputVolume * 100)}
+                        </span>
+                        <span style={{ fontSize: '10px', color: speechFallbackActive ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.35)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            Browser ASR {speechFallbackActive ? 'on' : 'off'}
+                        </span>
+                        <span style={{ fontSize: '10px', color: localMicVolume > 0.01 ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.35)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            Local {Math.round(localMicVolume * 100)}
+                        </span>
                     </div>
                 </header>
 
                 {/* AI + user video */}
                 <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', position: 'relative' }}>
+                    {status === 'error' && cameraError && (
+                        <div style={{ position: 'absolute', top: '86px', left: '50%', transform: 'translateX(-50%)', zIndex: 60, width: 'min(560px, calc(100% - 48px))', padding: '16px 18px', background: 'rgba(127,29,29,0.92)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: '8px', boxShadow: '0 18px 60px rgba(0,0,0,0.35)' }}>
+                            <p style={{ fontSize: '12px', color: '#fecaca', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>ElevenLabs session error</p>
+                            <p style={{ fontSize: '13px', lineHeight: '1.55', color: '#fee2e2' }}>{cameraError}</p>
+                            <button
+                                onClick={() => { setPreviewPhase(true); setCameraError(null); }}
+                                style={{ marginTop: '12px', padding: '7px 12px', borderRadius: '5px', border: '1px solid rgba(254,202,202,0.35)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '12px', cursor: 'pointer' }}
+                            >
+                                Back to setup
+                            </button>
+                        </div>
+                    )}
+                    {debugMessages.length > 0 && (
+                        <div style={{ position: 'absolute', left: '24px', bottom: '96px', zIndex: 50, width: 'min(420px, calc(100% - 48px))', padding: '12px 14px', background: 'rgba(10,11,12,0.86)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(10px)' }}>
+                            <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.38)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>ElevenLabs debug</p>
+                            {debugMessages.map((message, index) => (
+                                <p key={`${message}_${index}`} style={{ fontSize: '10px', lineHeight: '1.45', color: 'rgba(255,255,255,0.48)', fontFamily: 'IBM Plex Mono, monospace' }}>{message}</p>
+                            ))}
+                        </div>
+                    )}
                     <div style={{ position: 'relative', width: '100%', maxWidth: '900px', aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <AIInterviewer isActive={true} isSpeaking={isAISpeaking} isListening={isUserSpeaking} isProcessing={status === 'connecting'} size="full" />
                         <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
@@ -521,4 +579,4 @@ const VapiInterviewSession: React.FC<VapiInterviewSessionProps> = ({ onComplete,
     );
 };
 
-export default VapiInterviewSession;
+export default VoiceInterviewSession;

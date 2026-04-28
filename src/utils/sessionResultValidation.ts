@@ -6,7 +6,7 @@ export interface SessionResultValidation {
 }
 
 const VALID_TRANSCRIPT_ROLES = new Set(['assistant', 'user', 'system']);
-const VALID_TRANSCRIPT_VENDORS = new Set(['openai', 'self_hosted_whisper', 'hybrid', 'vapi']);
+const VALID_TRANSCRIPT_VENDORS = new Set(['openai', 'self_hosted_whisper', 'hybrid', 'vapi', 'elevenlabs']);
 
 export function validateSessionResultV2(value: unknown): SessionResultValidation {
   const errors: string[] = [];

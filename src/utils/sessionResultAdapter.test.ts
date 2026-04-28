@@ -63,7 +63,7 @@ describe('buildSessionResultV2', () => {
     expect(result.per_question_results).toHaveLength(2);
     expect(result.recommended_drills.length).toBeGreaterThan(0);
     expect(result.signal_reliability.overall_confidence).toBeGreaterThan(0);
-    expect(result.processing_metadata.transcript_vendor).toBe('vapi');
+    expect(result.processing_metadata.transcript_vendor).toBe('elevenlabs');
   });
 
   it('marks low-reliability sessions with reason flags', () => {

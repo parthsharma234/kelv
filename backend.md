@@ -1,12 +1,28 @@
 # Kelv Backend Implementation Notes
 
+## Latest Voice Runtime Update
+
+The active live interview provider is now ElevenLabs, not Vapi. See `elevenlabs.md` for the full migration handoff, changed files, prompt/blueprint contracts, whiteboard tool contract, environment setup, and verification results.
+
+Current active flow:
+
+```text
+VoiceInterviewSession
+  -> useElevenLabsInterview
+  -> ElevenLabs Conversation.startSession
+  -> transcript, duration, postureData, recordingBlob, jobContext.blueprint, whiteboardRequests
+  -> InterviewProcessing
+  -> buildSessionResultV2
+  -> savePlatformInterviewResult
+```
+
 ## Summary
 
-This backend pass added a typed, non-UI session pipeline around the current Vapi interview flow.
+This backend pass added a typed, non-UI session pipeline around the current live interview flow.
 
 The product still runs on the existing path:
 
-1. Vapi captures the live interview transcript.
+1. ElevenLabs captures the live interview transcript.
 2. `InterviewProcessing` computes transcript/posture metrics.
 3. The new backend layer builds a canonical `SessionResultV2`.
 4. Persistence stores the legacy payload plus V2 metadata for future UI and backend work.

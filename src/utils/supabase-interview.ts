@@ -663,9 +663,11 @@ export const savePlatformInterviewResult = async (sessionData: any): Promise<str
         fillerWordCount: payload?.metrics?.fillerWordCount || 0
       },
       session_metadata: {
-        source: 'vapi-platform',
+        source: payload?.voiceProvider === 'elevenlabs' ? 'elevenlabs-platform' : 'kelv-platform',
         processing_source: payload?.processingSource || 'transcript-and-posture',
         job_context: payload?.jobContext || {},
+        voice_provider: payload?.voiceProvider || 'elevenlabs',
+        whiteboard_requests: payload?.whiteboardRequests || [],
         voice_metrics: payload?.voiceMetrics || null,
         posture_data: payload?.postureData || null,
         per_question_analysis: payload?.perQuestionAnalysis || null,

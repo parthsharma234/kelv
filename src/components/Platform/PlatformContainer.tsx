@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import PlatformDashboard from './PlatformDashboard';
-import VapiInterviewSession from './VapiInterviewSession';
+import VoiceInterviewSession from './VoiceInterviewSession';
 import InterviewProcessing from './InterviewProcessing';
 import InterviewResults from './InterviewResults';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
@@ -42,7 +42,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
 
   // Notify parent about full-screen state changes
   React.useEffect(() => {
-    const isFullScreen = currentState === 'interview';
+    const isFullScreen = currentState === 'interview' || currentState === 'processing' || currentState === 'results';
 
     if (onFullScreenChange) {
       onFullScreenChange(isFullScreen);
@@ -157,7 +157,7 @@ const PlatformContainer: React.FC<PlatformContainerProps> = ({ onFullScreenChang
       )}
 
       {currentState === 'interview' && (
-        <VapiInterviewSession
+        <VoiceInterviewSession
           onComplete={handleInterviewComplete}
           onBack={handleBackToDashboard}
         />
