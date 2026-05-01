@@ -14,12 +14,15 @@ const BASE_FOLLOW_UP_POLICY: FollowUpPolicy = {
   ask_when: [
     'The answer does not include a concrete situation, action, and result.',
     'The candidate makes a claim without measurable proof, scope, ownership, or tradeoffs.',
+    'The candidate describes what the team did but not what they personally owned, decided, or delivered.',
     'A technical answer misses constraints, edge cases, testing, failure handling, or complexity.',
     'A case answer misses assumptions, success metrics, prioritization, or user/business impact.',
+    'A situational answer gives good intentions but no first step, stakeholder message, escalation threshold, risk tradeoff, or change-of-course trigger.',
     'The answer is generic, too short, contradicted by earlier context, or avoids the question.'
   ],
   move_on_when: [
     'The candidate gives specific evidence that maps to the competency and rubric.',
+    'The candidate has clarified personal ownership, impact, and the main tradeoff or learning.',
     'One strong follow-up has already clarified the missing evidence.',
     'The candidate is struggling and coverage across other categories is more valuable.',
     'Session pacing would be hurt by another probe.'
@@ -62,7 +65,8 @@ export function buildInterviewBlueprint(context: InterviewPromptContext): Interv
       content: [
         'Answers are specific, role-relevant, and grounded in evidence.',
         'Behavioral answers show situation, action, ownership, result, and learning.',
-        'Technical/case answers show constraints, alternatives, tradeoffs, validation, and clear conclusions.'
+        'Technical/case answers show constraints, alternatives, tradeoffs, validation, and clear conclusions.',
+        'Claims are backed by credible artifacts, numbers, stakeholders, decisions, or failure lessons.'
       ],
       delivery: [
         'Answers are concise enough to follow but detailed enough to be credible.',
@@ -141,7 +145,7 @@ function buildCompetencies(track: InterviewTrack, level: InterviewLevel): string
 
 function buildQuestionPlan(track: InterviewTrack, level: InterviewLevel): InterviewQuestionPlan[] {
   const core = [
-    behavioralQuestion('b1', 'Tell me about a project where you had to create impact under real constraints.'),
+    behavioralQuestion('b1', 'I have your resume and this job description in front of me. Pick one experience from your background that is most relevant to this role. What was happening, what did you personally own, and what changed because of your work?'),
     resumeQuestion(),
     situationalQuestion(level),
     companyFitQuestion()
@@ -149,12 +153,12 @@ function buildQuestionPlan(track: InterviewTrack, level: InterviewLevel): Interv
 
   const roleSpecific: Record<InterviewTrack, InterviewQuestionPlan[]> = {
     software_engineering: [
-      technicalQuestion('t1', 'Walk me through a technical system or feature you built and the tradeoffs you made.', 'technical_depth'),
-      whiteboardQuestion('w1', 'Design a reliable service for a feature in this role. Think through requirements, API shape, bottlenecks, and failure modes.', 'system_design'),
+      technicalQuestion('t1', 'Walk me through a technical system or feature you built. What tradeoff did you actually have to defend?', 'technical_depth'),
+      whiteboardQuestion('w1', 'Design a reliable service for a feature in this role. Start with requirements, then we will press on API shape, bottlenecks, and failure modes.', 'system_design'),
       whiteboardQuestion('w2', 'Solve a coding problem verbally: choose a data structure, explain edge cases, and outline tests.', 'coding')
     ],
     data_science: [
-      technicalQuestion('t1', 'Describe a model, experiment, or analysis where your first approach was not good enough.', 'technical_depth'),
+      technicalQuestion('t1', 'Describe a model, experiment, or analysis where your first approach was not good enough. How did you know, and what changed?', 'technical_depth'),
       whiteboardQuestion('w1', 'Design a data analysis plan to answer a business question for this role.', 'data_case')
     ],
     product_management: [
@@ -171,7 +175,7 @@ function buildQuestionPlan(track: InterviewTrack, level: InterviewLevel): Interv
     ],
     business_finance: [
       whiteboardQuestion('w1', 'Build a structured business case for entering a new market. Talk through assumptions, risks, and decision criteria.', 'data_case'),
-      technicalQuestion('t1', 'Tell me about an analysis where the numbers did not point to an obvious decision.', 'technical_depth')
+      technicalQuestion('t1', 'Tell me about an analysis where the numbers did not point to an obvious decision. What call did you recommend, and why?', 'technical_depth')
     ],
     general_professional: [
       communicationQuestion('c1', 'Tell me about a time you had to explain a complex idea to someone outside your domain.')
@@ -227,7 +231,7 @@ function resumeQuestion(): InterviewQuestionPlan {
     question_id: 'r1',
     category: 'resume_deep_dive',
     competency: 'resume credibility',
-    lead_question: 'Choose one experience from your resume that best proves you can do this role. What happened and what did you personally own?',
+    lead_question: 'Pick one resume experience that best proves you can do this role. What did you own, what evidence shows it worked, and what would your team say you contributed?',
     expected_evidence: ['resume-specific example', 'personal contribution', 'scope', 'result'],
     follow_up_triggers: ['resume detail is vague', 'ownership unclear', 'impact missing'],
     strong_answer_signals: ['specific artifact', 'clear scope', 'credible outcome']
@@ -239,10 +243,10 @@ function situationalQuestion(level: InterviewLevel, override?: string): Intervie
     question_id: 's1',
     category: 'situational',
     competency: level === 'senior' || level === 'executive' ? 'judgment under ambiguity' : 'prioritization',
-    lead_question: override || 'Imagine you are behind on a high-visibility deliverable and the requirements are changing. What do you do first?',
-    expected_evidence: ['first action', 'communication path', 'risk management', 'decision rationale'],
-    follow_up_triggers: ['no first step', 'no stakeholder plan', 'no prioritization criteria'],
-    strong_answer_signals: ['calm triage', 'clear escalation', 'explicit tradeoff']
+    lead_question: override || 'Imagine you are behind on a high-visibility deliverable and the requirements are changing. What do you do first, and what would you tell stakeholders?',
+    expected_evidence: ['first action', 'priority rationale', 'stakeholder wording', 'risk tradeoff', 'escalation threshold', 'change-of-course trigger'],
+    follow_up_triggers: ['no first step', 'no stakeholder plan', 'no prioritization criteria', 'no explicit tradeoff', 'no escalation trigger'],
+    strong_answer_signals: ['calm triage', 'clear escalation', 'explicit tradeoff', 'realistic stakeholder language', 'conditions for changing course']
   };
 }
 
@@ -263,7 +267,7 @@ function companyFitQuestion(): InterviewQuestionPlan {
     question_id: 'f1',
     category: 'company_fit',
     competency: 'motivation and role fit',
-    lead_question: 'Why this role, and what would make your first 90 days successful?',
+    lead_question: 'Why this role specifically, and what would make your first 90 days successful?',
     expected_evidence: ['role-specific motivation', 'success criteria', 'learning plan', 'business awareness'],
     follow_up_triggers: ['generic motivation', 'no 90-day plan', 'no connection to role'],
     strong_answer_signals: ['specific role match', 'clear ramp plan', 'company-aware priorities']

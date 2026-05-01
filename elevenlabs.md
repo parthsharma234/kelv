@@ -29,6 +29,14 @@ eleven_flash_v2
 
 Reason: the ElevenLabs Agents API currently rejects English agent creation unless the TTS model is Turbo or Flash v2. Flash v2 is the right default for low-latency live interviewing. Keep `eleven_turbo_v2` as the quality fallback if Flash sounds too clipped.
 
+Recommended Kelv interviewer voice setting:
+
+```text
+voice_id=cjVigY5qzO86Huf0OWal
+```
+
+Reason: this voice is available in the current ElevenLabs account. The setup script pairs it with slower, steadier TTS settings so Kelv sounds more like a seasoned interviewer than a casual assistant. To use a different account-accessible voice, set `ELEVENLABS_VOICE_ID` before running setup.
+
 ## API Setup Script
 
 Kelv can create the ElevenLabs agent without dashboard navigation:
@@ -84,6 +92,7 @@ Important runtime settings applied by the script:
 - `platform_settings.overrides.conversation_config_override.agent.prompt.prompt=true` so Kelv can inject the runtime interviewer prompt.
 - `platform_settings.overrides.conversation_config_override.agent.first_message=true` so Kelv can personalize the opening.
 - `platform_settings.overrides.conversation_config_override.agent.language=true` for SDK compatibility.
+- `conversation_config.agent.prompt.tools` includes ElevenLabs `skip_turn` and `end_call` system tools. `end_call` is used when the candidate explicitly wants to stop or the interview reaches a natural close.
 - The client uses ElevenLabs WebSocket voice transport to avoid LiveKit/WebRTC disconnects seen in local Windows testing.
 
 ## Files Changed

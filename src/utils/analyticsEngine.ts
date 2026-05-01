@@ -22,6 +22,18 @@ export interface PostureAnalysisData {
       isGoodPosture: boolean;
       confidence: number;
       timestamp: number;
+      keypoints?: Array<{
+        name: string;
+        x: number;
+        y: number;
+        score: number;
+      }>;
+      geometry?: {
+        shoulderTiltDeg: number;
+        headOffsetPct: number;
+        torsoLeanDeg: number;
+        shoulderWidthPct: number;
+      };
     };
   }>;
 }
@@ -459,13 +471,17 @@ export class AnalyticsEngine {
 
   private static segmentTranscript(transcript: TranscriptMessage[]): QuestionPair[] {
     const pairs: QuestionPair[] = [];
+    let pendingQuestion: TranscriptMessage | null = null;
 
-    for (let index = 0; index < transcript.length - 1; index += 1) {
-      const current = transcript[index];
-      const next = transcript[index + 1];
+    for (const message of transcript) {
+      if (message.role === 'assistant') {
+        pendingQuestion = message;
+        continue;
+      }
 
-      if (current.role === 'assistant' && next.role === 'user') {
-        pairs.push({ question: current, answer: next });
+      if (message.role === 'user' && pendingQuestion) {
+        pairs.push({ question: pendingQuestion, answer: message });
+        pendingQuestion = null;
       }
     }
 

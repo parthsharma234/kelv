@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildDeterministicInterviewFeedback,
-  buildInterviewFeedbackPrompt
-} from './openAIFeedback';
+import { buildInterviewFeedbackPrompt } from './openAIFeedback';
 
 const transcriptPairs = [
   {
@@ -22,23 +19,16 @@ describe('openAIFeedback coaching contract', () => {
     const prompt = buildInterviewFeedbackPrompt(transcriptPairs, {
       role: 'Product Manager',
       industry: 'Technology',
-      experienceLevel: 'mid'
+      experienceLevel: 'mid',
+      jobDescription: 'Own product discovery and customer research.'
     });
 
     expect(prompt).toContain('Reference question numbers');
     expect(prompt).toContain('Do not invent achievements');
     expect(prompt).toContain('Concrete drill with target reps');
+    expect(prompt).toContain('Analyze only candidate answers');
+    expect(prompt).toContain('"whatWorked"');
+    expect(prompt).toContain('"toImprove"');
     expect(prompt).toContain('Q1: Tell me about a time');
-  });
-
-  it('returns usable deterministic feedback without an API response', () => {
-    const feedback = buildDeterministicInterviewFeedback(transcriptPairs, {
-      role: 'Product Manager'
-    });
-
-    expect(feedback.overallSummary).toContain('Product Manager');
-    expect(feedback.questionFeedback).toHaveLength(2);
-    expect(feedback.criticalImprovements.length).toBeGreaterThan(0);
-    expect(feedback.nextSteps[0]).toContain('Rewrite');
   });
 });

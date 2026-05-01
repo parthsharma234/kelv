@@ -30,12 +30,21 @@ export interface PoseKeypoint {
   score: number;  // Confidence 0-1
 }
 
+export interface PostureGeometry {
+  shoulderTiltDeg: number;
+  headOffsetPct: number;
+  torsoLeanDeg: number;
+  shoulderWidthPct: number;
+}
+
 export interface PostureMetrics {
   shoulderAlignment: number;   // 0-100
   headPosition: 'centered' | 'forward' | 'tilted';
   isGoodPosture: boolean;
   confidence: number;          // 0-1 average confidence
   timestamp: number;           // Date.now()
+  keypoints?: PoseKeypoint[];
+  geometry?: PostureGeometry;
 }
 
 export interface PoseDetector {
@@ -148,42 +157,66 @@ class MoveNetPoseDetector implements PoseDetector {
         headPosition: 'centered',
         isGoodPosture: false,
         confidence: avgConfidence,
-        timestamp
+        timestamp,
+        keypoints,
+        geometry: {
+          shoulderTiltDeg: 0,
+          headOffsetPct: 0,
+          torsoLeanDeg: 0,
+          shoulderWidthPct: 0
+        }
       };
     }
 
-    // Calculate shoulder alignment (0-100, where 100 = perfectly horizontal)
-    const shoulderSlope = Math.abs(leftShoulder.y - rightShoulder.y);
-    const shoulderAlignment = Math.max(0, Math.min(100, Math.round(100 - (shoulderSlope * 400))));
+    const shoulderDx = rightShoulder.x - leftShoulder.x;
+    const shoulderDy = rightShoulder.y - leftShoulder.y;
+    const shoulderTiltDeg = Math.abs(Math.atan2(shoulderDy, shoulderDx) * 180 / Math.PI);
+    const shoulderAlignment = Math.max(0, Math.min(100, Math.round(100 - (shoulderTiltDeg / 18) * 100)));
+
+    const leftHip = keypoints[KEYPOINTS.LEFT_HIP];
+    const rightHip = keypoints[KEYPOINTS.RIGHT_HIP];
+    const hasHips = leftHip?.score > minConfidence && rightHip?.score > minConfidence;
+    const shoulderCenter = midpoint(leftShoulder, rightShoulder);
+    const hipCenter = hasHips ? midpoint(leftHip, rightHip) : { x: shoulderCenter.x, y: Math.min(1, shoulderCenter.y + 0.34) };
+    const torsoLeanDeg = Math.atan2(shoulderCenter.x - hipCenter.x, Math.max(0.001, hipCenter.y - shoulderCenter.y)) * 180 / Math.PI;
+    const headAnchor = nose?.score > minConfidence ? nose : hasEars ? midpoint(leftEar, rightEar) : shoulderCenter;
+    const shoulderWidth = Math.max(0.001, Math.abs(rightShoulder.x - leftShoulder.x));
+    const headOffsetPct = ((headAnchor.x - shoulderCenter.x) / shoulderWidth) * 100;
 
     // Calculate head position
     let headPosition: 'centered' | 'forward' | 'tilted' = 'centered';
 
     if (hasEars) {
-      const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
       const avgEarY = (leftEar.y + rightEar.y) / 2;
-      const earDiff = Math.abs(leftEar.y - rightEar.y);
+      const earTiltDeg = Math.abs(Math.atan2(rightEar.y - leftEar.y, rightEar.x - leftEar.x) * 180 / Math.PI);
 
       // Head tilted if ears are at significantly different heights
-      if (earDiff > 0.05) {
+      if (earTiltDeg > 10 || Math.abs(headOffsetPct) > 26) {
         headPosition = 'tilted';
       }
       // Head forward if ears are significantly below shoulder line
       // (in normalized coords, larger Y = lower on screen)
-      else if (avgEarY > avgShoulderY + 0.1) {
+      else if (avgEarY > shoulderCenter.y + 0.1 || Math.abs(torsoLeanDeg) > 12) {
         headPosition = 'forward';
       }
     }
 
     // Good posture: shoulders aligned and head centered
-    const isGoodPosture = shoulderAlignment > 70 && headPosition === 'centered';
+    const isGoodPosture = shoulderAlignment > 70 && headPosition === 'centered' && Math.abs(torsoLeanDeg) < 12;
 
     return {
       shoulderAlignment,
       headPosition,
       isGoodPosture,
       confidence: avgConfidence,
-      timestamp
+      timestamp,
+      keypoints,
+      geometry: {
+        shoulderTiltDeg: round1(shoulderTiltDeg),
+        headOffsetPct: round1(headOffsetPct),
+        torsoLeanDeg: round1(torsoLeanDeg),
+        shoulderWidthPct: round1(shoulderWidth * 100)
+      }
     };
   }
 
@@ -204,4 +237,15 @@ class MoveNetPoseDetector implements PoseDetector {
 // Factory function for easy instantiation
 export function createPoseDetector(): PoseDetector {
   return new MoveNetPoseDetector();
+}
+
+function midpoint(a: PoseKeypoint, b: PoseKeypoint): { x: number; y: number } {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2
+  };
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }

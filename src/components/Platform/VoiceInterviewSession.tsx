@@ -35,6 +35,11 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
     const micAudioContextRef = useRef<AudioContext | null>(null);
     const micAnimationRef = useRef<number | null>(null);
     const didCompleteRef = useRef(false);
+    const recorderRef = useRef<MediaRecorder | null>(null);
+    const recorderChunksRef = useRef<Blob[]>([]);
+    const recorderStreamRef = useRef<MediaStream | null>(null);
+    const recordingBlobRef = useRef<Blob | null>(null);
+    const [recordingReadyVersion, setRecordingReadyVersion] = useState(0);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
@@ -91,6 +96,68 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
         return inputDeviceId;
     }, []);
 
+    const stopLocalRecording = useCallback(() => {
+        const recorder = recorderRef.current;
+        if (recorder && recorder.state !== 'inactive') {
+            recorder.stop();
+            return;
+        }
+
+        recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+        recorderStreamRef.current = null;
+        recorderRef.current = null;
+    }, []);
+
+    const startLocalRecording = useCallback(async (inputDeviceId?: string) => {
+        if (!streamRef.current || recorderRef.current?.state === 'recording') return;
+
+        try {
+            const recordingStream = new MediaStream();
+            streamRef.current.getVideoTracks().forEach(track => recordingStream.addTrack(track.clone()));
+
+            try {
+                const audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: inputDeviceId ? { deviceId: { exact: inputDeviceId } } : true,
+                    video: false
+                });
+                audioStream.getAudioTracks().forEach(track => recordingStream.addTrack(track));
+            } catch (error) {
+                console.warn('[Recorder] Audio capture unavailable; saving video-only replay.', error);
+            }
+
+            if (recordingStream.getTracks().length === 0) return;
+
+            const mimeType = [
+                'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp8,opus',
+                'video/webm'
+            ].find(type => MediaRecorder.isTypeSupported(type)) || '';
+
+            recorderChunksRef.current = [];
+            recordingBlobRef.current = null;
+            const recorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : undefined);
+            recorder.ondataavailable = (event) => {
+                if (event.data?.size) recorderChunksRef.current.push(event.data);
+            };
+            recorder.onstop = () => {
+                const blob = recorderChunksRef.current.length
+                    ? new Blob(recorderChunksRef.current, { type: mimeType || 'video/webm' })
+                    : null;
+                recordingBlobRef.current = blob;
+                recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+                recorderStreamRef.current = null;
+                recorderRef.current = null;
+                setRecordingReadyVersion(version => version + 1);
+            };
+
+            recorderStreamRef.current = recordingStream;
+            recorderRef.current = recorder;
+            recorder.start(1000);
+        } catch (error) {
+            console.warn('[Recorder] Replay recording failed to start.', error);
+        }
+    }, []);
+
     useEffect(() => {
         let mounted = true;
         const setupMedia = async () => {
@@ -108,6 +175,12 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
         setupMedia();
         return () => { mounted = false; stopMedia(); };
     }, [stopMedia]);
+
+    useEffect(() => {
+        return () => {
+            stopLocalRecording();
+        };
+    }, [stopLocalRecording]);
 
     useEffect(() => { if (status === 'completed') stopMedia(); }, [status, stopMedia]);
 
@@ -248,6 +321,11 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
 
     useEffect(() => {
         if (status === 'completed' && !didCompleteRef.current) {
+            if (recorderRef.current) {
+                stopLocalRecording();
+                return;
+            }
+
             didCompleteRef.current = true;
             const interviewContext = buildVoiceInterviewContext({ jobDescription: tempJD, resumeText: tempResume, sessionPhase: 'close' });
             onComplete({
@@ -255,10 +333,11 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
                 jobContext: { role: interviewContext.role, industry: interviewContext.industry, experienceLevel: interviewContext.experienceLevel, category: interviewContext.category, jobDescription: tempJD, resumeSummary: interviewContext.promptContext.resume_summary, jdSummary: interviewContext.promptContext.jd_summary, promptContext: interviewContext.promptContext, blueprint: interviewContext.blueprint },
                 voiceProvider: 'elevenlabs',
                 whiteboardRequests,
+                recordingBlob: recordingBlobRef.current || undefined,
                 postureData: postureData ? { shoulderAlignment: postureData.shoulderAlignment, headPosition: postureData.headPosition, overallScore: postureData.overallScore, timeInGoodPosture: postureData.timeInGoodPosture, sampleCount: postureData.sampleCount, samples: postureData.samples } : undefined
             });
         }
-    }, [status, transcript, duration, postureData, onComplete, tempJD, tempResume, whiteboardRequests]);
+    }, [status, transcript, duration, postureData, onComplete, tempJD, tempResume, whiteboardRequests, stopLocalRecording, recordingReadyVersion]);
 
     const handleStartInterview = async () => {
         if (!tempJD.trim() || !tempResume.trim()) return;
@@ -269,18 +348,24 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
         setPreviewPhase(false);
         try {
             await startInterview(tempJD.trim(), tempResume.trim(), inputDeviceId);
+            await startLocalRecording(inputDeviceId);
         } finally {
             setIsInjectingContext(false);
         }
     };
 
-    const handleEndInterview = () => { stopMedia(); endInterview(); };
+    const handleEndInterview = () => { stopLocalRecording(); stopMedia(); endInterview(); };
     const isReady = tempJD.trim().length > 0 && tempResume.trim().length > 0 && stream;
     const latestOpenWhiteboard = whiteboardRequests.filter((request) => request.tool_name === 'openWhiteboard').slice(-1)[0];
     const latestCloseWhiteboard = whiteboardRequests.filter((request) => request.tool_name === 'closeWhiteboard').slice(-1)[0];
     const activeWhiteboard = latestOpenWhiteboard && (!latestCloseWhiteboard || latestCloseWhiteboard.timestamp < latestOpenWhiteboard.timestamp)
       ? latestOpenWhiteboard
       : null;
+    const hasMicActivity = isUserSpeaking || inputVolume > 0.01 || localMicVolume > 0.01;
+    const micStatusLabel = isMuted ? 'Mic muted' : isUserSpeaking ? 'Listening' : hasMicActivity ? 'Mic active' : 'Mic ready';
+    const micStatusColor = isMuted ? '#f87171' : hasMicActivity ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.48)';
+    const sessionStatusLabel = status === 'connecting' ? 'Connecting' : status === 'error' ? 'Needs attention' : 'Live session';
+    const showDebugPanel = import.meta.env.DEV && window.localStorage.getItem('kelv.showDebug') === 'true';
 
     const fieldStyle: React.CSSProperties = {
         width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -308,7 +393,7 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
                             ? { color: '#f87171', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)' }
                             : { color: 'rgba(74,222,128,0.8)', borderColor: 'rgba(74,222,128,0.2)', background: 'rgba(74,222,128,0.06)' })
                     }}>
-                        {cameraError ? 'Camera blocked' : `Camera live / Mic ${Math.round(localMicVolume * 100)}`}
+                        {cameraError ? 'Camera blocked' : `Camera live / ${localMicVolume > 0.01 ? 'Mic active' : 'Mic ready'}`}
                     </span>
                 </header>
 
@@ -472,7 +557,7 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
                         {activeWhiteboard.prompt || 'Use the whiteboard to structure your thinking.'}
                     </p>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.38)', lineHeight: '1.5', marginTop: '10px' }}>
-                        UI handoff: render a drawable/explainer surface here for {activeWhiteboard.mode || 'structured reasoning'}.
+                        Use this space to organize your answer{activeWhiteboard.mode ? ` for ${activeWhiteboard.mode}` : ''}.
                     </p>
                 </div>
             )}
@@ -492,20 +577,10 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: status === 'interviewing' ? '#ef4444' : 'rgba(255,255,255,0.2)', animation: status === 'interviewing' ? 'pulse-dot 2s ease-in-out infinite' : 'none' }} />
                         <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'IBM Plex Mono, monospace' }}>{formatTime(duration)}</span>
                         <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
-                        <span style={{ fontSize: '10px', color: '#E8651A', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Live session</span>
+                        <span style={{ fontSize: '10px', color: '#E8651A', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{sessionStatusLabel}</span>
                         <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
-                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                            {connectionTransport}
-                        </span>
-                        <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
-                        <span style={{ fontSize: '10px', color: inputVolume > 0.01 ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.35)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                            EL {Math.round(inputVolume * 100)}
-                        </span>
-                        <span style={{ fontSize: '10px', color: speechFallbackActive ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.35)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                            Browser ASR {speechFallbackActive ? 'on' : 'off'}
-                        </span>
-                        <span style={{ fontSize: '10px', color: localMicVolume > 0.01 ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.35)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                            Local {Math.round(localMicVolume * 100)}
+                        <span style={{ fontSize: '10px', color: micStatusColor, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            {micStatusLabel}
                         </span>
                     </div>
                 </header>
@@ -524,9 +599,9 @@ const VoiceInterviewSession: React.FC<VoiceInterviewSessionProps> = ({ onComplet
                             </button>
                         </div>
                     )}
-                    {debugMessages.length > 0 && (
+                    {showDebugPanel && debugMessages.length > 0 && (
                         <div style={{ position: 'absolute', left: '24px', bottom: '96px', zIndex: 50, width: 'min(420px, calc(100% - 48px))', padding: '12px 14px', background: 'rgba(10,11,12,0.86)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(10px)' }}>
-                            <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.38)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>ElevenLabs debug</p>
+                            <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.38)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Debug</p>
                             {debugMessages.map((message, index) => (
                                 <p key={`${message}_${index}`} style={{ fontSize: '10px', lineHeight: '1.45', color: 'rgba(255,255,255,0.48)', fontFamily: 'IBM Plex Mono, monospace' }}>{message}</p>
                             ))}

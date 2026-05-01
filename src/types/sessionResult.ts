@@ -27,6 +27,8 @@ export interface InterviewPromptContext {
   resume_summary: string;
   jd_summary: string;
   session_phase: SessionPhase;
+  company?: string;
+  resume_highlights?: string;
 }
 
 export interface QuestionEvaluation {

@@ -10,7 +10,8 @@
     "setup:elevenlabs-agent": "node scripts/setup-elevenlabs-agent.mjs",
     "setup:elevenlabs-agent:preview": "node scripts/setup-elevenlabs-agent.mjs --print-config",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:prompts": "vitest run src/utils/interviewerPromptEval.test.ts src/utils/interviewContext.test.ts src/utils/promptArchitecture.test.ts"
   },
   "dependencies": {
     "@elevenlabs/react": "^1.2.1",

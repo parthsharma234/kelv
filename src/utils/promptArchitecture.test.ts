@@ -32,8 +32,20 @@ describe('promptArchitecture', () => {
 
     const prompt = buildInterviewerSystemPrompt(context);
 
-    expect(prompt).toContain('hiring panel');
-    expect(prompt).toContain('ownership');
+    expect(prompt).toContain('experienced hiring manager who has done this hundreds of times');
+    expect(prompt).toContain('genuinely evaluating whether this person can do the job');
+    expect(prompt).toContain('Do not linger. Do not praise.');
+    expect(prompt).toContain('WEAK ANSWERS: Be calmly direct');
+    expect(prompt).toContain('"I need something more concrete');
+    expect(prompt).toContain('what did you personally do?');
+    expect(prompt).toContain('NEVER start a sentence with');
+    expect(prompt).toContain('START: Your first message is always a human check-in');
+    expect(prompt).toContain('Do not announce that you are starting the interview');
+    expect(prompt).not.toContain('what part of the role are you most interested in');
+    expect(prompt).toContain('Speak like a real person on a video call');
+    expect(prompt).toContain('I need the actual example, not the summary version');
+    expect(prompt).toContain('Do not accept hypothetical answers to behavioral questions');
+    expect(prompt).toContain('BACKGROUND_ANCHOR');
     expect(prompt).toContain('leadership');
   });
 

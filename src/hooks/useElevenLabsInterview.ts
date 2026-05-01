@@ -489,7 +489,7 @@ export function useElevenLabsInterview({
       conversation.sendContextualUpdate(buildContextSyncMessage(interviewContext));
       startVolumeMeter(conversation);
 
-      appendTranscript(createTranscriptMessage('system', `Context synced with Kelv via ElevenLabs (${activeTransportRef.current}).`));
+      appendTranscript(createTranscriptMessage('system', `Context synced with Kelv via ElevenLabs (${activeTransportRef.current}) for ${interviewContext.role}.`));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start ElevenLabs interview';
       setError(errorMessage);
