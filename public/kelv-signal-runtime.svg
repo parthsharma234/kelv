@@ -1,26 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="520" viewBox="0 0 1440 520" role="img" aria-labelledby="title desc">
-  <title id="title">Kelv data flow</title>
-  <desc id="desc">Camera, microphone, and live agent events are analyzed in the browser and combined into a local interview result.</desc>
-  <defs>
-    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#475569"/></marker>
-    <style>
-      .frame{fill:#fff;stroke:#cbd5e1;stroke-width:1.5}.box{fill:#f8fafc;stroke:#94a3b8;stroke-width:1.5}.core{fill:#fff7ed;stroke:#ea580c;stroke-width:1.8}.line{fill:none;stroke:#475569;stroke-width:2;marker-end:url(#arrow)}.title{font:700 20px Arial,sans-serif;fill:#0f172a}.label{font:700 16px Arial,sans-serif;fill:#0f172a}.copy{font:14px Arial,sans-serif;fill:#475569}.mono{font:12px 'Courier New',monospace;fill:#64748b}
-    </style>
-  </defs>
-  <rect class="frame" x="1" y="1" width="1438" height="518" rx="4"/>
-  <text class="title" x="40" y="48">Kelv browser data flow</text><text class="copy" x="40" y="75">Capture, analysis, and persistence stay in the client for the active path.</text>
-  <text class="mono" x="41" y="121">INPUTS</text><text class="mono" x="354" y="121">BROWSER ANALYSIS</text><text class="mono" x="781" y="121">FUSION</text><text class="mono" x="1128" y="121">OUTPUT</text>
-  <rect class="box" x="40" y="146" width="220" height="74" rx="4"/><text class="label" x="58" y="177">Camera stream</text><text class="copy" x="58" y="202">getUserMedia video</text>
-  <rect class="box" x="40" y="250" width="220" height="74" rx="4"/><text class="label" x="58" y="281">Microphone</text><text class="copy" x="58" y="306">WebM + AudioContext</text>
-  <rect class="box" x="40" y="354" width="220" height="74" rx="4"/><text class="label" x="58" y="385">Agent events</text><text class="copy" x="58" y="410">ElevenLabs transcript</text>
-  <rect class="box" x="354" y="146" width="292" height="74" rx="4"/><text class="label" x="372" y="177">MoveNet / WebGL</text><text class="copy" x="372" y="202">keypoints -&gt; posture samples</text>
-  <rect class="box" x="354" y="250" width="292" height="74" rx="4"/><text class="label" x="372" y="281">Voice feature pass</text><text class="copy" x="372" y="306">pace, pauses, energy, pitch</text>
-  <rect class="box" x="354" y="354" width="292" height="74" rx="4"/><text class="label" x="372" y="385">Transcript ledger</text><text class="copy" x="372" y="410">question / answer boundaries</text>
-  <rect class="core" x="781" y="215" width="242" height="142" rx="4"/><text class="label" x="809" y="258">Kelv LENS</text><text class="copy" x="809" y="286">quality checks</text><text class="copy" x="809" y="310">question alignment</text><text class="copy" x="809" y="334">signal weighting</text>
-  <rect class="box" x="1128" y="245" width="252" height="82" rx="4"/><text class="label" x="1148" y="278">SessionResultV2</text><text class="copy" x="1148" y="303">scores + coaching + metadata</text>
-  <path class="line" d="M260 183H354"/><path class="line" d="M260 287H354"/><path class="line" d="M260 391H354"/>
-  <path class="line" d="M646 183H732V251H781"/><path class="line" d="M646 287H781"/><path class="line" d="M646 391H732V321H781"/><path class="line" d="M1023 286H1128"/>
-  <text class="mono" x="1128" y="365">browser-local persistence</text>
-  <line x1="40" y1="466" x2="1380" y2="466" stroke="#e2e8f0"/>
-  <text class="mono" x="40" y="492">EXPERIMENTAL, EXCLUDED FROM ACTIVE SCORING: facial-expression and eye-tracking prototypes</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="480" viewBox="0 0 1440 480" role="img" aria-labelledby="title desc">
+  <title id="title">Kelv runtime trace</title><desc id="desc">Three browser inputs converge into a local interview result. Small packets move along the actual data paths.</desc>
+  <defs><style>.bg{fill:#0f172a}.grid{stroke:#1e293b;stroke-width:1}.rail{stroke:#475569;stroke-width:2}.node{fill:#111c31;stroke:#64748b;stroke-width:1}.core{fill:#331b10;stroke:#f97316;stroke-width:1.5}.out{fill:#13251f;stroke:#22c55e;stroke-width:1.5}.h{font:700 18px Arial,sans-serif;fill:#f8fafc}.t{font:14px Arial,sans-serif;fill:#cbd5e1}.m{font:12px 'Courier New',monospace;fill:#94a3b8}.p{fill:#fb923c}</style></defs>
+  <rect class="bg" x="0" y="0" width="1440" height="480" rx="4"/>
+  <g class="grid" opacity=".75"><path d="M40 88H1400M40 177H1400M40 266H1400M40 355H1400M40 430H1400"/><path d="M40 88V430M240 88V430M440 88V430M640 88V430M840 88V430M1040 88V430M1240 88V430M1400 88V430"/></g>
+  <text class="h" x="40" y="45">browser runtime / one interview turn</text><text class="m" x="40" y="71">all active analysis and persistence runs client-side</text>
+  <text class="m" x="54" y="121">01 INPUT</text><text class="m" x="382" y="121">02 EXTRACT</text><text class="m" x="774" y="121">03 ALIGN + WEIGHT</text><text class="m" x="1160" y="121">04 SAVE</text>
+  <g class="node"><rect x="40" y="143" width="190" height="53" rx="3"/><rect x="40" y="232" width="190" height="53" rx="3"/><rect x="40" y="321" width="190" height="53" rx="3"/></g>
+  <text class="t" x="57" y="175">camera frames</text><text class="t" x="57" y="264">microphone stream</text><text class="t" x="57" y="353">agent transcript events</text>
+  <g class="node"><rect x="382" y="143" width="248" height="53" rx="3"/><rect x="382" y="232" width="248" height="53" rx="3"/><rect x="382" y="321" width="248" height="53" rx="3"/></g>
+  <text class="t" x="400" y="175">MoveNet -> posture samples</text><text class="t" x="400" y="264">Web Audio -> delivery features</text><text class="t" x="400" y="353">question / answer ledger</text>
+  <rect class="core" x="774" y="193" width="246" height="130" rx="3"/><text class="h" x="796" y="234">Kelv LENS</text><text class="t" x="796" y="262">capture quality</text><text class="t" x="796" y="286">question alignment</text><text class="t" x="796" y="310">signal weighting</text>
+  <rect class="out" x="1160" y="218" width="215" height="80" rx="3"/><text class="h" x="1179" y="251">SessionResultV2</text><text class="t" x="1179" y="276">local browser storage</text>
+  <g class="rail" fill="none"><path d="M230 169H382"/><path d="M230 258H382"/><path d="M230 347H382"/><path d="M630 169H704V230H774"/><path d="M630 258H774"/><path d="M630 347H704V286H774"/><path d="M1020 258H1160"/></g>
+  <circle class="p" r="5"><animateMotion dur="3.8s" repeatCount="indefinite" path="M230,169H704V230H774H1020H1160"/></circle><circle class="p" r="5"><animateMotion dur="3.8s" begin="1.25s" repeatCount="indefinite" path="M230,258H774H1020H1160"/></circle><circle class="p" r="5"><animateMotion dur="3.8s" begin="2.5s" repeatCount="indefinite" path="M230,347H704V286H774H1020H1160"/></circle>
+  <text class="m" x="40" y="456">FACIAL-EXPRESSION AND EYE-TRACKING PROTOTYPES ARE NOT PART OF THIS ACTIVE PATH.</text>
 </svg>

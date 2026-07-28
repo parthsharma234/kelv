@@ -60,11 +60,13 @@ Results keep the evidence tied to each question and surface posture feedback bes
 - A browser-local WebM recording and Web Audio pass provide pace, pauses, filler usage, RMS energy, pitch, and spectral features.
 - Features are aligned with question and answer boundaries before coaching is generated.
 
-## Experiments
+## Future plans
 
-- Facial-expression and eye-tracking code remains experimental and is excluded from active scoring.
-- A future multi-camera rig could combine the built-in camera with two external viewpoints to reduce occlusion and improve posture confidence.
-- External microphones or audio interfaces could provide cleaner source material for future prosody and spectral experiments.
+We had a few things we wanted to try but did not have time to build into the capstone.
+
+- **More camera angles.** We wanted to pair the laptop camera with two external cameras so we could compare body position from different angles instead of guessing through occlusion.
+- **Better audio input.** We also talked about using an external or spectral microphone so voice features would start with cleaner audio than a laptop mic can give us.
+- **Face and eye prototypes.** There is exploratory code for these in the repo, but it is not part of the live scoring flow and we would only bring it back with clear, useful coaching use cases.
 
 ## Run
 
@@ -87,8 +89,3 @@ Open `http://localhost:5173/platform`.
 | `npm run capture:readme` | Regenerate README screenshots. |
 | `npm run test:prompts` | Test prompt/context composition. |
 | `npm run setup:elevenlabs-agent` | Set up the ElevenLabs Agent. |
-
-## Notes
-
-- Kelv is a practice and reflection tool, not an employment decision system.
-- Camera and microphone data are sensitive; the active path keeps capture and session persistence local to the browser.
