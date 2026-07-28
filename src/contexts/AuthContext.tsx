@@ -1,128 +1,77 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+
+const LOCAL_SESSION_KEY = 'kelv-local-session';
+
+export interface LocalUser {
+  id: string;
+  email: string;
+  created_at: string;
+  user_metadata: {
+    full_name: string;
+  };
+}
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: LocalUser | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<any>;
-  signIn: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ data: LocalUser; error: null }>;
+  signIn: (email: string, password: string) => Promise<{ data: LocalUser; error: null }>;
   signOut: () => Promise<void>;
-  isConfigured: boolean;
-  isPlatformEnabled: boolean;
+  isConfigured: true;
+  isPlatformEnabled: true;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function createLocalUser(email: string, fullName = ''): LocalUser {
+  return {
+    id: crypto.randomUUID?.() || `local_${Date.now()}`,
+    email: email.trim(),
+    created_at: new Date().toISOString(),
+    user_metadata: { full_name: fullName.trim() || email.split('@')[0] || 'Local user' }
+  };
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isConfigured] = useState(isSupabaseConfigured());
 
   useEffect(() => {
-    if (!isConfigured) {
-      setLoading(false);
-      return;
-    }
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }).catch((error) => {
-      console.error('Error getting session:', error);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [isConfigured]);
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    if (!isConfigured) {
-      return { 
-        data: null, 
-        error: { message: 'Supabase is not configured. Please set up your environment variables.' } 
-      };
-    }
-
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            waitlist_joined_at: new Date().toISOString(),
-            user_type: 'waitlist',
-            is_platform_enabled: false,
-          },
-        },
-      });
-      return { data, error };
-    } catch (error) {
-      return { data: null, error };
+      const saved = localStorage.getItem(LOCAL_SESSION_KEY);
+      if (saved) setUser(JSON.parse(saved) as LocalUser);
+    } catch {
+      localStorage.removeItem(LOCAL_SESSION_KEY);
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  const startLocalSession = async (email: string, fullName = '') => {
+    const nextUser = createLocalUser(email, fullName);
+    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(nextUser));
+    setUser(nextUser);
+    return { data: nextUser, error: null } as const;
   };
 
-  const signIn = async (email: string, password: string) => {
-    if (!isConfigured) {
-      return { 
-        data: null, 
-        error: { message: 'Supabase is not configured. Please set up your environment variables.' } 
-      };
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      return { data, error };
-    } catch (error) {
-      return { data: null, error };
-    }
-  };
-
-  const signOut = async () => {
-    if (!isConfigured) {
-      return;
-    }
-
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const value = {
+  const value = useMemo<AuthContextType>(() => ({
     user,
-    session,
     loading,
-    signUp,
-    signIn,
-    signOut,
-    isConfigured,
-    isPlatformEnabled: user?.user_metadata?.is_platform_enabled === true,
-  };
+    signUp: (email, _password, fullName) => startLocalSession(email, fullName),
+    signIn: (email, _password) => startLocalSession(email),
+    signOut: async () => {
+      localStorage.removeItem(LOCAL_SESSION_KEY);
+      setUser(null);
+    },
+    isConfigured: true,
+    isPlatformEnabled: true
+  }), [user, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

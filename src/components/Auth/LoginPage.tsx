@@ -18,12 +18,11 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) navigate('/waitlist-success');
+    if (user) navigate('/platform');
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isConfigured) { setError('Database connection not configured. Please contact support.'); return; }
     setLoading(true);
     setError('');
     try {
@@ -222,8 +221,9 @@ const LoginPage: React.FC = () => {
               </AnimatePresence>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Email</label>
+                <label htmlFor="login-email" style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Email</label>
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -236,9 +236,10 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Password</label>
+                <label htmlFor="login-password" style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-3)', marginBottom: '6px' }}>Password</label>
                 <div style={{ position: 'relative' }}>
                   <input
+                    id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

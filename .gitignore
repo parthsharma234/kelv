@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 .env
 .gstack/
+.claude/
+.bolt/
+.chrome-profile/
+.vscode/
+test-results/
+playwright-report/

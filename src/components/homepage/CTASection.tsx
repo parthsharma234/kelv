@@ -11,7 +11,7 @@ const CTASection: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const { signUp, isConfigured } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,26 +24,9 @@ const CTASection: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      if (isConfigured) {
-        const { error: authError } = await signUp(formData.email, formData.password, formData.name);
-        if (authError) {
-          if (authError.message.includes('already registered')) {
-            setIsSubmitted(true);
-            setTimeout(() => navigate('/waitlist-success'), 1500);
-            return;
-          }
-          throw authError;
-        }
-        setIsSubmitted(true);
-        setTimeout(() => navigate('/waitlist-success'), 1500);
-      } else {
-        await fetch('https://formspree.io/f/mwpbkloq', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        setIsSubmitted(true);
-      }
+      await signUp(formData.email, formData.password, formData.name);
+      setIsSubmitted(true);
+      setTimeout(() => navigate('/platform'), 500);
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {

@@ -1,28 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, ArrowRight, Calendar, Users, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import RedPandaLogo from './RedPandaLogo';
 
 const WaitlistSuccess: React.FC = () => {
   const { user } = useAuth();
-  const [waitlistCount, setWaitlistCount] = useState<number>(2847);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (isSupabaseConfigured()) {
-        try {
-          const { data: totalUsers } = await supabase.rpc('get_user_count');
-          if (totalUsers) setWaitlistCount(totalUsers);
-        } catch {}
-      }
-      setIsLoading(false);
-    };
-    fetchStats();
-  }, []);
+  const waitlistCount = 300;
 
   const joinedDate = user?.created_at
     ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -143,7 +128,7 @@ const WaitlistSuccess: React.FC = () => {
                     <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>Waitlist members</span>
                   </div>
                   <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                    {isLoading ? '…' : waitlistCount.toLocaleString()}
+                    {waitlistCount.toLocaleString()}
                   </span>
                 </div>
                 <div style={{ background: 'var(--surface-2)', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

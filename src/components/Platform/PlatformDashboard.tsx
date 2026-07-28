@@ -1,48 +1,14 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import {
-  ArrowRight,
-  Sparkles,
-  Target,
-  Brain,
-  MessageSquare,
-  ShieldCheck
-} from 'lucide-react';
+import { ArrowRight, Sparkles, Target } from 'lucide-react';
 import { InterviewHistory } from '../../types/interview';
-import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/supabase-interview';
+import { getInterviewHistory, getInterviewStats, getUserStrengthsAndWeaknesses } from '../../utils/local-interview';
 import { generateRecommendations, calculateAchievements, calculateStreak, Recommendation, Achievement, StreakData } from '../../utils/recommendations';
 
 interface PlatformDashboardProps {
   onStartRealtimeInterview: (type: 'standard' | 'focused', focusedType?: string) => void;
   onViewInterviewResults: (id: string, interviewType?: string | null) => void;
 }
-
-const focusedModes = [
-  {
-    id: 'technical',
-    label: 'Technical Deep-Dive',
-    duration: '7 min',
-    copy: 'Systems, algorithms, and whiteboard pressure with timed follow-ups.',
-    icon: Brain,
-    accent: 'from-orange-500 via-orange-400 to-amber-300'
-  },
-  {
-    id: 'behavioral',
-    label: 'Behavioral Storycraft',
-    duration: '5 min',
-    copy: 'STAR drills that stress receipts, conflict, and confident endings.',
-    icon: MessageSquare,
-    accent: 'from-purple-500 via-pink-500 to-rose-400'
-  },
-  {
-    id: 'situational',
-    label: 'Situational Judgement',
-    duration: '4 min',
-    copy: 'High-stakes "what if" prompts that test instincts and structure.',
-    icon: ShieldCheck,
-    accent: 'from-sky-500 via-blue-500 to-cyan-400'
-  }
-];
 
 const formatInterviewType = (type?: string) => {
   if (!type) return 'Dynamic';
@@ -51,6 +17,10 @@ const formatInterviewType = (type?: string) => {
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
+
+// Focused interview variants are intentionally withheld until their prompts and scoring
+// contracts are wired end-to-end; exposing them now would imply unsupported behavior.
+const focusedModes: Array<{ id: string; label: string; duration: string; copy: string }> = [];
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   onStartRealtimeInterview,
@@ -332,7 +302,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           </div>
         </section>
 
-        <section className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr] items-start">
+        {focusedModes.length > 0 && <section className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr] items-start">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -409,7 +379,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               </p>
             )}
           </div>
-        </section>
+        </section>}
 
         <section className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px' }}>

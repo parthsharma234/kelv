@@ -11,7 +11,7 @@ const Navbar: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const { user, signOut, isPlatformEnabled } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -30,14 +30,10 @@ const Navbar: React.FC = () => {
   };
 
   const handlePlatformClick = () => {
-    if (user) {
-      if (location.pathname === '/platform') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        navigate('/platform');
-      }
+    if (location.pathname === '/platform') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      navigate('/login');
+      navigate('/platform');
     }
     setIsOpen(false);
   };
@@ -141,17 +137,15 @@ const Navbar: React.FC = () => {
                       <RedPandaLogo size="sm" animate={false} />
                       Waitlist Status
                     </Link>
-                    {isPlatformEnabled && (
-                      <Link
-                        to="/platform"
-                        className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
-                        style={{ fontSize: '13px', color: 'var(--text-3)', textDecoration: 'none' }}
-                        onClick={() => setShowUserMenu(false)}
-                      >
-                        <Brain className="w-3.5 h-3.5" style={{ color: 'var(--orange)' }} />
-                        Interview Platform
-                      </Link>
-                    )}
+                    <Link
+                      to="/platform"
+                      className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
+                      style={{ fontSize: '13px', color: 'var(--text-3)', textDecoration: 'none' }}
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <Brain className="w-3.5 h-3.5" style={{ color: 'var(--orange)' }} />
+                      Interview Platform
+                    </Link>
                     <button
                       onClick={handleSignOut}
                       disabled={isSigningOut}

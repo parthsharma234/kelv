@@ -9,7 +9,7 @@ import {
   toggleSetupFavorite,
   deleteInterviewSetup,
   SavedInterviewSetup
-} from '../../utils/supabase-interview';
+} from '../../utils/local-interview';
 
 interface SetupFlowProps {
   onComplete: (setup: InterviewSetup) => void;

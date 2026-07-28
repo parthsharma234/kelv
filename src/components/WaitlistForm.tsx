@@ -47,8 +47,7 @@ export default function WaitlistForm() {
 
     try {
       if (isConfigured) {
-        // Use Supabase authentication for waitlist signup
-        // The welcome email will be automatically triggered by the database trigger
+        // Local session only; no credentials or profile leave this browser.
         const { error: authError } = await signUp(
           formData.email, 
           formData.password, // Use the actual password instead of temporary one
@@ -76,22 +75,6 @@ export default function WaitlistForm() {
         setTimeout(() => {
           navigate('/waitlist-success');
         }, 1500);
-      } else {
-        // Fallback to Formspree if Supabase is not configured
-        const response = await fetch('https://formspree.io/f/mwpbkloq', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Something went wrong. Please try again.');
-        }
-
-        setStatus('success');
-        setFormData({ email: '', name: '', password: '' });
-        // For non-Supabase users, show success message but don't navigate
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');

@@ -1,5 +1,5 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "kelv-ai",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,6 +11,7 @@
     "setup:elevenlabs-agent:preview": "node scripts/setup-elevenlabs-agent.mjs --print-config",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:prompts": "vitest run src/utils/interviewerPromptEval.test.ts src/utils/interviewContext.test.ts src/utils/promptArchitecture.test.ts"
   },
   "dependencies": {
@@ -19,7 +20,6 @@
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/face_detection": "^0.4.1646425229",
     "@mediapipe/pose": "^0.5.1675469404",
-    "@supabase/supabase-js": "^2.39.0",
     "@tailwindcss/postcss": "^4.1.10",
     "@tensorflow-models/pose-detection": "^2.1.3",
     "@tensorflow/tfjs": "^4.22.0",
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@playwright/test": "^1.62.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
