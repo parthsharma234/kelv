@@ -34,7 +34,7 @@ It runs entirely in the browser. There is no backend, no database, and no login.
 
 - **ElevenLabs Agents** drives the live interviewer over a WebRTC voice connection.
 - The browser captures webcam and microphone with the user's permission and analyzes both **on-device**.
-- Kelv assembles a local `SessionResultV2` — per-question scores, the signals behind them, a reliability estimate, and one concrete drill for the next rep.
+- Kelv assembles a local `SessionResultV2`: per-question scores, the signals behind them, a reliability estimate, and one concrete drill for the next rep.
 
 > [!IMPORTANT]
 > **Browser-first is a deliberate tradeoff.** Interview video and audio are personal, and a capstone didn't need a database to prove the feedback loop. The cost: saved sessions live in `localStorage` on the browser profile that created them, so they don't follow you across devices.
@@ -43,7 +43,7 @@ It runs entirely in the browser. There is no backend, no database, and no login.
 
 ### Dashboard
 
-`/platform` opens directly in local mode — no hosted login, Supabase project, or row-level-security setup to try it.
+`/platform` opens directly in local mode, with no hosted login, Supabase project, or row-level-security setup to try it.
 
 <img src="./public/readme-dashboard.png" alt="Kelv local interview dashboard" width="100%" />
 
@@ -101,7 +101,7 @@ A fusion step called **Kelv LENS** aligns all three to each answer, weights them
 
 ## The signal pipeline
 
-### Vision — posture from pose landmarks
+### Vision: posture from pose landmarks
 
 ```mermaid
 sequenceDiagram
@@ -121,15 +121,15 @@ sequenceDiagram
 
 Pose runs on **MoveNet SinglePose Lightning** (`@tensorflow-models/pose-detection`) on the TensorFlow.js WebGL backend, so no frames ever leave the machine. Each inference returns 17 keypoints normalized to `0–1` with a confidence score.
 
-`poseDetector.ts` doesn't score the image — it reduces the keypoints to geometry:
+`poseDetector.ts` doesn't score the image. It reduces the keypoints to geometry:
 
-- **Shoulder alignment** — `atan2` of the shoulder vector; a level line scores 100, and the score falls off linearly to 0 at an 18° tilt.
-- **Head position** — classified `centered` / `forward` / `tilted` from ear-line tilt, horizontal head offset relative to shoulder width, and torso lean.
-- **Confidence gate** — keypoints below `0.3` confidence are treated as unreliable, and a frame with weak shoulders returns a neutral sample instead of a confident-but-wrong one.
+- **Shoulder alignment:** `atan2` of the shoulder vector; a level line scores 100, and the score falls off linearly to 0 at an 18° tilt.
+- **Head position:** classified `centered` / `forward` / `tilted` from ear-line tilt, horizontal head offset relative to shoulder width, and torso lean.
+- **Confidence gate:** keypoints below `0.3` confidence are treated as unreliable, and a frame with weak shoulders returns a neutral sample instead of a confident-but-wrong one.
 
 `usePoseTracking` samples these on an interval and timestamps each one so LENS can line them up with the answer that was being spoken.
 
-### Voice — prosody from the raw waveform
+### Voice: prosody from the raw waveform
 
 ```mermaid
 flowchart LR
@@ -162,19 +162,19 @@ flowchart LR
 
 Delivery is measured on two lanes that meet on the same time range.
 
-**Audio lane.** The `MediaRecorder` capture (`video/webm`, VP8/VP9 + Opus) is decoded with `AudioContext.decodeAudioData`, then `enhancedSpeech.ts` runs a windowed feature pass — 16 kHz, a 1024-sample window with 512-sample hop — and computes RMS energy, zero-crossing rate, autocorrelation pitch (80–800 Hz), spectral centroid, and 13 MFCC-style coefficients. Those roll up into speech rate, fluency, clarity, and voice-stability scores. If a browser can't decode the blob, it falls back to transcript-only metrics and flags the answer as lower confidence.
+**Audio lane.** The `MediaRecorder` capture (`video/webm`, VP8/VP9 + Opus) is decoded with `AudioContext.decodeAudioData`, then `enhancedSpeech.ts` runs a windowed feature pass (16 kHz, a 1024-sample window with 512-sample hop) and computes RMS energy, zero-crossing rate, autocorrelation pitch (80–800 Hz), spectral centroid, and 13 MFCC-style coefficients. Those roll up into speech rate, fluency, clarity, and voice-stability scores. If a browser can't decode the blob, it falls back to transcript-only metrics and flags the answer as lower confidence.
 
 **Transcript lane.** ElevenLabs conversation events tell Kelv what was said and when. That's what marks the start and end of each answer, counts filler terms, and keeps one answer's delivery from bleeding into the next question.
 
 A long pause only becomes feedback once Kelv knows *which* answer it landed in and whether the recording was clean enough to trust.
 
-### Fusion — Kelv LENS
+### Fusion: Kelv LENS
 
 `kelvLens.ts` (`buildKelvLensSignals`, engine `kelv-lens-v1.0.0`) is a reliability-aware fusion step, not a model that guesses whether someone is employable.
 
 - **Voice confidence** is a weighted blend of pace, filler control, pause control, articulation, fluency, and vocal variety.
 - **Vision confidence** blends posture score, shoulder alignment, head centering, visual stability, and sample coverage.
-- **Delivery-presence** fuses the two (`voice × 0.62 + vision × 0.38`), then scales the result by the session's reliability weight and pulls the remainder toward a conservative baseline — so a noisy capture reports a hedged score rather than a confident wrong one.
+- **Delivery-presence** fuses the two (`voice × 0.62 + vision × 0.38`), then scales the result by the session's reliability weight and pulls the remainder toward a conservative baseline, so a noisy capture reports a hedged score rather than a confident wrong one.
 - It emits raw signals with **flags** (`pace_too_fast`, `high_filler_load`, `posture_drift`, `head_forward`, `no_pose_samples`, …) and turns the top flags into at most four concrete coaching lines.
 
 ### Reliability
@@ -216,13 +216,13 @@ interface SessionResultV2 {
 
 ## Built with
 
-- **App** — React 18, TypeScript, Vite 5, Tailwind CSS, React Router 7
-- **Voice interviewer** — ElevenLabs Agents (`@elevenlabs/react`)
-- **Computer vision** — MoveNet via `@tensorflow-models/pose-detection` on `@tensorflow/tfjs-backend-webgl`
-- **Audio DSP** — Web Audio API (`AudioContext`), custom feature extraction in `enhancedSpeech.ts`
-- **UI** — Framer Motion, Chart.js, WaveSurfer.js, Lucide / Heroicons
-- **Testing** — Vitest (unit) and Playwright (end-to-end)
-- **Optional** — OpenAI SDK for a demo-only LLM feedback path
+- **App:** React 18, TypeScript, Vite 5, Tailwind CSS, React Router 7
+- **Voice interviewer:** ElevenLabs Agents (`@elevenlabs/react`)
+- **Computer vision:** MoveNet via `@tensorflow-models/pose-detection` on `@tensorflow/tfjs-backend-webgl`
+- **Audio DSP:** Web Audio API (`AudioContext`), custom feature extraction in `enhancedSpeech.ts`
+- **UI:** Framer Motion, Chart.js, WaveSurfer.js, Lucide / Heroicons
+- **Testing:** Vitest (unit) and Playwright (end-to-end)
+- **Optional:** OpenAI SDK for a demo-only LLM feedback path
 
 ## Project structure
 
@@ -263,7 +263,7 @@ npm run dev
 
 Then open **`http://localhost:5173/platform`**.
 
-Don't have an agent yet? Add your `ELEVENLABS_API_KEY` to `.env` and run `npm run setup:elevenlabs-agent` — it provisions the Kelv agent through the ElevenLabs API (the `eleven_flash_v2` voice model is recommended for latency).
+Don't have an agent yet? Add your `ELEVENLABS_API_KEY` to `.env` and run `npm run setup:elevenlabs-agent`. It provisions the Kelv agent through the ElevenLabs API (the `eleven_flash_v2` voice model is recommended for latency).
 
 > [!WARNING]
 > `VITE_OPENAI_API_KEY` enables an optional LLM feedback path and is **demo-only**. A `VITE_`-prefixed key is bundled into the client, so never ship one to production.
@@ -284,7 +284,7 @@ Don't have an agent yet? Add your `ELEVENLABS_API_KEY` to `.env` and run `npm ru
 A few things we wanted to try but couldn't fit in the capstone timeline:
 
 - **More camera angles.** Pair the laptop camera with two external cameras and use cross-view agreement to cut down on occlusion errors.
-- **Better audio.** Test an external or spectral microphone — cleaner source audio makes the prosody and spectral features far more stable than a laptop mic allows.
+- **Better audio.** Test an external or spectral microphone. Cleaner source audio makes the prosody and spectral features far more stable than a laptop mic allows.
 - **Face and eye signals.** There's exploratory code in the repo (`computerVision.ts`) that isn't in the active scoring path. We'd only bring it back if it produced specific, explainable coaching rather than a vague emotion label.
 
 ---
