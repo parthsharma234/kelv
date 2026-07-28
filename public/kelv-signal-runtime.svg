@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="850" viewBox="0 0 1600 850" role="img" aria-labelledby="title desc">
+  <title id="title">Kelv browser signal runtime</title>
+  <desc id="desc">Camera, microphone, and live interviewer events flow through browser-local analysis and into the Kelv LENS coaching result.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0c1019"/><stop offset="1" stop-color="#17111d"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      .h { fill: #f7f4ef; font: 700 27px Arial, sans-serif; } .k { fill: #a9b1c1; font: 500 17px Arial, sans-serif; }
+      .n { fill: #111925; stroke: #334155; stroke-width: 2; rx: 17; } .nt { fill: #f8fafc; font: 700 20px Arial, sans-serif; } .ns { fill: #aeb8c8; font: 500 15px Arial, sans-serif; }
+      .tag { font: 700 13px Arial, sans-serif; letter-spacing: 1px; } .line { fill: none; stroke: #6c7b91; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#6c7b91"/></marker>
+  </defs>
+  <rect width="1600" height="850" rx="28" fill="url(#bg)"/>
+  <circle cx="120" cy="92" r="165" fill="#ff6333" opacity=".08"/><circle cx="1490" cy="770" r="245" fill="#b65bff" opacity=".07"/>
+  <text x="76" y="78" class="h">The browser-native signal runtime</text><text x="76" y="112" class="k">No hosted video analysis or session database is required for the active path.</text>
+
+  <rect x="76" y="183" width="230" height="112" class="n"/><text x="100" y="225" class="nt">Camera stream</text><text x="100" y="254" class="ns">getUserMedia video</text><text x="100" y="278" class="tag" fill="#ff754b">LOCAL INPUT</text>
+  <rect x="76" y="410" width="230" height="112" class="n"/><text x="100" y="452" class="nt">Microphone</text><text x="100" y="481" class="ns">WebM + AudioContext</text><text x="100" y="505" class="tag" fill="#4ce1bd">LOCAL INPUT</text>
+  <rect x="76" y="637" width="230" height="112" class="n"/><text x="100" y="679" class="nt">ElevenLabs Agent</text><text x="100" y="708" class="ns">conversation events</text><text x="100" y="732" class="tag" fill="#b896ff">LIVE DIALOGUE</text>
+
+  <rect x="445" y="150" width="310" height="162" class="n" stroke="#ff754b"/><text x="474" y="196" class="nt">MoveNet / WebGL</text><text x="474" y="226" class="ns">17 body keypoints -> pose tensors</text><text x="474" y="254" class="ns">shoulders, head, torso, confidence</text><text x="474" y="286" class="tag" fill="#ff754b">TENSORFLOW.JS</text>
+  <rect x="445" y="381" width="310" height="162" class="n" stroke="#4ce1bd"/><text x="474" y="427" class="nt">Voice feature pass</text><text x="474" y="457" class="ns">timing, filler words, RMS, pitch</text><text x="474" y="485" class="ns">spectral features from local recording</text><text x="474" y="517" class="tag" fill="#4ce1bd">WEB AUDIO</text>
+  <rect x="445" y="612" width="310" height="162" class="n" stroke="#b896ff"/><text x="474" y="658" class="nt">Transcript ledger</text><text x="474" y="688" class="ns">question / answer boundaries</text><text x="474" y="716" class="ns">timestamped conversation evidence</text><text x="474" y="748" class="tag" fill="#b896ff">AGENT EVENTS</text>
+
+  <path d="M306 239 H445" class="line"/><path d="M306 466 H445" class="line"/><path d="M306 693 H445" class="line"/>
+  <path d="M755 231 H895" class="line"/><path d="M755 462 H895" class="line"/><path d="M755 693 H895" class="line"/>
+
+  <rect x="895" y="291" width="335" height="342" rx="21" fill="#1d1720" stroke="#ff6333" stroke-width="3" filter="url(#glow)"/>
+  <text x="932" y="353" class="nt" font-size="29">Kelv LENS</text><text x="932" y="389" class="ns">Reliability-aware signal fusion</text>
+  <line x1="932" y1="423" x2="1192" y2="423" stroke="#5b4650"/>
+  <text x="932" y="464" class="k">calibrate capture quality</text><text x="932" y="500" class="k">weight voice + posture evidence</text><text x="932" y="536" class="k">score each answer in context</text><text x="932" y="572" class="k">produce one coaching target</text>
+  <path d="M1230 462 H1355" class="line"/>
+  <rect x="1355" y="348" width="174" height="228" class="n" stroke="#ff754b"/><text x="1381" y="398" class="nt">Result</text><text x="1381" y="432" class="ns">SessionResultV2</text><text x="1381" y="464" class="ns">question scores</text><text x="1381" y="496" class="ns">next rep</text><text x="1381" y="536" class="tag" fill="#ff754b">LOCAL STORAGE</text>
+  <rect x="895" y="683" width="634" height="89" rx="15" fill="#121826" stroke="#53627c" stroke-dasharray="7 8" stroke-width="2"/>
+  <text x="926" y="720" class="nt" font-size="17">Experimental lane (not in active scoring)</text><text x="926" y="749" class="ns">Facial-expression and eye-tracking prototypes remain separated from the production coaching path.</text>
+</svg>
