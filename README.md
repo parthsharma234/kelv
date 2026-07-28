@@ -2,37 +2,60 @@
 
 <h1 align="center">Kelv AI</h1>
 
-<p align="center"><strong>A browser-first interview practice system that turns a live conversation into question-level feedback on content, delivery, and posture.</strong></p>
+<p align="center"><strong>Browser-based interview practice that turns a live conversation into per-question feedback on content, delivery, and posture.</strong></p>
 
-<p align="center"><a href="https://www.youtube.com/watch?v=sv-mgria_6Q"><strong>Watch demo</strong></a> &middot; <a href="#run"><strong>Run locally</strong></a> &middot; <a href="#how-it-works"><strong>How it works</strong></a></p>
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=sv-mgria_6Q">Watch the demo</a>
+  &middot;
+  <a href="#run-locally">Run locally</a>
+  &middot;
+  <a href="#how-it-works">How it works</a>
+  &middot;
+  <a href="#the-signal-pipeline">Pipeline</a>
+</p>
 
-> Kelv started as a senior-year capstone built by my friends and me. Before we started thinking about open source, it had roughly **300 people on the waitlist**.
+<p align="center">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white" />
+  <img alt="TensorFlow.js" src="https://img.shields.io/badge/TensorFlow.js-MoveNet-FF6F00?logo=tensorflow&logoColor=white" />
+  <img alt="ElevenLabs" src="https://img.shields.io/badge/ElevenLabs-Agents-000000" />
+  <img alt="Web Audio API" src="https://img.shields.io/badge/Web%20Audio%20API-DSP-DB2777" />
+</p>
+
+> [!NOTE]
+> Kelv started as a senior-year capstone built by my friends and me. Before we thought about open-sourcing it, it had roughly **300 people on the waitlist**.
 
 ## What it is
 
-Interview prep usually gives you a question list or generic feedback after the fact. We wanted to make the practice session itself useful: run a real conversation, keep the evidence attached to each answer, and show the person exactly what to work on next.
+Most interview prep hands you a question list or generic feedback after the fact. Kelv makes the practice session itself the product: it runs a real conversation, keeps the evidence attached to each answer, and tells you the one thing to fix next.
 
-- ElevenLabs Agents handles the live interviewer.
-- The browser captures webcam and microphone input with user permission.
-- Kelv builds a local `SessionResultV2` with per-question scores, supporting signals, and a practical next rep.
+It runs entirely in the browser. There is no backend, no database, and no login.
+
+- **ElevenLabs Agents** drives the live interviewer over a WebRTC voice connection.
+- The browser captures webcam and microphone with the user's permission and analyzes both **on-device**.
+- Kelv assembles a local `SessionResultV2` — per-question scores, the signals behind them, a reliability estimate, and one concrete drill for the next rep.
+
+> [!IMPORTANT]
+> **Browser-first is a deliberate tradeoff.** Interview video and audio are personal, and a capstone didn't need a database to prove the feedback loop. The cost: saved sessions live in `localStorage` on the browser profile that created them, so they don't follow you across devices.
 
 ## Product
 
 ### Dashboard
 
-`/platform` is deliberately open in local mode. There is no hosted login, Supabase project, or row-level-security setup required to try the product.
+`/platform` opens directly in local mode — no hosted login, Supabase project, or row-level-security setup to try it.
 
 <img src="./public/readme-dashboard.png" alt="Kelv local interview dashboard" width="100%" />
 
 ### Setup
 
-Before the interview, the user adds job context and grants camera/microphone access. The same browser session owns the capture stream and the local recovery state.
+Before the interview, the user adds job context and grants camera/microphone access. The same browser tab owns the capture stream and the local recovery state for the session.
 
 <img src="./public/readme-presession.png" alt="Kelv pre-session setup" width="100%" />
 
 ### Review
 
-The review keeps the question, answer, signal quality, and coaching together. That makes a weak score debuggable instead of feeling like a black-box verdict.
+The review keeps the question, the answer, the signal quality, and the coaching in one place, so a weak score is traceable to the evidence that produced it.
 
 <img src="./public/readme-results.png" alt="Kelv interview review" width="100%" />
 
@@ -66,31 +89,47 @@ flowchart LR
   class Result,Store output
 ```
 
-**Why browser-first:** interview video and audio are personal, and a capstone did not need a database to prove the feedback loop. The tradeoff is intentional: saved sessions stay in the browser profile that created them instead of following the user across devices.
+Three signal streams run in parallel inside the browser and converge on a single question/answer timeline:
 
-## Vision
+| Stream | Source | Extracts |
+| --- | --- | --- |
+| **Vision** | Webcam frames → MoveNet | shoulder alignment, head position, torso lean |
+| **Voice** | Local WebM recording → Web Audio | speech rate, pauses, energy, pitch, spectrum |
+| **Content** | ElevenLabs transcript events | answer boundaries, filler terms, STAR structure |
+
+A fusion step called **Kelv LENS** aligns all three to each answer, weights them by how trustworthy the capture was, and emits scores plus one coaching target.
+
+## The signal pipeline
+
+### Vision — posture from pose landmarks
 
 ```mermaid
 sequenceDiagram
   autonumber
   participant Camera as Browser camera
   participant Model as MoveNet on WebGL
-  participant Pose as Pose sampler
+  participant Pose as poseDetector
   participant LENS as Kelv LENS
 
   Camera->>Model: sampled video frame
-  Model->>Pose: 17 keypoints and confidence values
-  Pose->>Pose: calculate shoulder angle, head offset, torso lean
+  Model->>Pose: 17 keypoints + confidence
+  Pose->>Pose: shoulder tilt, head offset, torso lean
   Pose->>LENS: timestamped posture sample
-  Note over LENS: low confidence or missing points lower the sample weight
-  LENS-->>LENS: keep reliable posture evidence with the answer
+  Note over LENS: low-confidence points lower the sample weight
+  LENS-->>LENS: attach reliable posture evidence to the answer
 ```
 
-- **Frame to landmarks.** The camera gives MoveNet a sampled frame. MoveNet runs through TensorFlow.js and WebGL in the browser, then returns 17 body landmarks with a confidence value for each point.
-- **Landmarks to posture.** `poseDetector` does not score the image directly. It turns those points into geometry: the shoulder line angle, head offset from the torso center, and torso lean.
-- **Posture to feedback.** `usePoseTracking` sends timestamped samples to LENS. A blurry frame, occluded shoulder, or weak landmark confidence reduces the weight of that sample instead of creating a confident-sounding coaching claim.
+Pose runs on **MoveNet SinglePose Lightning** (`@tensorflow-models/pose-detection`) on the TensorFlow.js WebGL backend, so no frames ever leave the machine. Each inference returns 17 keypoints normalized to `0–1` with a confidence score.
 
-## Voice
+`poseDetector.ts` doesn't score the image — it reduces the keypoints to geometry:
+
+- **Shoulder alignment** — `atan2` of the shoulder vector; a level line scores 100, and the score falls off linearly to 0 at an 18° tilt.
+- **Head position** — classified `centered` / `forward` / `tilted` from ear-line tilt, horizontal head offset relative to shoulder width, and torso lean.
+- **Confidence gate** — keypoints below `0.3` confidence are treated as unreliable, and a frame with weak shoulders returns a neutral sample instead of a confident-but-wrong one.
+
+`usePoseTracking` samples these on an interval and timestamps each one so LENS can line them up with the answer that was being spoken.
+
+### Voice — prosody from the raw waveform
 
 ```mermaid
 flowchart LR
@@ -121,44 +160,133 @@ flowchart LR
   class Delivery,Coaching out
 ```
 
-- **Audio lane.** The local WebM recording is decoded with the Web Audio API. This is where the system measures timing and acoustics: speech rate, silence, RMS energy, pitch contour, and spectral shape.
-- **Transcript lane.** ElevenLabs events tell Kelv what was said and when. That lets the system find the start and end of each answer, count filler terms, and avoid mixing one answer's delivery with the next question.
-- **Answer window.** The two lanes meet on the same time range. A long pause only becomes useful feedback once Kelv knows which answer it happened in and whether the recording quality was good enough to trust it.
+Delivery is measured on two lanes that meet on the same time range.
 
-## Scoring
+**Audio lane.** The `MediaRecorder` capture (`video/webm`, VP8/VP9 + Opus) is decoded with `AudioContext.decodeAudioData`, then `enhancedSpeech.ts` runs a windowed feature pass — 16 kHz, a 1024-sample window with 512-sample hop — and computes RMS energy, zero-crossing rate, autocorrelation pitch (80–800 Hz), spectral centroid, and 13 MFCC-style coefficients. Those roll up into speech rate, fluency, clarity, and voice-stability scores. If a browser can't decode the blob, it falls back to transcript-only metrics and flags the answer as lower confidence.
 
-`Kelv LENS` is a reliability-aware fusion step, not a model that guesses whether somebody is employable.
+**Transcript lane.** ElevenLabs conversation events tell Kelv what was said and when. That's what marks the start and end of each answer, counts filler terms, and keeps one answer's delivery from bleeding into the next question.
 
-- It aligns content, voice, and posture evidence to a question/answer pair.
-- It records weak capture conditions instead of treating every signal as equally trustworthy.
-- It returns scores with the evidence that produced them, then picks one concrete practice target for the next session.
+A long pause only becomes feedback once Kelv knows *which* answer it landed in and whether the recording was clean enough to trust.
 
-## Future plans
+### Fusion — Kelv LENS
 
-We had a few things we wanted to try but could not fit into the capstone timeline.
+`kelvLens.ts` (`buildKelvLensSignals`, engine `kelv-lens-v1.0.0`) is a reliability-aware fusion step, not a model that guesses whether someone is employable.
 
-- **More camera angles.** The idea was to pair the laptop camera with two external cameras, compare pose landmarks across views, and use cross-view confidence to reduce occlusion problems.
-- **Better audio.** We also wanted to test an external or spectral microphone. Cleaner source audio would make prosody and spectral measurements more stable than a laptop mic can make them.
-- **Face and eye prototypes.** There is exploratory code in the repo, but it is not in the active scoring path. We would only bring it back if it produced specific, explainable coaching—not a vague emotion label.
+- **Voice confidence** is a weighted blend of pace, filler control, pause control, articulation, fluency, and vocal variety.
+- **Vision confidence** blends posture score, shoulder alignment, head centering, visual stability, and sample coverage.
+- **Delivery-presence** fuses the two (`voice × 0.62 + vision × 0.38`), then scales the result by the session's reliability weight and pulls the remainder toward a conservative baseline — so a noisy capture reports a hedged score rather than a confident wrong one.
+- It emits raw signals with **flags** (`pace_too_fast`, `high_filler_load`, `posture_drift`, `head_forward`, `no_pose_samples`, …) and turns the top flags into at most four concrete coaching lines.
 
-## Run
+### Reliability
 
-**You need:** Node.js 20+, a Chromium-based browser, and an ElevenLabs Agent ID for live voice interviews.
+`signalReliability.ts` runs alongside LENS. It scores content, delivery, and presence confidence separately, blends them (`0.45 / 0.35 / 0.20`), slices the session into 30-second windows, and raises reason flags (`short_transcript`, `short_utterance`, `tracking_loss`, …). Downstream, `applyReliabilityAdjustment` pulls low-confidence scores toward a neutral baseline. The design goal is that Kelv would rather say *"I couldn't see you clearly"* than invent a posture verdict from three bad frames.
+
+## Output: `SessionResultV2`
+
+Every session produces one typed, self-contained object (`kelv-session-v2.0.0`), assembled by `sessionResultAdapter.ts`, validated by `sessionResultValidation.ts`, and persisted to `localStorage`.
+
+<details>
+<summary>The shape (trimmed)</summary>
+
+```ts
+interface SessionResultV2 {
+  transcript: { role: 'assistant' | 'user' | 'system'; content: string; timestamp: string }[];
+  timing: { duration_sec: number; speaking_rate_wpm?: number; filler_word_count?: number };
+  posture_summary?: {
+    sample_count: number;
+    overall_score: number;
+    head_position: 'centered' | 'forward' | 'tilted';
+    time_in_good_posture: number;
+  };
+  per_question_results: QuestionEvaluation[];      // content / delivery / presence + next_rep
+  overall_scores: { content: number; delivery: number; presence: number; overall: number };
+  recommended_drills: PracticePlan[];              // one weak point → one drill
+  signal_reliability: SignalReliability;           // confidence + reason flags + windows
+  signal_fusion?: VoiceCvSignalFusion;             // the LENS output
+  processing_metadata: {
+    pipeline_version: string;
+    transcript_vendor: 'elevenlabs' | 'openai' | 'self_hosted_whisper' | 'hybrid' | 'vapi';
+    used_fallback: boolean;
+    reliability_flags: string[];
+  };
+}
+```
+
+</details>
+
+## Built with
+
+- **App** — React 18, TypeScript, Vite 5, Tailwind CSS, React Router 7
+- **Voice interviewer** — ElevenLabs Agents (`@elevenlabs/react`)
+- **Computer vision** — MoveNet via `@tensorflow-models/pose-detection` on `@tensorflow/tfjs-backend-webgl`
+- **Audio DSP** — Web Audio API (`AudioContext`), custom feature extraction in `enhancedSpeech.ts`
+- **UI** — Framer Motion, Chart.js, WaveSurfer.js, Lucide / Heroicons
+- **Testing** — Vitest (unit) and Playwright (end-to-end)
+- **Optional** — OpenAI SDK for a demo-only LLM feedback path
+
+## Project structure
+
+```
+src/
+  hooks/
+    useElevenLabsInterview.ts   # live agent session + transcript events
+    useInterviewRecorder.ts     # MediaRecorder capture (webm)
+    usePoseTracking.ts          # MoveNet sampling loop
+  utils/
+    poseDetector.ts             # keypoints -> posture geometry
+    enhancedSpeech.ts           # Web Audio feature extraction
+    perQuestionAnalytics.ts     # answer segmentation + per-question metrics
+    signalReliability.ts        # confidence + reason flags
+    kelvLens.ts                 # voice + vision + content fusion
+    sessionResultAdapter.ts     # assembles SessionResultV2
+    sessionResultValidation.ts  # runtime schema guard
+    openAIFeedback.ts           # optional, demo-only LLM feedback
+  types/
+    sessionResult.ts            # the data contract
+  components/Platform/          # dashboard, session, results UI
+scripts/
+  dev.mjs                       # dev entry (optionally provisions the agent)
+  setup-elevenlabs-agent.mjs    # creates the Kelv agent via the ElevenLabs API
+e2e/                            # Playwright flows + README capture
+```
+
+## Run locally
+
+**Prerequisites:** Node.js 20+, a Chromium-based browser, and an ElevenLabs Agent ID for the live voice interview.
 
 ```bash
 npm install
 cp .env.example .env
-# add VITE_ELEVENLABS_AGENT_ID to .env
+# set VITE_ELEVENLABS_AGENT_ID in .env
 npm run dev
 ```
 
-Open `http://localhost:5173/platform`.
+Then open **`http://localhost:5173/platform`**.
 
-| Command | Use |
+Don't have an agent yet? Add your `ELEVENLABS_API_KEY` to `.env` and run `npm run setup:elevenlabs-agent` — it provisions the Kelv agent through the ElevenLabs API (the `eleven_flash_v2` voice model is recommended for latency).
+
+> [!WARNING]
+> `VITE_OPENAI_API_KEY` enables an optional LLM feedback path and is **demo-only**. A `VITE_`-prefixed key is bundled into the client, so never ship one to production.
+
+### Scripts
+
+| Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the local platform. |
-| `npm test` | Run unit tests. |
-| `npm run test:e2e` | Run browser tests. |
-| `npm run capture:readme` | Regenerate README screenshots. |
-| `npm run test:prompts` | Test prompt and context composition. |
-| `npm run setup:elevenlabs-agent` | Set up the ElevenLabs Agent. |
+| `npm run dev` | Start the local platform on port 5173. |
+| `npm test` | Run the Vitest unit suite. |
+| `npm run test:e2e` | Run the Playwright end-to-end flow. |
+| `npm run test:prompts` | Test interviewer prompt and context composition. |
+| `npm run capture:readme` | Regenerate the screenshots in this README. |
+| `npm run setup:elevenlabs-agent` | Create the ElevenLabs agent. |
+
+## Roadmap
+
+A few things we wanted to try but couldn't fit in the capstone timeline:
+
+- **More camera angles.** Pair the laptop camera with two external cameras and use cross-view agreement to cut down on occlusion errors.
+- **Better audio.** Test an external or spectral microphone — cleaner source audio makes the prosody and spectral features far more stable than a laptop mic allows.
+- **Face and eye signals.** There's exploratory code in the repo (`computerVision.ts`) that isn't in the active scoring path. We'd only bring it back if it produced specific, explainable coaching rather than a vague emotion label.
+
+---
+
+<p align="center"><sub>Built as a senior capstone. If you try it, I'd genuinely like to hear what broke.</sub></p>
