@@ -40,22 +40,30 @@ The review keeps the question, answer, signal quality, and coaching together. Th
 
 ```mermaid
 flowchart LR
-  User[Candidate] --> App[Kelv browser app]
+  User([Candidate]) --> App[Kelv browser app]
   App <-->|live conversation events| Agent[ElevenLabs Agent]
 
   subgraph Local[Local browser boundary]
-    Camera[getUserMedia camera] --> Pose[MoveNet pose inference]
-    Mic[getUserMedia microphone] --> Audio[WebM recording + Web Audio]
-    AgentEvents[Agent transcript events] --> Ledger[Question and answer ledger]
-    Pose --> Lens[Kelv LENS]
+    direction TB
+    Camera[Camera stream] --> Pose[MoveNet pose inference]
+    Mic[Microphone stream] --> Audio[WebM plus Web Audio]
+    Events[Transcript events] --> Ledger[Question and answer ledger]
+    Pose --> Lens{{Kelv LENS}}
     Audio --> Lens
     Ledger --> Lens
     Lens --> Result[SessionResultV2]
-    Result --> Store[localStorage]
+    Result --> Store[(localStorage)]
   end
   App --> Camera
   App --> Mic
-  App --> AgentEvents
+  App --> Events
+
+  classDef input fill:#eff6ff,stroke:#2563eb,color:#172554
+  classDef compute fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+  classDef output fill:#f0fdf4,stroke:#16a34a,color:#14532d
+  class Camera,Mic,Events input
+  class Pose,Audio,Ledger,Lens compute
+  class Result,Store output
 ```
 
 **Why browser-first:** interview video and audio are personal, and a capstone did not need a database to prove the feedback loop. The tradeoff is intentional: saved sessions stay in the browser profile that created them instead of following the user across devices.
@@ -64,38 +72,58 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-  participant Camera as Webcam stream
-  participant MoveNet as MoveNet on WebGL
-  participant Sampler as Pose sampler
+  autonumber
+  participant Camera as Browser camera
+  participant Model as MoveNet on WebGL
+  participant Pose as Pose sampler
   participant LENS as Kelv LENS
 
-  Camera->>MoveNet: sampled video frame
-  MoveNet->>Sampler: 17 keypoints plus confidence
-  Sampler->>Sampler: shoulder angle, head offset, torso lean
-  Sampler->>LENS: timestamped posture sample
-  LENS->>LENS: down-weight weak or missing capture
-  LENS-->>LENS: attach posture evidence to coaching
+  Camera->>Model: sampled video frame
+  Model->>Pose: 17 keypoints and confidence values
+  Pose->>Pose: calculate shoulder angle, head offset, torso lean
+  Pose->>LENS: timestamped posture sample
+  Note over LENS: low confidence or missing points lower the sample weight
+  LENS-->>LENS: keep reliable posture evidence with the answer
 ```
 
-- The active path uses TensorFlow.js, WebGL, and MoveNet SinglePose Lightning; it does not send frames to a video-analysis service.
-- `usePoseTracking` and `poseDetector` turn landmarks into simple geometry, then carry detector confidence forward with each sample.
-- We chose pose geometry over face or emotion labels because the feedback is easier to inspect: shoulders, head position, torso stability, and how reliable the capture was.
+- **Frame to landmarks.** The camera gives MoveNet a sampled frame. MoveNet runs through TensorFlow.js and WebGL in the browser, then returns 17 body landmarks with a confidence value for each point.
+- **Landmarks to posture.** `poseDetector` does not score the image directly. It turns those points into geometry: the shoulder line angle, head offset from the torso center, and torso lean.
+- **Posture to feedback.** `usePoseTracking` sends timestamped samples to LENS. A blurry frame, occluded shoulder, or weak landmark confidence reduces the weight of that sample instead of creating a confident-sounding coaching claim.
 
 ## Voice
 
 ```mermaid
-flowchart TB
-  Recording[Local WebM recording] --> Features[Web Audio feature pass]
-  Transcript[ElevenLabs transcript events] --> Boundaries[Question and answer boundaries]
-  Features --> Window[Answer-level time window]
-  Boundaries --> Window
-  Window --> Delivery[pace, pauses, fillers, RMS, pitch, spectral features]
-  Delivery --> Coaching[question-level delivery coaching]
+flowchart LR
+  subgraph AudioLane[Audio lane]
+    direction TB
+    Recording[Local WebM recording] --> Features[Web Audio feature pass]
+    Features --> Acoustics[energy, pitch, pauses, spectrum]
+  end
+
+  subgraph TextLane[Transcript lane]
+    direction TB
+    Events[ElevenLabs transcript events] --> Boundaries[question and answer boundaries]
+    Boundaries --> Words[answer text and filler terms]
+  end
+
+  Acoustics --> Window{{Answer time window}}
+  Words --> Window
+  Window --> Delivery[question-level delivery evidence]
+  Delivery --> Coaching([specific coaching target])
+
+  classDef audio fill:#fdf2f8,stroke:#db2777,color:#831843
+  classDef text fill:#eff6ff,stroke:#2563eb,color:#172554
+  classDef merge fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+  classDef out fill:#f0fdf4,stroke:#16a34a,color:#14532d
+  class Recording,Features,Acoustics audio
+  class Events,Boundaries,Words text
+  class Window merge
+  class Delivery,Coaching out
 ```
 
-- Audio alone cannot tell us which answer a pause belongs to; the transcript alone cannot tell us how it was delivered. The answer window is where those two streams meet.
-- The feature pass includes speaking pace, silence/pause structure, filler language, RMS energy, pitch contour, and spectral measurements when a recording is available.
-- ElevenLabs provides the conversation and transcript events. The recording-backed analysis stays in the browser after the session.
+- **Audio lane.** The local WebM recording is decoded with the Web Audio API. This is where the system measures timing and acoustics: speech rate, silence, RMS energy, pitch contour, and spectral shape.
+- **Transcript lane.** ElevenLabs events tell Kelv what was said and when. That lets the system find the start and end of each answer, count filler terms, and avoid mixing one answer's delivery with the next question.
+- **Answer window.** The two lanes meet on the same time range. A long pause only becomes useful feedback once Kelv knows which answer it happened in and whether the recording quality was good enough to trust it.
 
 ## Scoring
 
